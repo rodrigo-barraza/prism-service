@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { COLLECTIONS as TAXONOMY_COLLECTIONS } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
 
 // ─── Timing Constants ───────────────────────────────────────
 
@@ -58,6 +59,7 @@ export const COLLECTIONS = {
   PERMISSION_DECISIONS: "permission_decisions",
   AGENT_INSTRUCTIONS: "agent_instructions",
   MCP_SERVERS: "mcp_servers",
+  MCP_OAUTH: "mcp_oauth",
   MEMORIES: "memories",
   MEMORY_CONSOLIDATION_RUNS: "memory_consolidation_runs",
   MEMORY_CONSOLIDATION_HISTORY: "memory_consolidation_history",
@@ -67,6 +69,9 @@ export const COLLECTIONS = {
   CUSTOM_AGENTS: "custom_agents",
   WORKSPACES: "workspaces",
   TOOL_CONTEXT: "tool_context",
+  TURN_RUNS: "turn_runs",
+  TURN_INPUTS: "turn_inputs",
+  DETACHED_WORK: "detached_work",
   SCHEDULED_TASKS: "scheduled_tasks",
   CONVERSATION_TIMERS: "conversation_timers",
   PROMPTS: "prompts",
@@ -80,6 +85,7 @@ export const COLLECTIONS = {
   PROFILES: "profiles",
   PUSH_SUBSCRIPTIONS: "push_subscriptions",
   PENDING_DECISIONS: "pending_decisions",
+  MODEL_ROUTING_DECISIONS: "model_routing_decisions",
 };
 
 /** Shared system-wide statuses for agents, tasks, and workflows. */
@@ -98,6 +104,8 @@ export const SYSTEM_STATUSES = {
   CANCELLED: "cancelled",
   ERROR: "error",
   WARNING: "warning",
+  /** Background work a restart cut off mid-run: it may have partly happened (TURN_RESUME). */
+  UNCERTAIN: "uncertain",
 } as const;
 
 export const APPROVAL_STATUS = {
@@ -131,11 +139,12 @@ export const AGENT_DIRECTIVES = {
 
 /**
  * Turn input — messages that reach a RUNNING turn (see TurnInputMailbox).
- * Event/status literals are local until promoted to the shared taxonomy.
+ * The event type is the event protocol's (src/protocol/events.ts); the
+ * status literals are local until promoted to the shared taxonomy.
  */
 export const TURN_INPUT = {
   /** SSE event: an input entry was injected into the running turn. */
-  EVENT_TYPE: "turn_input",
+  EVENT_TYPE: PROTOCOL_EVENT_TYPES.TURN_INPUT,
   /** `status` message value: acknowledgement that an entry was applied. */
   STATUS_APPLIED: "turn_input_applied",
   /** `status` message value: a non-blocking question is awaiting an answer. */
@@ -150,7 +159,7 @@ export const TURN_INPUT = {
  */
 export const APPROVALS = {
   /** SSE event: one pending call was decided (user, another tab, scope, superseded, turn end). */
-  DECIDED_EVENT_TYPE: "approval_decided",
+  DECIDED_EVENT_TYPE: PROTOCOL_EVENT_TYPES.APPROVAL_DECIDED,
   /** A denial reason longer than this is cut before it reaches the model. */
   MAXIMUM_REASON_LENGTH: 2_000,
   /** File-write previews: a diff is only computed when both sides fit. */
@@ -170,6 +179,59 @@ export const PENDING_DECISIONS = {
   /** Conversation `runState` while a turn is parked on its user. */
   RUN_STATE_AWAITING_USER: "awaiting_user",
   /** A settled record is kept this long (TTL on `expiresAt`) — a late second POST still reads 409. */
+  SETTLED_RETENTION_DAYS: 7,
+} as const;
+
+/**
+ * Durable runs — a turn a restart interrupted is re-driven from what it
+ * recorded (TurnRunStore): the pass whose tool batch was in progress, each
+ * call's progress, and what the turn still owed its user. Background work
+ * and mid-turn input outlive the process too (DetachedWorkStore,
+ * TurnInputStore), each delivered at most once after a restart.
+ */
+export const TURN_RESUME = {
+  /** A turn re-driven this many times without finishing is salvaged instead (a crash loop). */
+  MAXIMUM_ATTEMPTS: 2,
+  /**
+   * Capability tags (permissions/ToolCapabilities) that make a call a side
+   * effect: an AUTO-tier call carrying none of them is read-only and re-runs
+   * after a restart interrupted it.
+   */
+  SIDE_EFFECT_CAPABILITIES: [
+    "fs_write",
+    "shell",
+    "subagent",
+    "memory_write",
+    "external_side_effect",
+    "mcp",
+  ],
+  /**
+   * Flagged idempotent: re-run after an interruption whatever their tier or
+   * tags — whether or not their capabilities were registered yet. ask_user
+   * finds its own question again, wait_for_tasks waits again, the plan tools
+   * pick up their decision.
+   */
+  RERUNNABLE_TOOL_NAMES: [
+    "ask_user",
+    "wait_for_tasks",
+    "enter_plan_mode",
+    "exit_plan_mode",
+    "sleep",
+    "list_async_tasks",
+    "list_timers",
+    "list_artifacts",
+  ],
+  /** AUTO tier, no side-effect tags, but they act through other tools: never re-run unasked. */
+  NOT_RERUNNABLE_TOOL_NAMES: ["run_tool_program"],
+  /** The decision id of "retry this interrupted call?" is the call's id plus this. */
+  RETRY_DECISION_SUFFIX: "#retry",
+  /** `requestedBy` on the approval card that asks it. */
+  RETRY_REQUESTED_BY: "restart",
+  /** A finished call's result longer than this (JSON) is not kept: the call counts as interrupted. */
+  MAXIMUM_STORED_RESULT_CHARACTERS: 1_000_000,
+  /** SSE status: this turn was re-driven after a restart. */
+  STATUS_RESUMED: "turn_resumed",
+  /** Delivered background-work records are kept this long (TTL on `expiresAt`). */
   SETTLED_RETENTION_DAYS: 7,
 } as const;
 
@@ -359,6 +421,8 @@ export const SYSTEM_PROMPT_SECTIONS = {
   CONSTRAINTS: "constraints",
   ENVIRONMENT: "environment",
   PROJECT_STRUCTURE: "project-structure",
+  /** Skill catalog — one line per skill; bodies load through load_skill */
+  SKILLS: "skills",
 } as const;
 
 /**
@@ -765,6 +829,41 @@ export const OFFLOAD = {
 
   /** Default context lines around each regex match. */
   DEFAULT_CONTEXT_LINES: 2,
+} as const;
+
+// ─── MCP Client Constants ───────────────────────────────────
+
+export const MCP = {
+  /** Client name sent to MCP servers. */
+  CLIENT_NAME: "prism",
+
+  /**
+   * Default cap on one MCP tool result, in estimated tokens. Anything past
+   * it is offloaded (retrieve_offloaded_content reads it back). A server's
+   * `outputCapTokens` / `toolOutputCapTokens` override it.
+   */
+  OUTPUT_CAP_TOKENS: 25_000,
+
+  /**
+   * How long protocol negotiation waits for `server/discover` on stdio
+   * before treating the server as 2025-era. A legacy server that ignores
+   * unknown pre-`initialize` requests stalls a connect for this long.
+   */
+  STDIO_PROBE_TIMEOUT_MILLISECONDS: 5_000,
+
+  /**
+   * Request timeout for a call that may show an elicitation card on a
+   * 2025-era connection, where the call stays open while the person
+   * answers. (On 2026-07-28 the answer is collected between wire legs, so
+   * the default timeout applies.)
+   */
+  INTERACTIVE_CALL_TIMEOUT_MILLISECONDS: 300_000,
+
+  /** How long an OAuth `state` stays redeemable at the callback. */
+  OAUTH_STATE_TTL_MILLISECONDS: 15 * 60_000,
+
+  /** OAuth redirect path, on prism-service's public origin. */
+  OAUTH_CALLBACK_PATH: "/mcp/oauth/callback",
 } as const;
 
 // ─── Context Window Constants ───────────────────────────────

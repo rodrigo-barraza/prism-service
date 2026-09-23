@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import "./setup.ts";
 import { PROVIDERS } from "#src/constants";
 
@@ -75,9 +75,7 @@ vi.mock("#src/services/SettingsService", () => ({
 
 import OrchestratorService from "#src/services/OrchestratorService";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
-import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
 import { SubAgentTelemetryEmitter } from "#src/services/orchestrator/SubAgentTelemetryEmitter";
-import { HierarchicalRouter } from "#src/services/orchestrator/routers/HierarchicalRouter";
 import { SequentialRouter } from "#src/services/orchestrator/routers/SequentialRouter";
 import { PeerToPeerRouter } from "#src/services/orchestrator/routers/PeerToPeerRouter";
 import { InstanceLoadBalancer } from "#src/services/orchestrator/InstanceLoadBalancer";

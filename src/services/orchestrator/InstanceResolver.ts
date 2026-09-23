@@ -92,7 +92,25 @@ export function selectInstanceForMember(
   const { isLocal, siblings, instanceModelOverrides, orchestratorFallback } =
     resolvedSiblings;
 
-  let assignedProvider = providerName;
+  // Role routing may put a member on another provider than its parent's
+  // (a cloud sidekick under a local lead, a Gemini sub-agent under Claude).
+  // The siblings were resolved for the PARENT's provider: they do not
+  // apply, and the member runs where it was routed.
+  const memberProvider = member.provider;
+  if (
+    memberProvider &&
+    (getInstanceType(memberProvider) || memberProvider) !==
+      (getInstanceType(providerName) || providerName)
+  ) {
+    return {
+      assignedProvider: memberProvider,
+      assignedModel: member.model || resolvedModel,
+      assignment: null,
+      usedFallback: false,
+    };
+  }
+
+  let assignedProvider = memberProvider || providerName;
   let assignedModel = member.model || resolvedModel;
   let assignment: InstanceAssignment | null = null;
   let usedFallback = false;

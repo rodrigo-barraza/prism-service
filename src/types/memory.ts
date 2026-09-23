@@ -1,3 +1,9 @@
+import type {
+  MemorySource,
+  MemorySourceRef,
+  MemoryTrust,
+} from "#src/services/memory/MemoryProvenance";
+
 /**
  * Memory Type Definitions
  *
@@ -30,6 +36,16 @@ export interface MemoryDocument {
   sourceUsername?: string;
   confidence?: number;
   sourceMessageId?: string | null;
+  // Provenance (memory/MemoryProvenance). Legacy documents lack all of
+  // these and read as source "assistant", trust "derived", live.
+  source?: MemorySource;
+  trust?: MemoryTrust;
+  sourceRefs?: MemorySourceRef[];
+  /** Held for review: listed in the Memories panel, never injected. */
+  quarantined?: boolean;
+  reviewDecision?: "accepted" | "rejected" | "corroborated" | null;
+  reviewedAt?: string;
+  reviewedBy?: string;
   [key: string]: unknown;
 }
 
@@ -47,6 +63,10 @@ export interface MemorySearchResult {
   aboutUsername?: string;
   confidence?: number;
   createdAt: string;
+  /** Provenance, legacy fields defaulted — rendered with the memory. */
+  source: MemorySource;
+  trust: MemoryTrust;
+  reviewDecision: "accepted" | "rejected" | "corroborated" | null;
   age: string;
   ageDays: number;
   score: number;

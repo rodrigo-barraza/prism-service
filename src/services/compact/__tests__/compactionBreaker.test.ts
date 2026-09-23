@@ -23,7 +23,7 @@ vi.mock("#src/providers/index", () => ({
 }));
 
 vi.mock("#src/services/ModelRoleRouter", () => ({
-  MODEL_ROLES: { UTILITY: "utility" },
+  MODEL_ROLES: { UTILITY: "utility", COMPACTION: "compaction" },
   default: {
     resolveChain: vi.fn().mockResolvedValue([
       { provider: "test-provider", model: "test-model" },

@@ -4,9 +4,17 @@ import { app } from "./setup.ts";
 import adminRouter from "#src/routes/AdminRoutes";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { COLLECTIONS, PROVIDERS } from "#src/constants";
+import { StatsCache } from "#src/caches/StatsCache";
 
 
 app.use("/admin", adminRouter);
+
+/** Read a dotted field path ("toolExecutions.name") the way Mongo does. */
+function getPath(document: any, path: string): any {
+  return path
+    .split(".")
+    .reduce((value, segment) => (value == null ? undefined : value[segment]), document);
+}
 
 function runAggregation(documents: any[], pipeline: any[]): any[] {
   let currentDocuments = JSON.parse(JSON.stringify(documents));
@@ -16,19 +24,20 @@ function runAggregation(documents: any[], pipeline: any[]): any[] {
       const match = stage.$match;
       currentDocuments = currentDocuments.filter((doc: any) => {
         for (const [key, value] of Object.entries(match)) {
+          const fieldValue = getPath(doc, key);
           if (value && typeof value === "object" && "$exists" in value) {
             const exists = (value as any).$exists;
-            const hasField = key in doc && doc[key] !== undefined && doc[key] !== null;
+            const hasField = fieldValue !== undefined && fieldValue !== null;
             if (exists && !hasField) return false;
             if (!exists && hasField) return false;
           } else if (value && typeof value === "object" && "$ne" in value) {
             const neValue = (value as any).$ne;
-            if (Array.isArray(doc[key]) && Array.isArray(neValue) && doc[key].length === 0 && neValue.length === 0) {
+            if (Array.isArray(fieldValue) && Array.isArray(neValue) && fieldValue.length === 0 && neValue.length === 0) {
               return false;
             }
-            if (doc[key] === neValue) return false;
+            if (fieldValue === neValue) return false;
           } else {
-            if (doc[key] !== value) return false;
+            if (fieldValue !== value) return false;
           }
         }
         return true;
@@ -78,7 +87,7 @@ function runAggregation(documents: any[], pipeline: any[]): any[] {
       const idExpr = group._id.replace("$", "");
       const groups = new Map<string, any[]>();
       for (const doc of currentDocuments) {
-        const key = doc[idExpr];
+        const key = getPath(doc, idExpr);
         if (!groups.has(key)) {
           groups.set(key, []);
         }
@@ -103,7 +112,7 @@ function runAggregation(documents: any[], pipeline: any[]): any[] {
                     const fieldName = condition.$eq[0].replace("$", "");
                     const val = condition.$eq[1];
                     groupedDoc[key] = docsInGroup.reduce((totalSum, doc) => {
-                      return totalSum + (doc[fieldName] === val ? cond[1] : cond[2]);
+                      return totalSum + (getPath(doc, fieldName) === val ? cond[1] : cond[2]);
                     }, 0);
                   } else if (condition && condition.$gt) {
                     const fieldName = condition.$gt[0].replace("$", "");
@@ -155,14 +164,22 @@ function runAggregation(documents: any[], pipeline: any[]): any[] {
                   return totalSum + val;
                 }, 0);
                 groupedDoc[key] = total / docsInGroup.length;
+              } else if (typeof avgExpr === "string") {
+                // Like Mongo: non-numeric and missing values are ignored; none → null.
+                const values = docsInGroup
+                  .map((doc) => getPath(doc, avgExpr.replace("$", "")))
+                  .filter((value) => typeof value === "number");
+                groupedDoc[key] = values.length
+                  ? values.reduce((totalSum, value) => totalSum + value, 0) / values.length
+                  : null;
               }
             } else if ("$min" in op) {
               const minExpr = (op as any).$min.replace("$", "");
-              const vals = docsInGroup.map((doc) => doc[minExpr]).filter(Boolean);
+              const vals = docsInGroup.map((doc) => getPath(doc, minExpr)).filter(Boolean);
               groupedDoc[key] = vals.length ? vals.reduce((a, b) => (a < b ? a : b)) : null;
             } else if ("$max" in op) {
               const maxExpr = (op as any).$max.replace("$", "");
-              const vals = docsInGroup.map((doc) => doc[maxExpr]).filter(Boolean);
+              const vals = docsInGroup.map((doc) => getPath(doc, maxExpr)).filter(Boolean);
               groupedDoc[key] = vals.length ? vals.reduce((a, b) => (a > b ? a : b)) : null;
             } else if ("$push" in op) {
               const pushExpr = (op as any).$push.replace("$", "");
@@ -191,6 +208,8 @@ describe("GET /admin/stats/tools", () => {
   let mockDocuments: any[] = [];
 
   beforeEach(() => {
+    // Each test's rows answer the same query — don't serve the last test's.
+    StatsCache.clear();
     mockDocuments = [
       {
         requestId: "request-1",
@@ -261,6 +280,83 @@ describe("GET /admin/stats/tools", () => {
     expect(searchWebData.totalCost).toBeCloseTo(0.03);
     expect(searchWebData.totalInputTokens).toBe(1500);
     expect(searchWebData.totalOutputTokens).toBe(500);
+  });
+
+  it("reports tool latency from the tools' measured durations (ms), not the calling LLM request's time", async () => {
+    mockDocuments = [
+      {
+        requestId: "iteration-1",
+        toolApiNames: ["get_weather", "search_web"],
+        totalTime: 120, // seconds — the model call that asked for the tools
+        success: true,
+        model: "gpt-4o",
+        provider: PROVIDERS.OPENAI,
+        createdAt: "2026-09-22T10:00:00Z",
+        toolExecutions: [
+          { id: "call-a", name: "get_weather", durationMilliseconds: 200, success: true },
+          { id: "call-b", name: "search_web", durationMilliseconds: 900, success: false, errorType: "TOOL_TIMEOUT" },
+        ],
+      },
+      {
+        requestId: "iteration-2",
+        toolApiNames: ["get_weather"],
+        totalTime: 240,
+        success: true,
+        model: "gpt-4o",
+        provider: PROVIDERS.OPENAI,
+        createdAt: "2026-09-22T10:01:00Z",
+        toolExecutions: [
+          { id: "call-c", name: "get_weather", durationMilliseconds: 400, success: true },
+        ],
+      },
+      {
+        // Logged before tool durations were recorded: counted, never timed.
+        requestId: "iteration-old",
+        toolApiNames: ["get_weather"],
+        totalTime: 360,
+        success: true,
+        model: "gpt-4o",
+        provider: PROVIDERS.OPENAI,
+        createdAt: "2026-05-30T10:00:00Z",
+      },
+    ];
+
+    const apiResponse = await request(app)
+      .get("/admin/stats/tools")
+      .set("x-gateway-secret", "test-secret")
+      .expect(200);
+
+    const getWeather = apiResponse.body.find((item: any) => item.tool === "get_weather");
+    const searchWeb = apiResponse.body.find((item: any) => item.tool === "search_web");
+
+    expect(getWeather).toMatchObject({
+      totalCalls: 3,
+      timedCalls: 2,
+      avgLatency: 300,
+      minLatency: 200,
+      maxLatency: 400,
+      errorRate: 0,
+    });
+    expect(searchWeb).toMatchObject({
+      totalCalls: 1,
+      timedCalls: 1,
+      avgLatency: 900,
+      minLatency: 900,
+      maxLatency: 900,
+      errorRate: 100,
+    });
+  });
+
+  it("reports no latency for a tool whose executions were never timed", async () => {
+    const apiResponse = await request(app)
+      .get("/admin/stats/tools")
+      .set("x-gateway-secret", "test-secret")
+      .expect(200);
+
+    const getWeather = apiResponse.body.find((item: any) => item.tool === "get_weather");
+    expect(getWeather.timedCalls).toBe(0);
+    expect(getWeather.avgLatency).toBeNull();
+    expect(getWeather.errorRate).toBeNull();
   });
 
   describe("GET /admin/stats with advanced filters", () => {

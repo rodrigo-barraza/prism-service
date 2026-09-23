@@ -28,6 +28,7 @@ import {
   getDefaultModels,
   getPricing,
   getModelByName,
+  resolveModelAlias,
   getAgentDefaults,
 } from "#src/config";
 import {
@@ -73,6 +74,7 @@ import type {
   ConversationMessage,
   EmitFunction,
   ToolSchema,
+  TurnResumeState,
 } from "#src/services/harnesses/types";
 import type { ChatMessage } from "#src/types/ProviderTypes";
 import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
@@ -85,7 +87,13 @@ import {
   MESSAGE_ROLES,
 } from "#src/constants";
 import { getRequestContext } from "#src/utils/RequestContext";
+import {
+  routeAgentTurn,
+  saveConversationModelRouting,
+} from "#src/services/routing/ConversationModelRouting";
 import { DEFAULT_PROFILE_ID, normalizeProfileId } from "#src/utils/ProfileScope";
+import { toErrorEvent } from "#src/protocol/errors";
+import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
 
 interface ToolSchemaWithDomain extends ToolSchema {
   domain?: string;
@@ -221,7 +229,7 @@ async function prepareGenerationContext(
 
   const {
     provider: _providerName,
-    model: requestedModel,
+    model: rawRequestedModel,
     messages,
     conversationId: incomingConversationId,
     agentConversationId: incomingAgentConversationId,
@@ -234,6 +242,7 @@ async function prepareGenerationContext(
     harness,
     topology,
     thoughtStructure,
+    routingPreset,
     activeRuleNames,
     // Generation options — flat at top-level (OpenAI-style)
     tools,
@@ -271,6 +280,8 @@ async function prepareGenerationContext(
     textOnly,
     skipConversation,
     autoApprove,
+    permissionMode,
+    unattended,
     planFirst,
     maxIterations,
     maxSubAgentIterations,
@@ -298,6 +309,15 @@ async function prepareGenerationContext(
   } = validatedParams;
 
   let providerName = _providerName;
+  // A model ID the catalog lists under another name (tools-service's image
+  // generation still sends gemini-3-pro-image-preview) becomes the catalog
+  // name here, before anything reads it — so the provider call, the model
+  // definition (streaming, output modalities), logging and pricing all see
+  // the model the catalog describes (config MODEL_ID_ALIASES).
+  const requestedModel =
+    typeof rawRequestedModel === "string"
+      ? resolveModelAlias(rawRequestedModel)
+      : rawRequestedModel;
   // Build the internal options object that providers expect
   const options: Record<string, unknown> = {
     ...(tools && { tools }),
@@ -334,6 +354,8 @@ async function prepareGenerationContext(
     ...(serviceTier != null && { serviceTier }),
     ...(textOnly != null && { textOnly }),
     ...(autoApprove != null && { autoApprove }),
+    ...(permissionMode != null && { permissionMode }),
+    ...(unattended != null && { unattended }),
     ...(planFirst != null && { planFirst }),
     ...(maxIterations != null && { maxIterations }),
     ...(maxSubAgentIterations != null && { maxSubAgentIterations }),
@@ -347,6 +369,7 @@ async function prepareGenerationContext(
     ...(harness != null && { harness }),
     ...(topology != null && { topology }),
     ...(thoughtStructure != null && { thoughtStructure }),
+    ...(typeof routingPreset === "string" && routingPreset && { routingPreset }),
     ...(Array.isArray(activeRuleNames) &&
       activeRuleNames.length > 0 && { activeRuleNames }),
     ...(parallelToolCalls != null && { parallelToolCalls }),
@@ -637,10 +660,7 @@ export async function handleConversation(
   try {
     context = await prepareGenerationContext(params, emit, { signal });
   } catch (error: unknown) {
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: params.provider as string | undefined }));
     return;
   }
   const {
@@ -676,10 +696,14 @@ export async function handleConversation(
     // systemPrompt) — title policy is server-owned.
     conversationMeta = { title: titleSnippet, ...(conversationMeta || {}) };
   }
-  const traceId = incomingTraceId || null;
-  if (traceId && conversationMeta) {
+  // Minted when the caller sent none, so the turn's request rows still group.
+  // The conversation takes a caller's id, or a minted one only when it is new
+  // too: conversationMeta also marks a turn's first call (the user message is
+  // appended on it), so it is never created just to carry a minted id.
+  const traceId = incomingTraceId || crypto.randomUUID();
+  if (conversationMeta && (incomingTraceId || !incomingConversationId)) {
     (conversationMeta as Record<string, unknown>).traceId = traceId;
-  } else if (traceId) {
+  } else if (incomingTraceId) {
     conversationMeta = { traceId };
   }
   // The request layer binds the direct-viewer broadcast to the REQUEST's
@@ -834,10 +858,7 @@ export async function handleConversation(
       messages: context.rawMessages || [],
       options,
     });
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: providerName }));
   }
 }
 // ─── Agent conversation path (agentConversationId, no conversationId) ─
@@ -847,19 +868,31 @@ export async function handleConversation(
  *
  * Used exclusively by the /agent route.
  */
+/**
+ * The params a turn was started with, as TurnRunStore keeps them: without
+ * the messages (the conversation and its checkpoint hold those) and
+ * without a resume payload of its own.
+ */
+function requestParamsOf(params: Record<string, unknown>): Record<string, unknown> {
+  const { messages: _messages, _resume: _resumePayload, ...request } = params;
+  return request;
+}
+
 export async function handleAgent(
   params: Record<string, unknown>,
   emit: (event: SseEvent) => void,
   { signal }: { signal?: AbortSignal } = {},
 ) {
+  // Role routing: the conversation's main model (and its routing preset)
+  // is decided at its start and kept for its life — BEFORE anything is
+  // assembled for it, because the model decides the system prompt, the
+  // tools and the cache (routing/ConversationModelRouting).
+  const { params: routedParams, routed } = await routeAgentTurn(params);
   let context: Awaited<ReturnType<typeof prepareGenerationContext>> | null;
   try {
-    context = await prepareGenerationContext(params, emit, { signal });
+    context = await prepareGenerationContext(routedParams, emit, { signal });
   } catch (error: unknown) {
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: params.provider as string | undefined }));
     return;
   }
   const {
@@ -891,15 +924,16 @@ export async function handleAgent(
       : null;
   const conversationId = incomingConversationId || serverConversationId || crypto.randomUUID();
   // The request layer binds the direct-viewer broadcast to the REQUEST's
-  // conversationId — undefined when the id is minted server-side (every
-  // lupos turn, any new conversation). Rebind here with the resolved id or
-  // viewers (/admin/chat, second tabs) receive nothing; when the request
-  // DID carry an id the request layer already broadcasts, and wrapping
-  // again would double-deliver.
-  if (!incomingConversationId) {
+  // conversationId, or to the `serverConversationId` /agent minted for a
+  // new conversation. Only a caller that brought neither (a workflow node
+  // calling handleAgent directly) arrives unwrapped: rebind here with the
+  // resolved id or viewers (/admin/chat, second tabs) receive nothing.
+  // Wrapping an already-wrapped emit would double-deliver every event.
+  if (!incomingConversationId && !serverConversationId) {
     emit = withDirectViewerBroadcast(conversationId, emit);
   }
-  const traceId = incomingTraceId || null;
+  // Minted when the caller sent none, so the turn's request rows still group.
+  const traceId = incomingTraceId || crypto.randomUUID();
   let conversationMeta = incomingConversationMeta || null;
   // Title policy is server-owned: when the client didn't send one (new
   // conversations), derive it from the user message — same snippet rule
@@ -990,11 +1024,23 @@ export async function handleAgent(
         requestStart,
         emit,
         signal,
+        // What a restart needs to start this turn again (TurnRunRecorder),
+        // and — when this IS that restart — where it picks up.
+        request: requestParamsOf(params),
+        resume: (params._resume as TurnResumeState | undefined) ?? null,
       });
     } finally {
       if (localRelease) {
         localRelease();
         logger.info(`[agent] 🔓 Released local GPU lock for ${resolvedModel}`);
+      }
+      if (routed?.decided) {
+        await saveConversationModelRouting({
+          conversationId,
+          project: String(project),
+          username: String(username),
+          record: routed.record,
+        });
       }
       // When the SSE connection is severed (user pressed stop), abort any
       // spawned sub-agents that are still running under this orchestrator session.
@@ -1042,10 +1088,7 @@ export async function handleAgent(
       messages: context.rawMessages || [],
       options,
     });
-    emit({
-      type: SERVER_SENT_EVENT_TYPES.ERROR,
-      message: getErrorMessage(error),
-    });
+    emit(toErrorEvent(error, { provider: providerName }));
   }
 }
 // ─── Dispatch: Image API models (e.g. GPT Image 1.5, OpenAI images) ─
@@ -1231,9 +1274,11 @@ async function handleImageAPIModel(
   }
   emit({
     type: SERVER_SENT_EVENT_TYPES.DONE,
+    provider: providerName,
+    model: resolvedModel,
     usage: null,
     estimatedCost,
-    totalTime: totalSec,
+    totalTime: roundMilliseconds(totalSec),
     ...(traceId && { traceId }),
     ...(conversationId && { conversationId }),
   });
@@ -1362,6 +1407,7 @@ async function handleStreamingText(context: GenerationContext) {
             project,
             username,
             agent: agent || null,
+            agentContext: options.agentContext,
             requestId,
             conversationId: conversationId || null,
             traceId: traceId || null,
@@ -1650,6 +1696,15 @@ async function handleNonStreamingText(context: GenerationContext) {
   // Emit chunk/thinking/toolCall events before finalization
   if (genResult.text) {
     emit({ type: SERVER_SENT_EVENT_TYPES.CHUNK, content: genResult.text });
+  }
+  // The same typed refusal the streaming path's dispatcher emits, so a
+  // ?stream=false caller (tools-service's generate_image) learns why.
+  if (genResult.refusal) {
+    emit({
+      type: PROTOCOL_EVENT_TYPES.REFUSAL,
+      category: genResult.refusal.category,
+      explanation: genResult.refusal.explanation,
+    });
   }
   if (genResult.thinking) {
     emit({

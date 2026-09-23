@@ -18,6 +18,12 @@ import {
   type ExtractionSpan,
   type TranscriptEntry,
 } from "./memory/ExtractionWatermark.ts";
+import {
+  combineProvenance,
+  quotesUncitedText,
+  untrustedInputProvenance,
+  type MemoryProvenance,
+} from "./memory/MemoryProvenance.ts";
 import { DEFAULT_PROFILE_ID } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
 import logger from "#src/utils/logger";
@@ -48,25 +54,97 @@ import type { MessagePayload } from "./RequestLogger.ts";
 
 const MIN_MESSAGES_FOR_EXTRACTION = MEMORY.MIN_MESSAGES_FOR_EXTRACTION;
 
-function renderEntries(entries: TranscriptEntry[]): string {
-  return entries.map((entry) => `${entry.role}: ${entry.text}`).join("\n");
+/**
+ * Agents whose platform extracts their memories itself, so the in-loop
+ * extractor skips their turns. lupos-bot posts each Discord exchange to
+ * POST /memory/extract (MemoryService.extractAndStore), which stores
+ * guild-scoped facts keyed to the members' Discord ids — the only rows a
+ * guild turn recalls. This extractor's rows for LUPOS were conversation-
+ * scoped or global, never recalled by a guild turn, and cost ≈$6.9/month
+ * of extraction calls (2026-08-23 → 09-22).
+ */
+const PLATFORM_EXTRACTED_AGENTS = new Set<string>([AGENT_IDS.LUPOS]);
+
+/**
+ * An untrusted entry says so where the extraction model reads it: text the
+ * agent wrote after reading a web page, an MCP result or a sub-agent report
+ * repeats that content, and an instruction in it is data, not a memory.
+ */
+function entryLabel(entry: TranscriptEntry): string {
+  if (entry.provenance.trust !== "untrusted") return entry.role;
+  return `${entry.role} [untrusted: ${entry.provenance.source}]`;
 }
 
-/** The user turn of an extraction call: the new span, after its context if any. */
+/** Entries numbered from `firstNumber` — the numbers a memory's `sources` cite. */
+function renderEntries(entries: TranscriptEntry[], firstNumber: number): string {
+  return entries
+    .map((entry, index) => `[${firstNumber + index}] ${entryLabel(entry)}: ${entry.text}`)
+    .join("\n");
+}
+
+/**
+ * The user turn of an extraction call: the new span, after its context if
+ * any. Entries are numbered from 1 across both, context first.
+ */
 export function buildExtractionRequest({
   context,
   span,
 }: ExtractionSpan): string {
   if (context.length === 0) {
-    return `Extract memories from this coding session:\n\n${renderEntries(span)}`;
+    return `Extract memories from this coding session:\n\n${renderEntries(span, 1)}`;
   }
   return (
     "Extract memories from the NEW messages of this coding session. The earlier " +
     "messages were already processed: use them only to understand the new ones, " +
     "and do not extract anything that appears only there.\n\n" +
-    `<earlier_messages>\n${renderEntries(context)}\n</earlier_messages>\n\n` +
-    `<new_messages>\n${renderEntries(span)}\n</new_messages>`
+    `<earlier_messages>\n${renderEntries(context, 1)}\n</earlier_messages>\n\n` +
+    `<new_messages>\n${renderEntries(span, context.length + 1)}\n</new_messages>`
   );
+}
+
+/** The entries a memory's `sources` name, by their number in the request. */
+function citedEntries(
+  sources: unknown,
+  numbered: TranscriptEntry[],
+): TranscriptEntry[] {
+  if (!Array.isArray(sources)) return [];
+  const cited = new Set<TranscriptEntry>();
+  for (const source of sources) {
+    const number =
+      typeof source === "number"
+        ? source
+        : Number.parseInt(String(source).replace(/[^0-9]/g, ""), 10);
+    if (Number.isInteger(number) && number >= 1 && number <= numbered.length) {
+      cited.add(numbered[number - 1]);
+    }
+  }
+  return [...cited];
+}
+
+/**
+ * The provenance of one extracted memory: the lowest trust among the
+ * entries its `sources` cite. With no usable citation it may have come from
+ * anywhere in the new span, so it takes the span's lowest trust. Then a
+ * backstop that does not depend on the model's honesty: a memory quoting
+ * an untrusted entry it did not cite takes that entry's provenance too.
+ */
+export function attributeExtractedMemory(
+  memory: { title?: unknown; content?: unknown; sources?: unknown },
+  selection: ExtractionSpan,
+): MemoryProvenance {
+  const numbered = [...selection.context, ...selection.span];
+  const cited = citedEntries(memory.sources, numbered);
+  const drawnOn = cited.length > 0 ? cited : selection.span;
+  const parts = drawnOn.map((entry) => entry.provenance);
+  const memoryText = `${String(memory.title ?? "")}\n${String(memory.content ?? "")}`;
+  const citedTexts = drawnOn.map((entry) => entry.text);
+  for (const entry of numbered) {
+    if (entry.provenance.trust !== "untrusted" || drawnOn.includes(entry)) continue;
+    if (quotesUncitedText(memoryText, entry.text, citedTexts)) {
+      parts.push(entry.provenance);
+    }
+  }
+  return combineProvenance(parts);
 }
 
 /**
@@ -91,12 +169,18 @@ interface ExtractedMemory {
   type: string;
   title: string;
   content: string;
+  /** Numbers of the transcript entries it draws on (buildExtractionRequest). */
+  sources?: unknown;
 }
 
 interface StoredMemory {
   type: string;
   id: string;
   title: string;
+  /** Held for review — never injected until accepted or corroborated. */
+  quarantined?: boolean;
+  /** An earlier quarantined memory this user-sourced one confirmed. */
+  corroborated?: boolean;
 }
 
 interface MemoryExtractionContext {
@@ -136,6 +220,10 @@ interface AfterResponseOutput {
  * - 4-type taxonomy: user, feedback, project, reference
  * - All memories stored in the unified `memories` collection via MemoryService
  * - Mutual exclusion: skips extraction when the main agent used save_memory
+ *   (unless the loop read untrusted input — that save is quarantined, and a
+ *   fact the user stated can only corroborate it if extraction runs)
+ * - Provenance: each memory takes the lowest trust of the messages it drew
+ *   on; untrusted ones are quarantined (memory/MemoryProvenance)
  * - Reads only what the last extraction did not (memory/ExtractionWatermark)
  * - Configurable extraction model: the `memory` role (MODEL_ROLE_MEMORY, then
  *   Settings → Memory Models, then the utility chain)
@@ -181,7 +269,9 @@ export default class MemoryExtractor {
     // Built after an await on purpose: finalize() pushes the turn's final
     // assistant reply into this same array right after firing afterResponse,
     // and an extraction must see it — as the pre-diet code did.
-    const transcript = buildExtractionTranscript(messages);
+    const transcript = buildExtractionTranscript(messages, {
+      conversationId: conversationId || null,
+    });
     const advanceWatermark = async () => {
       const next = watermarkThroughEnd(transcript);
       if (watermarkScope && next) {
@@ -195,14 +285,27 @@ export default class MemoryExtractor {
     // This prevents duplicate or conflicting memories from the extraction
     // pipeline when the agent has already decided what to remember. The
     // watermark moves past the span: the agent has already decided about it.
+    //
+    // Not when the loop read untrusted input: that save_memory was stored
+    // quarantined (AgentMemoriesRoutes), and the one way a quarantined
+    // memory goes live without a click is a user-sourced extraction of the
+    // same fact (MemoryService.store corroboration).
     if (
       toolCalls?.some((toolCall) => toolCall.name === TOOL_NAMES.SAVE_MEMORY)
     ) {
+      const taint = untrustedInputProvenance(messages, {
+        conversationId: conversationId || null,
+      });
+      if (!taint) {
+        logger.info(
+          `[MemoryExtractor] Skipping — main agent used save_memory this turn (mutual exclusion)`,
+        );
+        await advanceWatermark();
+        return [];
+      }
       logger.info(
-        `[MemoryExtractor] Skipping — main agent used save_memory this turn (mutual exclusion)`,
+        `[MemoryExtractor] save_memory ran after untrusted input (${taint.source}) — extracting anyway so the user's own words can corroborate it`,
       );
-      await advanceWatermark();
-      return [];
     }
 
     // ── The span: only what no extraction has read yet ────────────
@@ -404,6 +507,7 @@ export default class MemoryExtractor {
           ? memoryObject.type
           : "project";
 
+        const provenance = attributeExtractedMemory(memoryObject, selection);
         try {
           const storeResult = await MemoryService.store({
             agent: agentId,
@@ -416,6 +520,7 @@ export default class MemoryExtractor {
             traceId: traceId || undefined,
             agentConversationId: agentConversationId || undefined,
             endpoint: endpoint || "/agent",
+            provenance,
           });
 
           if (storeResult) {
@@ -423,9 +528,16 @@ export default class MemoryExtractor {
               type,
               id: storeResult.id,
               title: memoryObject.title,
+              quarantined: storeResult.quarantined === true,
+              corroborated: storeResult.corroborated === true,
             });
+            const outcome = storeResult.corroborated
+              ? "Corroborated a quarantined memory with"
+              : storeResult.quarantined
+                ? "Quarantined"
+                : "Stored";
             logger.info(
-              `[MemoryExtractor] Stored [${type}] "${memoryObject.title.substring(0, LOG_PREVIEW.SHORT)}"`,
+              `[MemoryExtractor] ${outcome} [${type}] "${memoryObject.title.substring(0, LOG_PREVIEW.SHORT)}" (source: ${provenance.source}, trust: ${provenance.trust})`,
             );
           } else {
             logger.info(
@@ -493,6 +605,7 @@ export default class MemoryExtractor {
       context: AgenticContext,
       { _text, messages, toolCalls }: AfterResponseOutput,
     ) => {
+      if (context.agent && PLATFORM_EXTRACTED_AGENTS.has(context.agent)) return;
       // Fire-and-forget — don't block the response
       MemoryExtractor.extractAndStore({
         project: context.project,

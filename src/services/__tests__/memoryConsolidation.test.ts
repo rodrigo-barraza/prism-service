@@ -12,6 +12,7 @@ vi.mock("#src/services/MemoryService", () => ({
     reopen: vi.fn().mockResolvedValue(true),
   },
   CURRENT_MEMORY_FILTER: { validTo: null },
+  NOT_QUARANTINED_FILTER: { quarantined: { $ne: true } },
 }));
 
 vi.mock("#src/services/SettingsService", () => ({
@@ -160,6 +161,86 @@ describe("MemoryConsolidationService", () => {
         content: "Avoid database mocking in integration tests to prevent masked migrations.",
         dedupe: false
       }));
+    });
+
+    it("preserves provenance on a merge and never raises trust", async () => {
+      mockCollection.toArray.mockResolvedValueOnce([
+        {
+          id: "mem-user",
+          type: "user",
+          title: "Tabs",
+          content: "The user prefers tabs.",
+          embedding: [0.1, 0.2, 0.3],
+          createdAt: new Date().toISOString(),
+          source: "user",
+          trust: "user",
+          sourceRefs: [{ source: "user", trust: "user", messageId: "msg-1" }],
+        },
+        {
+          // Accepted from a web page: live, still untrusted.
+          id: "mem-web",
+          type: "user",
+          title: "Tabs width",
+          content: "Tabs are four columns wide.",
+          embedding: [0.1, 0.2, 0.3],
+          createdAt: new Date().toISOString(),
+          source: "web",
+          trust: "untrusted",
+          reviewDecision: "accepted",
+        },
+      ]);
+      mockGenerateText.mockResolvedValueOnce({
+        text: JSON.stringify({
+          actions: [
+            {
+              type: "merge",
+              sourceIds: ["mem-user", "mem-web"],
+              reason: "same preference",
+              merged: { type: "user", title: "Tabs", content: "The user prefers four-column tabs." },
+            },
+          ],
+        }),
+        usage: { inputTokens: 100, outputTokens: 50 },
+      });
+
+      await MemoryConsolidationService.consolidate({
+        agent: "CODING",
+        project: "test-proj",
+        username: "rodrigo",
+      });
+
+      // Quarantined memories are never loaded for a merge.
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        expect.objectContaining({ quarantined: { $ne: true } }),
+      );
+      const stored = vi.mocked(MemoryService.store).mock.calls[0][0];
+      expect(stored.quarantined).toBe(false);
+      expect(stored.provenance).toMatchObject({ source: "web", trust: "untrusted" });
+      expect(stored.provenance!.sourceRefs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ memoryId: "mem-user", trust: "user" }),
+          expect.objectContaining({ memoryId: "mem-web", trust: "untrusted" }),
+          expect.objectContaining({ messageId: "msg-1" }),
+        ]),
+      );
+    });
+
+    it("gives a merge of legacy memories the legacy provenance, not more", async () => {
+      mockCollection.toArray.mockResolvedValueOnce([
+        { id: "old-1", type: "project", title: "A", content: "a", embedding: [0.1, 0.2, 0.3], createdAt: new Date().toISOString() },
+        { id: "old-2", type: "project", title: "B", content: "b", embedding: [0.1, 0.2, 0.3], createdAt: new Date().toISOString() },
+      ]);
+      mockGenerateText.mockResolvedValueOnce({
+        text: JSON.stringify({
+          actions: [{ type: "merge", sourceIds: ["old-1", "old-2"], merged: { type: "project", title: "AB", content: "a and b" } }],
+        }),
+        usage: { inputTokens: 1, outputTokens: 1 },
+      });
+
+      await MemoryConsolidationService.consolidate({ agent: "CODING", project: "test-proj", username: "rodrigo" });
+
+      const stored = vi.mocked(MemoryService.store).mock.calls[0][0];
+      expect(stored.provenance).toMatchObject({ source: "assistant", trust: "derived" });
     });
 
     it("should delete memories when the LLM recommends delete actions", async () => {

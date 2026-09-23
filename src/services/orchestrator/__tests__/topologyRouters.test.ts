@@ -90,7 +90,6 @@ describe("Topology Routers Test Suite", () => {
         toolUses: 2,
         durationMilliseconds: 120,
         iterations: 1,
-        messages: [],
         diff: {
           additions: 1,
           deletions: 0,
@@ -185,7 +184,6 @@ describe("Topology Routers Test Suite", () => {
         toolUses: 1,
         durationMilliseconds: 10,
         iterations: 1,
-        messages: [],
         diff: { additions: 1, deletions: 0, files: ["test.txt"] },
         mergeBack: {
           status: "conflict",
@@ -225,7 +223,6 @@ describe("Topology Routers Test Suite", () => {
           toolUses: 0,
           durationMilliseconds: 50,
           iterations: 1,
-          messages: [],
         };
       });
 
@@ -249,7 +246,6 @@ describe("Topology Routers Test Suite", () => {
         toolUses: 1,
         durationMilliseconds: 80,
         iterations: 1,
-        messages: [],
         diff: {
           additions: 1,
           deletions: 0,
@@ -276,7 +272,6 @@ describe("Topology Routers Test Suite", () => {
           toolUses: 2,
           durationMilliseconds: 120,
           iterations: 1,
-          messages: [],
           diff: { additions: 1, deletions: 0, files: ["app.ts"] },
         })
         .mockResolvedValueOnce({
@@ -288,7 +283,6 @@ describe("Topology Routers Test Suite", () => {
           toolUses: 2,
           durationMilliseconds: 100,
           iterations: 1,
-          messages: [],
           diff: { additions: 1, deletions: 0, files: ["test.ts"] },
         });
 
@@ -331,7 +325,6 @@ describe("Topology Routers Test Suite", () => {
           toolUses: 2,
           durationMilliseconds: 120,
           iterations: 1,
-          messages: [],
         })
         .mockResolvedValueOnce({
           agent_id: "agent-qa-001",
@@ -342,7 +335,6 @@ describe("Topology Routers Test Suite", () => {
           toolUses: 2,
           durationMilliseconds: 100,
           iterations: 1,
-          messages: [],
         });
 
       await router.execute(
@@ -402,7 +394,6 @@ describe("Topology Routers Test Suite", () => {
           toolUses: 0,
           iterations: 1,
           durationMilliseconds: 10,
-          messages: [],
         })
         .mockResolvedValueOnce({
           agent_id: "agent-qa",
@@ -413,7 +404,6 @@ describe("Topology Routers Test Suite", () => {
           toolUses: 0,
           iterations: 1,
           durationMilliseconds: 10,
-          messages: [],
         });
 
       const results = await router.execute(
@@ -443,7 +433,6 @@ describe("Topology Routers Test Suite", () => {
         toolUses: 1,
         durationMilliseconds: 10,
         iterations: 1,
-        messages: [],
         diff: { additions: 1, deletions: 0, files: ["test.txt"] },
         mergeBack: {
           status: "deferred",
@@ -543,7 +532,6 @@ describe("Topology Routers Test Suite", () => {
         toolUses: 0,
         durationMilliseconds: 10,
         iterations: 1,
-        messages: [],
       }));
 
       await router.execute(
@@ -574,7 +562,6 @@ describe("Topology Routers Test Suite", () => {
           toolNames: { web_search: 5, read_file: 3 },
           iterations: 15,
           durationMilliseconds: 30000,
-          messages: [],
         })
         .mockImplementationOnce(async (assignment: OrchestratorSpawnParams) => {
           expect(assignment.prompt).toContain("web_search (5×)");
@@ -591,7 +578,6 @@ describe("Topology Routers Test Suite", () => {
             toolUses: 0,
             iterations: 1,
             durationMilliseconds: 1000,
-            messages: [],
           };
         });
 
@@ -641,7 +627,6 @@ describe("Topology Routers Test Suite", () => {
         toolNames: { write_file: 4, execute_command: 2 },
         iterations: 10,
         durationMilliseconds: 20000,
-        messages: [],
       });
 
       // Second step gets the accumulated context — verify it got the structured fallback
@@ -660,7 +645,6 @@ describe("Topology Routers Test Suite", () => {
           toolUses: 0,
           iterations: 1,
           durationMilliseconds: 1000,
-          messages: [],
         };
       });
 
@@ -728,7 +712,6 @@ describe("Topology Routers Test Suite", () => {
           toolUses: 1,
           durationMilliseconds: 50,
           iterations: 1,
-          messages: [],
         })
         .mockResolvedValueOnce({
           error: "Task B failed",
@@ -774,7 +757,6 @@ describe("Topology Routers Test Suite", () => {
           toolNames: { write_file: 5 },
           iterations: 3,
           durationMilliseconds: 100,
-          messages: [],
         })
         .mockResolvedValueOnce({
           agent_id: "agent-b",
@@ -785,7 +767,6 @@ describe("Topology Routers Test Suite", () => {
           toolUses: 1,
           durationMilliseconds: 50,
           iterations: 1,
-          messages: [],
         });
 
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
@@ -863,15 +844,15 @@ describe("Topology Routers Test Suite", () => {
       spawnSubAgentMock
         .mockResolvedValueOnce({
           agent_id: "agent-dev", description: "Write Code", status: "completed",
-          result: "Dev output", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "Dev output", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         })
         .mockResolvedValueOnce({
           agent_id: "agent-qa", description: "Verify Code", status: "completed",
-          result: "QA output", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "QA output", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         })
         .mockResolvedValueOnce({
           agent_id: "agent-pm", description: "Review", status: "completed",
-          result: "PM output [DONE]", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "PM output [DONE]", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         });
 
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock);
@@ -917,7 +898,6 @@ describe("Topology Routers Test Suite", () => {
         toolUses: 1,
         durationMilliseconds: 80,
         iterations: 1,
-        messages: [],
       }));
     });
 
@@ -931,11 +911,11 @@ describe("Topology Routers Test Suite", () => {
       spawnSubAgentMock
         .mockResolvedValueOnce({
           agent_id: "agent-dev", description: "Write Code", status: "completed",
-          result: "Dev output", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "Dev output", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         })
         .mockResolvedValueOnce({
           agent_id: "agent-qa", description: "Verify Code", status: "completed",
-          result: "QA output [DONE]", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "QA output [DONE]", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         });
 
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
@@ -954,11 +934,11 @@ describe("Topology Routers Test Suite", () => {
       spawnSubAgentMock
         .mockResolvedValueOnce({
           agent_id: "agent-dev", description: "Write Code", status: "completed",
-          result: "Dev round 1", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "Dev round 1", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         })
         .mockResolvedValueOnce({
           agent_id: "agent-qa", description: "Verify Code", status: "completed",
-          result: "QA round 1", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "QA round 1", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         });
 
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
@@ -980,15 +960,15 @@ describe("Topology Routers Test Suite", () => {
       spawnSubAgentMock
         .mockResolvedValueOnce({
           agent_id: "agent-a", description: "Task A", status: "completed",
-          result: "A round 1", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "A round 1", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         })
         .mockResolvedValueOnce({
           agent_id: "agent-b", description: "Task B", status: "completed",
-          result: "B round 1", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "B round 1", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         })
         .mockResolvedValueOnce({
           agent_id: "agent-c", description: "Task C", status: "completed",
-          result: "C round 1", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "C round 1", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         });
 
       // continueSubAgent will be called for round 2 (turns 4, 5, 6)
@@ -1000,7 +980,6 @@ describe("Topology Routers Test Suite", () => {
         toolUses: 1,
         durationMilliseconds: 80,
         iterations: 1,
-        messages: [],
       }));
 
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
@@ -1030,11 +1009,11 @@ describe("Topology Routers Test Suite", () => {
       spawnSubAgentMock
         .mockResolvedValueOnce({
           agent_id: "agent-dev", description: "Write Code", status: "completed",
-          result: "Dev output", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "Dev output", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         })
         .mockResolvedValueOnce({
           agent_id: "agent-qa", description: "Verify Code", status: "completed",
-          result: "QA output [DONE]", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "QA output [DONE]", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         });
 
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
@@ -1063,11 +1042,11 @@ describe("Topology Routers Test Suite", () => {
       spawnSubAgentMock
         .mockResolvedValueOnce({
           agent_id: "agent-first", description: "First", status: "completed",
-          result: "First output", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "First output", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         })
         .mockResolvedValueOnce({
           agent_id: "agent-second", description: "Second", status: "completed",
-          result: "Second output [DONE]", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1, messages: [],
+          result: "Second output [DONE]", summary: "Done", toolUses: 1, durationMilliseconds: 50, iterations: 1,
         });
 
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
@@ -1091,11 +1070,11 @@ describe("Topology Routers Test Suite", () => {
       spawnSubAgentMock
         .mockResolvedValueOnce({
           agent_id: "agent-dev", description: "Write Code", status: "completed",
-          result: "Dev built feature X", summary: "Done", toolUses: 2, durationMilliseconds: 100, iterations: 1, messages: [],
+          result: "Dev built feature X", summary: "Done", toolUses: 2, durationMilliseconds: 100, iterations: 1,
         })
         .mockResolvedValueOnce({
           agent_id: "agent-qa", description: "Verify Code", status: "completed",
-          result: "QA found 2 issues", summary: "Done", toolUses: 1, durationMilliseconds: 80, iterations: 1, messages: [],
+          result: "QA found 2 issues", summary: "Done", toolUses: 1, durationMilliseconds: 80, iterations: 1,
         });
 
       await router.execute("test-team", members, orchestratorContext, spawnSubAgentMock, continueSubAgentMock);
@@ -1165,7 +1144,6 @@ describe("Topology Routers Test Suite", () => {
           toolUses: 1,
           durationMilliseconds: 50,
           iterations: 1,
-          messages: [],
         })
         .mockResolvedValueOnce({ error: "Failed B" });
 

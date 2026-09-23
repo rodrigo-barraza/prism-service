@@ -319,9 +319,13 @@ const ConversationService: ConversationServiceInterface = {
     project: string,
     username: string,
     messages: Array<ChatMessage | MessagePayload>,
-    { collection = DEFAULT_COLLECTION }: { collection?: string } = {},
+    {
+      collection = DEFAULT_COLLECTION,
+      iteration,
+      allowEmpty = false,
+    }: { collection?: string; iteration?: number; allowEmpty?: boolean } = {},
   ): Promise<void> {
-    if (!conversationId || messages.length === 0) return;
+    if (!conversationId || (messages.length === 0 && !allowEmpty)) return;
     const dbCollection = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
     await dbCollection.updateOne(
       { id: conversationId, project, username },
@@ -330,6 +334,7 @@ const ConversationService: ConversationServiceInterface = {
           turnCheckpoint: {
             messages,
             savedAt: new Date().toISOString(),
+            ...(typeof iteration === "number" ? { iteration } : {}),
           },
         },
       },
@@ -342,11 +347,13 @@ const ConversationService: ConversationServiceInterface = {
    * Any surviving turnCheckpoint at process start is orphaned by definition
    * (no turn can be in flight yet), so its messages are appended for real
    * via appendMessages — which also recomputes derived fields, derives the
-   * title, and atomically clears the checkpoint.
+   * title, and atomically clears the checkpoint. Conversations whose turn is
+   * re-driven instead (`skipConversationIds`) keep theirs.
    */
   async recoverOrphanedTurnCheckpoints({
     collection = DEFAULT_COLLECTION,
-  }: { collection?: string } = {}): Promise<number> {
+    skipConversationIds,
+  }: { collection?: string; skipConversationIds?: ReadonlySet<string> } = {}): Promise<number> {
     const dbCollection = MongoWrapper.getCollection(MONGO_DB_NAME, collection);
     const orphanedConversations = await dbCollection
       .find({ "turnCheckpoint.messages.0": { $exists: true } })
@@ -355,6 +362,8 @@ const ConversationService: ConversationServiceInterface = {
 
     let recoveredCount = 0;
     for (const orphaned of orphanedConversations) {
+      // A turn about to be re-driven owns its checkpoint (TurnResumeService).
+      if (skipConversationIds?.has(orphaned.id as string)) continue;
       try {
         await ConversationService.appendMessages(
           orphaned.id as string,

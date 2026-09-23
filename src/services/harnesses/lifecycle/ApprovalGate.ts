@@ -16,9 +16,13 @@ import type AgentHooks from "#src/services/AgentHooks";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 import { resolveLoopKey } from "#src/services/LoopKey";
 import { decisionOwnerOf } from "#src/services/conversation/ConversationRunState";
-import { APPROVALS } from "#src/constants";
+import { APPROVALS, TURN_RESUME } from "#src/constants";
 import { buildHookPayload } from "#src/services/hooks/buildPayload";
 import { HOOK_EVENTS } from "#src/services/hooks/types";
+import {
+  hookPermissionModeName,
+  unattendedDenialReason,
+} from "#src/services/permissions/PermissionModes";
 import { buildApprovalPreview } from "./ApprovalPreview.ts";
 import { buildDeniedToolResult, firePermissionDenied } from "./TurnHooks.ts";
 
@@ -76,6 +80,19 @@ export interface ApprovalGateOptions {
   toolSchemas?: ToolSchema[];
   /** The run's hooks — PermissionRequest, Notification and PermissionDenied fire through them. */
   hooks?: AgentHooks;
+  /**
+   * The batch is a pass replayed after a restart (ResumedPass): the cards it
+   * put out before are picked up again, not asked twice.
+   */
+  resume?: boolean;
+}
+
+/**
+ * A call a restart cut off mid-run that is not read-only: it may have
+ * partly happened, so it runs again only if the user says so.
+ */
+function isInterruptedCall(toolCall: ToolCall): boolean {
+  return toolCall._resumed?.status === "interrupted";
 }
 
 /** Order results the way the model emitted the calls. */
@@ -113,10 +130,31 @@ export function approvalRecordFor(toolCall: ToolCall): Pick<ToolCall, "_approval
       isApproved: stamp.isApproved === true,
       ...(stamp.isDenied ? { isDenied: true } : {}),
       ...(stamp.deniedBy ? { deniedBy: stamp.deniedBy } : {}),
+      ...(stamp.deniedBy === "mode" && stamp.mode ? { mode: stamp.mode } : {}),
       ...(stamp.reason ? { reason: stamp.reason } : {}),
       ...(stamp.decidedBy ? { decidedBy: stamp.decidedBy } : {}),
       ...(stamp.userReason ? { userReason: stamp.userReason } : {}),
       ...(stamp.editedByUser ? { editedByUser: true, originalArgs: stamp.originalArgs } : {}),
+    },
+  };
+}
+
+/**
+ * The result of an interrupted call that is not run again. Not "declined":
+ * it ran (at least partly) before the restart; it was not run AGAIN. The
+ * model must not assume either outcome.
+ */
+function notRerunResult(toolCall: ToolCall, locale: string, reason?: string | null): ToolResult {
+  return {
+    name: toolCall.name,
+    id: toolCall.id,
+    result: {
+      success: false,
+      error: "INTERRUPTED_BY_RESTART",
+      message: PromptLocaleService.get(locale, "harness.resume.notRerun", {
+        toolName: toolCall.name,
+      }),
+      ...(reason ? { reason } : {}),
     },
   };
 }
@@ -126,6 +164,7 @@ function userDeclinedResult(
   decision: ToolCallDecision,
   locale: string,
 ): ToolResult {
+  if (isInterruptedCall(toolCall)) return notRerunResult(toolCall, locale, decision.reason);
   const isLapsed = decision.source !== "user";
   const messageKey = isLapsed
     ? "harness.approval.lapsed"
@@ -175,8 +214,14 @@ async function runPermissionRequestHooks(
   pending: ToolCall[],
   context: AgenticContext,
   hooks: AgentHooks,
+  approvalEngine: AutoApprovalEngine,
 ): Promise<ToolCall[]> {
-  const permissionMode = context.options?.autoApprove ? "auto" : "default";
+  // Claude Code's names: "approve all" on top of the default mode is what
+  // Claude Code calls bypassing permissions.
+  const mode = approvalEngine.mode ?? "default";
+  const permissionMode = hookPermissionModeName(
+    context.options?.autoApprove && mode === "default" ? "bypass" : mode,
+  );
   const verdicts = await Promise.all(
     pending.map((call) =>
       hooks.run(
@@ -239,24 +284,37 @@ export async function checkAndWaitForApproval(
   toolCalls: ToolCall[],
   context: AgenticContext,
   approvalEngine: AutoApprovalEngine,
-  { toolSchemas = [], hooks }: ApprovalGateOptions = {},
+  { toolSchemas = [], hooks, resume = false }: ApprovalGateOptions = {},
 ): Promise<ApprovalVerdict> {
   const { emit, options } = context;
+  const locale =
+    (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
 
   const { needsApproval, denied = [] } = approvalEngine.checkBatch(toolCalls);
 
   const deniedOriginals = matchOriginals(toolCalls, denied);
   if (deniedOriginals.size > 0) {
+    // "denied by policy: a" / "denied by plan mode: b" — one clause per layer.
+    const byLayer = new Map<string, string[]>();
+    for (const toolCall of denied) {
+      const label =
+        toolCall._approval?.deniedBy === "mode"
+          ? `${toolCall._approval.mode ?? "permission"} mode`
+          : "policy";
+      byLayer.set(label, [...(byLayer.get(label) ?? []), toolCall.name]);
+    }
     emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
-      message: `Tool execution denied by policy: ${denied.map((toolCall) => toolCall.name).join(", ")}`,
+      message: `Tool execution denied by ${[...byLayer]
+        .map(([label, names]) => `${label}: ${names.join(", ")}`)
+        .join("; ")}`,
     });
     for (const deniedCall of deniedOriginals) {
       await firePermissionDenied(
         hooks,
         context,
         deniedCall,
-        "rule",
+        deniedCall._approval?.deniedBy === "mode" ? "mode" : "rule",
         deniedCall._approval?.reason || "policy rule",
       );
     }
@@ -264,12 +322,15 @@ export async function checkAndWaitForApproval(
   const awaitingOriginals = matchOriginals(toolCalls, needsApproval);
 
   // Mid-loop "auto-approve this conversation" (options.autoApprove flipped
-  // after engine construction) answers every prompt — except the ones a
-  // PreToolUse hook explicitly asked for, which is the whole point of `ask`.
+  // after engine construction) answers every prompt — except those no
+  // "approve all" answers: a PreToolUse hook's `ask` (the whole point of
+  // `ask`) and a write to a protected path.
   let pending = toolCalls.filter(
     (toolCall) =>
       awaitingOriginals.has(toolCall) &&
-      (!options.autoApprove || toolCall._hookPermission?.decision === "ask"),
+      (!options.autoApprove ||
+        toolCall._hookPermission?.decision === "ask" ||
+        toolCall._approval?.alwaysAsks === true),
   );
 
   if (options.autoApprove) {
@@ -289,8 +350,48 @@ export async function checkAndWaitForApproval(
     }
   }
 
+  // A call a restart cut off mid-run is asked about whatever its tier or the
+  // mode, and only a person answers "run it again?" — not the mode, not a
+  // PermissionRequest hook: it is not a permission anyone gave already.
+  // Where nobody can answer (dontAsk, an unattended run) it is not asked:
+  // it is not run again — denied by the mode — and the model is told it may
+  // have partly happened, as when a person says no.
+  const modeHandle = options._permissionMode;
+  const unanswerableRetries = new Set(
+    modeHandle?.cannotAsk
+      ? toolCalls.filter((toolCall) => isInterruptedCall(toolCall) && !deniedOriginals.has(toolCall))
+      : [],
+  );
+  for (const toolCall of unanswerableRetries) {
+    const reason = unattendedDenialReason(toolCall.name, modeHandle!.mode, "run it again after a restart");
+    toolCall._approval = {
+      ...(toolCall._approval ?? { tier: 2, tierLabel: "write" }),
+      isApproved: false,
+      isDenied: true,
+      deniedBy: "mode",
+      mode: modeHandle!.mode,
+      reason,
+    };
+    await firePermissionDenied(hooks, context, toolCall, "mode", reason);
+  }
+  const deniedResultOf = (toolCall: ToolCall): ToolResult =>
+    unanswerableRetries.has(toolCall)
+      ? notRerunResult(toolCall, locale, toolCall._approval?.reason)
+      : buildDeniedToolResult(toolCall);
+  const interruptedCalls = toolCalls.filter(
+    (toolCall) =>
+      isInterruptedCall(toolCall) && !deniedOriginals.has(toolCall) && !unanswerableRetries.has(toolCall),
+  );
+  pending = pending.filter((toolCall) => !isInterruptedCall(toolCall));
+
   if (pending.length > 0 && hooks) {
-    pending = await runPermissionRequestHooks(pending, context, hooks);
+    pending = await runPermissionRequestHooks(pending, context, hooks, approvalEngine);
+  }
+
+  if (interruptedCalls.length > 0) {
+    pending = [...pending, ...interruptedCalls].sort(
+      (left, right) => toolCalls.indexOf(left) - toolCalls.indexOf(right),
+    );
   }
 
   const isDenied = (toolCall: ToolCall) =>
@@ -300,7 +401,7 @@ export async function checkAndWaitForApproval(
   if (pending.length === 0) {
     return {
       executableToolCalls: toolCalls.filter((toolCall) => !isDenied(toolCall)),
-      blockedResults: deniedToolCalls.map(buildDeniedToolResult),
+      blockedResults: deniedToolCalls.map(deniedResultOf),
       deniedToolCalls,
       shouldApproveAll: false,
     };
@@ -330,16 +431,19 @@ export async function checkAndWaitForApproval(
   );
 
   // ── One decision per call ────────────────────────────────────
-  const batchId = crypto.randomUUID();
+  const proposedBatchId = crypto.randomUUID();
   const usedKeys = new Set<string>();
   const pendingCalls = new Set(pending);
   const awaiting = toolCalls.flatMap((toolCall, index) => {
     if (!pendingCalls.has(toolCall)) return [];
     // The id the client decides the call by: the provider's id, made
     // unique within the batch (providers without ids, or repeating ones).
-    let toolCallId = toolCall.id || `${batchId}:${index}`;
+    let toolCallId = toolCall.id || `${proposedBatchId}:${index}`;
     if (usedKeys.has(toolCallId)) toolCallId = `${toolCallId}#${index}`;
     usedKeys.add(toolCallId);
+    // "Run it again?" is its own decision — never the approval it had
+    // before the restart, which is spent.
+    if (isInterruptedCall(toolCall)) toolCallId += TURN_RESUME.RETRY_DECISION_SUFFIX;
     return [{ toolCallId, toolCall }];
   });
 
@@ -357,16 +461,28 @@ export async function checkAndWaitForApproval(
     tierLabel: toolCall._approval?.tierLabel,
     argsSchema: (schemaByName.get(toolCall.name) as Record<string, unknown> | null) ?? null,
     preview: previews[index],
+    ...(isInterruptedCall(toolCall)
+      ? {
+          requestedBy: TURN_RESUME.RETRY_REQUESTED_BY,
+          reason: PromptLocaleService.get(locale, "harness.resume.retryReason", {
+            toolName: toolCall.name,
+          }),
+        }
+      : {}),
   }));
 
   // Recorded first, THEN shown: a decision can only land on a call that
   // exists, and a card must never outlive the process that showed it.
+  // A replayed pass picks up the batch it opened before the restart (its
+  // own batch id, the decisions already made) — only what is still
+  // undecided gets a card.
   const loopKey = resolveLoopKey(context);
-  const { decisions: decisionsPromise } = await ApprovalRegistry.open(
+  let batchId: string = proposedBatchId;
+  const opened = await ApprovalRegistry.open(
     loopKey,
     {
       type: "tool",
-      batchId,
+      batchId: proposedBatchId,
       calls: requests,
       onDecided: (toolCallId, decision) => {
         emit({
@@ -382,9 +498,14 @@ export async function checkAndWaitForApproval(
       },
     },
     decisionOwnerOf(context),
+    { resume },
   );
+  batchId = opened.batchId;
+  const decisionsPromise = opened.decisions;
+  const stillPending = new Set(opened.pendingToolCallIds);
 
   requests.forEach((request, index) => {
+    if (!stillPending.has(request.toolCallId)) return;
     const hookPermission = awaiting[index].toolCall._hookPermission;
     emit({
       type: "approval_required",
@@ -399,9 +520,21 @@ export async function checkAndWaitForApproval(
       tier: request.tier,
       tierLabel: request.tierLabel,
       ...(request.preview ? { preview: request.preview } : {}),
+      ...(request.requestedBy && {
+        requestedBy: request.requestedBy,
+        reason: request.reason ?? null,
+      }),
       ...(hookPermission?.decision === "ask" && {
         requestedBy: "hook",
         reason: hookPermission.reason ?? null,
+      }),
+      // A protected-path write: "Always allow" cannot stop this card asking.
+      ...(awaiting[index].toolCall._approval?.protectedPath && {
+        protectedPath: awaiting[index].toolCall._approval!.protectedPath,
+        alwaysAsks: true,
+      }),
+      ...(awaiting[index].toolCall._approval?.mode && {
+        mode: awaiting[index].toolCall._approval!.mode,
       }),
     });
   });
@@ -418,8 +551,6 @@ export async function checkAndWaitForApproval(
   }
 
   // ── Assemble, in the model's order ───────────────────────────
-  const locale =
-    (options?.locale as string | undefined) || PromptLocaleService.getDefaultLocale();
   const decisionByCall = new Map(
     awaiting.map(({ toolCallId, toolCall }) => [toolCall, decisions.get(toolCallId)]),
   );
@@ -430,7 +561,7 @@ export async function checkAndWaitForApproval(
 
   for (const toolCall of toolCalls) {
     if (isDenied(toolCall)) {
-      blockedResults.push(buildDeniedToolResult(toolCall));
+      blockedResults.push(deniedResultOf(toolCall));
       continue;
     }
     if (!decisionByCall.has(toolCall)) {

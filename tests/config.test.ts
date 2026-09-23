@@ -27,6 +27,12 @@ beforeAll(() => {
       domain: "Reasoning",
       system: true,
     },
+    {
+      name: "read_url",
+      description: "Read a URL",
+      domain: "Core Harness Tools",
+      system: true,
+    },
   ]);
 });
 
@@ -129,9 +135,12 @@ describe('GET /config/agents', () => {
 
     const luposAgent = res.body.find((a: any) => a.id === 'LUPOS');
     expect(luposAgent).toBeDefined();
-    // Lupos agent explicitly enables core agentic tools in its persona
+    // System (core) tools reach a scoped persona through the core bypass…
     expect(luposAgent.enabledToolNames).toContain('enter_plan_mode');
-    expect(luposAgent.enabledToolNames).toContain('save_memory');
+    expect(luposAgent.enabledToolNames).toContain('read_url');
+    // …minus the ones it blocks: Lupos's one-shot Discord replies never
+    // used save_memory, so his persona trims it (lupos-agent-hardening).
+    expect(luposAgent.enabledToolNames).not.toContain('save_memory');
   });
 });
 
@@ -161,10 +170,11 @@ describe('GET /config/tools', () => {
       .expect(200);
 
     expect(Array.isArray(res.body)).toBe(true);
-    // Lupos explicitly enables enter_plan_mode in its persona
+    // System tools reach Lupos through the core bypass…
     expect(res.body.some((t: any) => t.name === 'enter_plan_mode')).toBe(true);
-    // Lupos also has save_memory
-    expect(res.body.some((t: any) => t.name === 'save_memory')).toBe(true);
+    expect(res.body.some((t: any) => t.name === 'read_url')).toBe(true);
+    // …except the core tools his persona blocks.
+    expect(res.body.some((t: any) => t.name === 'save_memory')).toBe(false);
   });
 
   it('preserves system: true for whitelisted core agentic tools returned for LUPOS agent', async () => {
@@ -173,10 +183,10 @@ describe('GET /config/tools', () => {
       .expect(200);
 
     expect(Array.isArray(res.body)).toBe(true);
-    const saveMemory = res.body.find((t: any) => t.name === 'save_memory');
-    expect(saveMemory).toBeDefined();
+    const readUrl = res.body.find((t: any) => t.name === 'read_url');
+    expect(readUrl).toBeDefined();
     // System flag should be preserved as true
-    expect(saveMemory.system).toBe(true);
+    expect(readUrl.system).toBe(true);
   });
 });
 

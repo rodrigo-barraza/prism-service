@@ -209,25 +209,10 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
     toolNames: Object.keys(toolNames).length > 0 ? toolNames : undefined,
     iterations: iterationCount,
     durationMilliseconds: subAgent.durationMilliseconds || 0,
-    // Include full conversation for frontend MessageList rendering.
-    // Strip system messages — they're large and not useful for display.
-    // Sanitize assistant content to remove leaked model tokens
-    // (e.g. Gemma 4 channel/thought blocks that survived streaming).
-    messages: (subAgent.messages || [])
-      .filter((message) => message.role !== "system")
-      .map((message) => {
-        if (
-          message.role === "assistant" &&
-          typeof message.content === "string" &&
-          message.content.includes("<")
-        ) {
-          const sanitizedContent = stripToolCallMarkup(message.content).trim();
-          if (sanitizedContent !== message.content) {
-            return { ...message, content: sanitizedContent };
-          }
-        }
-        return message;
-      }),
+    // No transcript: this object is what the PARENT model reads (tool
+    // results of create_subagent(s), wait_for_tasks, get_subagent_output).
+    // A sub-agent's raw tool output stays in its own conversation — the
+    // parent gets the brief (`result`), never the work behind it.
   };
 
   if (subAgent.diff && subAgent.diff.files.length > 0) {
@@ -236,6 +221,13 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
       deletions: subAgent.diff.stats.deletions,
       files: subAgent.diff.files.map((file) => file.path),
     };
+  }
+
+  if (subAgent.partial && status === "completed") {
+    result.partial = true;
+    result.summary =
+      `Agent "${subAgent.description}" stopped at its turn limit (${subAgent.maxIterations}) before finishing — ` +
+      `resume_subagent with agent_id "${subAgent.agentId}" continues it`;
   }
 
   // Shared by reference: a router settling a deferred worktree later updates
@@ -267,6 +259,25 @@ export function buildSubAgentResult(subAgent: SubAgentState): SubAgentResult {
   }
 
   return result;
+}
+
+/**
+ * How a finished sub-agent reads in its parent's completion message:
+ * "✅", "⏸ partial — …" (stopped at its turn cap; says how to continue), or
+ * "⚠️ <status>". `withStatus` spells the status out ("✅ completed").
+ */
+export function describeSubAgentOutcome(
+  result: Pick<SubAgentResult, "agent_id" | "status" | "partial" | "iterations">,
+  { withStatus = false }: { withStatus?: boolean } = {},
+): string {
+  if (result.status !== "completed") return `⚠️ ${result.status}`;
+  if (result.partial) {
+    return (
+      `⏸ partial — stopped at its turn limit (${result.iterations} iterations) before finishing; ` +
+      `resume_subagent with agent_id "${result.agent_id}" continues it`
+    );
+  }
+  return withStatus ? "✅ completed" : "✅";
 }
 
 function buildDiagnosticSummary(

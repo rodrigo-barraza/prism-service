@@ -1,4 +1,6 @@
 import logger from "#src/utils/logger";
+import { lookupMcpTool } from "#src/services/mcp/McpToolRegistry";
+import { toMcpScope, type McpScope } from "#src/services/mcp/McpScope";
 import { CAPABILITIES, type Capability } from "./types.ts";
 
 /**
@@ -13,7 +15,9 @@ import { CAPABILITIES, type Capability } from "./types.ts";
  *   - Internal tools declare `capabilities` on their definition;
  *     InternalToolRegistry registers them at initialize.
  *   - MCP tools derive them from the server's annotations
- *     (`capabilitiesFromMcpAnnotations`); MCPClientService registers them.
+ *     (`capabilitiesFromMcpAnnotations`); MCPClientService records them per
+ *     connection in McpToolRegistry, which is read by the CALLER's scope —
+ *     two profiles can each have a server with the same name.
  *
  * A tool nobody declared resolves conservatively. The rules that care most —
  * deny rules — are better served by "may have side effects" than by "none".
@@ -35,6 +39,13 @@ const BUILT_IN: Record<string, readonly Capability[]> = {
   stop_subagent: ["subagent"],
   delete_subagents: ["subagent"],
   get_subagent_output: ["subagent"],
+
+  // Plan-mode control flow and questions: no side effects of their own.
+  // Declared here too so plan mode can never refuse its own way out when a
+  // registry has not reported them.
+  enter_plan_mode: [],
+  exit_plan_mode: [],
+  ask_user: [],
 
   read_file: ["fs_read"],
   read_files: ["fs_read"],
@@ -117,7 +128,8 @@ export function registerToolCapabilities(
  * Map MCP tool annotations to tags. Annotations are hints from a server we
  * may not trust, so they only ever ADD tags relative to the spec defaults —
  * `readOnlyHint` adds `fs_read` in place of `external_side_effect`, and
- * nothing here lowers the DANGER tier AutoApprovalEngine gives every MCP tool.
+ * `openWorldHint` (default true) adds `network`. Tags feed rules; the tier
+ * is `mcpTierFromAnnotations`, which lowers a tool only on a trusted server.
  */
 export function capabilitiesFromMcpAnnotations(annotations: unknown): Capability[] {
   const hints =
@@ -130,11 +142,19 @@ export function capabilitiesFromMcpAnnotations(annotations: unknown): Capability
   return tags;
 }
 
-/** Capabilities of a tool, by name. Never empty-by-omission. */
-export function resolveToolCapabilities(toolName: string): readonly Capability[] {
+/**
+ * Capabilities of a tool, by name. Never empty-by-omission. An MCP tool is
+ * resolved in `scope` (default: the ambient request's).
+ */
+export function resolveToolCapabilities(
+  toolName: string,
+  scope?: McpScope,
+): readonly Capability[] {
+  if (toolName.startsWith("mcp__")) {
+    return lookupMcpTool(toolName, scope ?? toMcpScope())?.capabilities ?? UNDECLARED_MCP;
+  }
   const registered = declared.get(toolName);
   if (registered) return registered;
-  if (toolName.startsWith("mcp__")) return UNDECLARED_MCP;
   return BUILT_IN[toolName] ?? UNDECLARED;
 }
 

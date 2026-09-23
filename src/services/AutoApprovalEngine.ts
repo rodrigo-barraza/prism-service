@@ -5,9 +5,22 @@ import type { PolicyRule, PolicyDecision } from "./PolicyEngine.ts";
 import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import type PermissionRuleSet from "./permissions/PermissionRuleSet.ts";
 import { resolveToolCapabilities } from "./permissions/ToolCapabilities.ts";
+import { lookupMcpTool } from "./mcp/McpToolRegistry.ts";
+import { toMcpScope } from "./mcp/McpScope.ts";
 import { checkSelfProtection } from "./permissions/SelfProtection.ts";
 import { strongestVerdict } from "./permissions/PermissionEvaluator.ts";
 import { recordUserApproval } from "./permissions/ApprovalHistory.ts";
+import {
+  isPlanSafe,
+  isWorkspaceEdit,
+  planModeDenialReason,
+  requiresUserInteraction,
+  unattendedDenialReason,
+  userInteractionDenialReason,
+  type PermissionMode,
+} from "./permissions/PermissionModes.ts";
+import { modeOf, type PermissionModeHandle } from "./permissions/PermissionModeState.ts";
+import { findProtectedPathWrite } from "./permissions/ProtectedPaths.ts";
 import type {
   Capability,
   PermissionDecision,
@@ -113,8 +126,10 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.TRIGGER_CRON_JOB]: APPROVAL_TIERS.WRITE,
   [TOOL_NAMES.EDIT_NOTEBOOK]: APPROVAL_TIERS.WRITE,
 
-  // Tier 1 — skill management (read-only discovery)
+  // Tier 1 — skill discovery and reading (read-only over the caller's
+  // own skills; load_skill is Prism-local, not yet in TOOL_NAMES)
   [TOOL_NAMES.LIST_SKILLS]: APPROVAL_TIERS.AUTO,
+  load_skill: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — structured output (data formatting only)
   [TOOL_NAMES.EMIT_STRUCTURED_OUTPUT]: APPROVAL_TIERS.AUTO,
@@ -161,7 +176,7 @@ export interface ApprovalResult {
    */
   isDenied?: boolean;
   /** Which layer denied (set on every denial). */
-  deniedBy?: "rule" | "classifier" | "hook" | "user";
+  deniedBy?: "rule" | "classifier" | "hook" | "user" | "mode";
   tier: ApprovalTier;
   tierLabel: string;
   reason: string;
@@ -171,6 +186,15 @@ export interface ApprovalResult {
   rule?: string;
   ruleId?: string;
   ruleScope?: PermissionScope;
+  /** The permission mode the call was judged in. */
+  mode?: PermissionMode;
+  /**
+   * An ask that "approve all" cannot answer — a protected path or a hook's
+   * `ask`. Only a person's decision on the card lets it through.
+   */
+  alwaysAsks?: boolean;
+  /** The protected path an `alwaysAsks` write names. */
+  protectedPath?: string;
 }
 
 /** `check()` plus the evidence behind it — what the rules page's tester shows. */
@@ -191,6 +215,14 @@ export interface AutoApprovalEngineOptions {
   policies?: PolicyRule[];
   /** The run's stored permission rules (`/permissions/rules`). */
   permissionRules?: PermissionRuleSet | null;
+  /**
+   * The run's permission mode — its live handle (read on every check, so a
+   * mid-turn switch applies to the next call) or a fixed mode. Absent =
+   * `default`.
+   */
+  permissionMode?: PermissionModeHandle | PermissionMode | null;
+  /** The run's workspace root — where `acceptEdits` lets edits run. */
+  workspaceRoot?: string | null;
 }
 
 const POLICY_DECISION: Record<PolicyDecision, PermissionDecision> = {
@@ -221,12 +253,28 @@ export default class AutoApprovalEngine {
   private tierOverrides: Record<string, ApprovalTier>;
   private policies: PolicyRule[];
   private permissionRules: PermissionRuleSet | null;
+  private permissionMode: PermissionModeHandle | PermissionMode | null;
+  private workspaceRoot: string | null;
 
   constructor(options: AutoApprovalEngineOptions = {}) {
     this.fullAuto = options.fullAuto || false;
     this.tierOverrides = options.tierOverrides || {};
     this.policies = options.policies || [];
     this.permissionRules = options.permissionRules ?? null;
+    this.permissionMode = options.permissionMode ?? null;
+    this.workspaceRoot =
+      options.workspaceRoot ?? options.permissionRules?.context.workspaceRoot ?? null;
+  }
+
+  /** The mode calls are judged in right now. */
+  get mode(): PermissionMode {
+    return modeOf(this.permissionMode);
+  }
+
+  /** Nobody can answer a card: `dontAsk`, or an unattended run in any mode. */
+  private get cannotAsk(): boolean {
+    const handle = this.permissionMode;
+    return handle && typeof handle === "object" ? handle.cannotAsk : handle === "dontAsk";
   }
   getTier(toolName: string): ApprovalTier {
     if (this.tierOverrides[toolName] !== undefined) {
@@ -234,23 +282,28 @@ export default class AutoApprovalEngine {
     }
     // SECURITY: MCP-namespaced tools are third-party code with unknown
     // side effects — they default to DANGER (Tier 3) so common
-    // WRITE-auto settings never silently auto-approve them. Trusted
-    // servers can be relaxed per-tool via tierOverrides.
+    // WRITE-auto settings never silently auto-approve them. The one way
+    // down is a `readOnlyHint` on a server its owner marked trusted
+    // (mcpTierFromAnnotations), looked up in the run's own scope;
+    // `destructiveHint` is always DANGER, and rules and tierOverrides still
+    // decide above the tier.
     // Research basis (harness_landscape_survey_2026-07.md, D4): VIPER-MCP
     // found 106 zero-days across ~40k MCP repos (arXiv 2605.21392,
     // https://arxiv.org/abs/2605.21392); see also Unit 42's OpenClaw
     // supply-chain report (cited in MCPClientService).
     if (toolName.startsWith("mcp__")) {
-      return APPROVAL_TIERS.DANGER;
+      return lookupMcpTool(toolName, toMcpScope(this.permissionRules?.identity))?.tier === "auto"
+        ? APPROVAL_TIERS.AUTO
+        : APPROVAL_TIERS.DANGER;
     }
     return DEFAULT_TIER_MAP[toolName] ?? APPROVAL_TIERS.WRITE; // Unknown tools default to Tier 2
   }
   getTierLabel(toolName: string): string {
     return TIER_LABELS[this.getTier(toolName)] || "write";
   }
-  check(toolCall: ToolCall): ApprovalResult {
+  check(toolCall: ToolCall, overrides: { fullAuto?: boolean } = {}): ApprovalResult {
     const { matchedRules: _matchedRules, capabilities: _capabilities, ...result } =
-      this.explain(toolCall);
+      this.explain(toolCall, overrides);
     return result;
   }
 
@@ -259,12 +312,26 @@ export default class AutoApprovalEngine {
    *
    *   1. Self-protection — built in; an agent cannot reach its own
    *      permissions. Nothing below relaxes it.
-   *   2. Permission rules and agent policies, together: deny > ask > allow
-   *      across both layers, so a persona's APPROVE cannot undo a user's
-   *      DENY (or the reverse). Full auto answers "ask" with yes; a deny
-   *      holds even there, and inside sub-agents.
-   *   3. Full auto — everything not denied runs.
-   *   4. The tier — AUTO runs, WRITE and DANGER ask.
+   *   2. Deny — from permission rules or agent policies. Final in every
+   *      mode, full auto and sub-agents included.
+   *   3. The mode's refusals — `plan` refuses anything that is not
+   *      read-only; a run nobody watches refuses tools that wait on a person.
+   *   4. Protected paths — a write to one asks. Nothing below answers it:
+   *      not an allow rule, not full auto, not `bypass`.
+   *   5. Ask/allow — rules and policies together: deny > ask > allow across
+   *      both layers, so a persona's APPROVE cannot undo a user's ASK. Full
+   *      auto (the legacy "approve all") answers a rule's "ask" with yes;
+   *      no mode does.
+   *   6. Full auto — everything not stopped above runs.
+   *   7. The mode — `bypass` runs everything; `acceptEdits` and `auto` run
+   *      file edits inside the workspace.
+   *   8. The tier — AUTO runs. For the rest, `auto` would consult its
+   *      classifier (Landing 3; until then, and whenever it fails, it asks),
+   *      and every other mode asks.
+   *
+   * Every "ask" is then checked against the run: where nobody can answer
+   * (`dontAsk`, an unattended scheduled or timer run), it is a denial that
+   * names what would have asked.
    *
    * The configured PreToolUse hooks ran before this (Claude Code's order:
    * hooks → rules → mode → ask) and stamped `_hookPermission`:
@@ -275,11 +342,19 @@ export default class AutoApprovalEngine {
    *     is for.
    *   - A hook `allow` stands in for the tier/mode prompt only.
    *
-   * Every result names the layer (and rule) that decided.
+   * `overrides.fullAuto` judges the call as if "approve all" were on — the
+   * mid-turn switch (options.autoApprove) without rebuilding the engine.
+   *
+   * Every result names the layer (and rule) that decided, and the mode.
    */
-  explain(toolCall: ToolCall): ApprovalExplanation {
+  explain(
+    toolCall: ToolCall,
+    { fullAuto = this.fullAuto }: { fullAuto?: boolean } = {},
+  ): ApprovalExplanation {
     const tier = this.getTier(toolCall.name);
     const tierLabel = TIER_LABELS[tier] || "write";
+    const mode = this.mode;
+    const cannotAsk = this.cannotAsk;
     const hookPermission = toolCall._hookPermission;
     const hookAsks = hookPermission?.decision === "ask";
     const hookAskReason = `hook_ask${hookPermission?.reason ? `: ${hookPermission.reason}` : ""}`;
@@ -287,8 +362,34 @@ export default class AutoApprovalEngine {
       name: toolCall.name,
       args: (toolCall.args ?? {}) as Record<string, unknown>,
     };
-    const capabilities = resolveToolCapabilities(toolCall.name);
-    const base = { tier, tierLabel, capabilities, matchedRules: [] as ApprovalExplanation["matchedRules"] };
+    const capabilities = resolveToolCapabilities(toolCall.name, toMcpScope(this.permissionRules?.identity));
+    const base = {
+      tier,
+      tierLabel,
+      mode,
+      capabilities,
+      matchedRules: [] as ApprovalExplanation["matchedRules"],
+    };
+    const deniedByMode = (reason: string): ApprovalExplanation => ({
+      ...base,
+      isApproved: false,
+      isDenied: true,
+      deniedBy: "mode",
+      reason,
+      layer: "mode",
+    });
+    // An ask where nobody can answer becomes a denial that names the ask.
+    const ask = (result: Omit<ApprovalExplanation, "isApproved">): ApprovalExplanation =>
+      cannotAsk
+        ? {
+            ...result,
+            isApproved: false,
+            isDenied: true,
+            deniedBy: "mode",
+            layer: "mode",
+            reason: unattendedDenialReason(toolCall.name, mode, result.reason),
+          }
+        : { ...result, isApproved: false };
 
     const guard = checkSelfProtection(call, capabilities);
     if (guard) {
@@ -327,38 +428,73 @@ export default class AutoApprovalEngine {
     }
 
     const decided = strongestVerdict(verdicts);
-    if (decided) {
-      const stamp = {
+    const stamp = decided
+      ? {
+          ...base,
+          reason: decided.reason,
+          layer: decided.layer,
+          ...(decided.rule !== undefined && { rule: decided.rule }),
+          ...(decided.ruleId !== undefined && { ruleId: decided.ruleId }),
+          ...(decided.scope !== undefined && { ruleScope: decided.scope }),
+        }
+      : null;
+    if (decided?.decision === "deny") {
+      // Terminal rejection — never downgraded to an approval prompt.
+      return { ...stamp!, isApproved: false, isDenied: true, deniedBy: "rule" };
+    }
+
+    if (mode === "plan" && !isPlanSafe(capabilities)) {
+      return deniedByMode(planModeDenialReason(toolCall.name));
+    }
+    if (cannotAsk && requiresUserInteraction(toolCall.name)) {
+      return deniedByMode(userInteractionDenialReason(toolCall.name, mode));
+    }
+
+    const protectedWrite = findProtectedPathWrite(call, capabilities);
+    if (protectedWrite) {
+      return ask({
         ...base,
-        reason: decided.reason,
-        layer: decided.layer,
-        ...(decided.rule !== undefined && { rule: decided.rule }),
-        ...(decided.ruleId !== undefined && { ruleId: decided.ruleId }),
-        ...(decided.scope !== undefined && { ruleScope: decided.scope }),
-      };
+        reason: `protected path: ${protectedWrite.path} (${protectedWrite.target}) — writes to it always ask`,
+        layer: "protected_path",
+        rule: protectedWrite.target,
+        alwaysAsks: true,
+        protectedPath: protectedWrite.path,
+      });
+    }
+
+    if (decided && stamp) {
       switch (decided.decision) {
-        case "deny":
-          // Terminal rejection — never downgraded to an approval prompt.
-          return { ...stamp, isApproved: false, isDenied: true, deniedBy: "rule" };
         case "ask":
-          if (!this.fullAuto || hookAsks) return { ...stamp, isApproved: false };
+          if (!fullAuto || hookAsks) return ask({ ...stamp, ...(hookAsks && { alwaysAsks: true }) });
           break; // full auto answers "ask" with yes — unless a hook asked too
         case "allow":
-          if (hookAsks) return { ...base, isApproved: false, reason: hookAskReason, layer: "hook" };
+          if (hookAsks) {
+            return ask({ ...base, reason: hookAskReason, layer: "hook", alwaysAsks: true });
+          }
           return { ...stamp, isApproved: true };
       }
     }
 
     if (hookAsks) {
-      return { ...base, isApproved: false, reason: hookAskReason, layer: "hook" };
+      return ask({ ...base, reason: hookAskReason, layer: "hook", alwaysAsks: true });
     }
     if (hookPermission?.decision === "allow") {
       return { ...base, isApproved: true, reason: "hook_allow", layer: "hook" };
     }
 
     // Full Auto mode: everything not denied runs
-    if (this.fullAuto) {
+    if (fullAuto) {
       return { ...base, isApproved: true, reason: "full_auto", layer: "full_auto" };
+    }
+
+    if (mode === "bypass") {
+      return { ...base, isApproved: true, reason: "bypass_mode", layer: "mode" };
+    }
+    if (
+      (mode === "acceptEdits" || mode === "auto") &&
+      isWorkspaceEdit(call, capabilities, this.workspaceRoot)
+    ) {
+      return { ...base, isApproved: true, reason: "workspace_edit", layer: "mode" };
     }
 
     // Tier 1: always auto-approve
@@ -366,8 +502,18 @@ export default class AutoApprovalEngine {
       return { ...base, isApproved: true, reason: "read_only", layer: "tier" };
     }
 
+    // The auto-mode classifier's slot. It isn't here yet (Landing 3), and a
+    // classifier that cannot decide asks — it never allows.
+    if (mode === "auto") {
+      return ask({
+        ...base,
+        reason: "auto mode: the classifier is not available, so this asks",
+        layer: "mode",
+      });
+    }
+
     // Tier 2 and 3: require approval
-    return { ...base, isApproved: false, reason: "requires_approval", layer: "tier" };
+    return ask({ ...base, reason: "requires_approval", layer: "tier" });
   }
   checkBatch(toolCalls: ToolCall[]): {
     autoApproved: ApprovedToolCall[];
@@ -438,13 +584,12 @@ export default class AutoApprovalEngine {
       // Mid-loop "approve all" flips options.autoApprove without rebuilding
       // this engine — honor it so already-permitted calls aren't blocked.
       if (context?.options?.autoApprove && !this.fullAuto) {
-        const result = this.check(toolCall);
-        if (result.isDenied) return result;
+        const result = this.check(toolCall, { fullAuto: true });
+        if (result.isDenied || !result.isApproved) return result; // a denial, or an ask no "approve all" answers
         return {
           ...result,
-          isApproved: true,
-          reason: "approve_all",
-          layer: result.isApproved ? result.layer : "approve_all",
+          reason: result.layer === "full_auto" ? "approve_all" : result.reason,
+          layer: result.layer === "full_auto" ? "approve_all" : result.layer,
         };
       }
       return this.check(toolCall);

@@ -172,6 +172,27 @@ describe("PromptCacheTelemetry.recordRequest", () => {
     });
   });
 
+  it("records a declared boundary and Anthropic's input_transformations on the row", () => {
+    PromptCacheTelemetry.recordRequest({
+      conversationKey: "conv",
+      requestId: "req-1",
+      provider: "anthropic",
+      model: "claude-opus-5-5",
+      telemetry: telemetry(["a", "b"]),
+    });
+    const compacted = PromptCacheTelemetry.recordRequest({
+      conversationKey: "conv",
+      requestId: "req-2",
+      provider: "anthropic",
+      model: "claude-opus-5-5",
+      telemetry: { ...telemetry(["a", "stub", "c"]), inputTransformations: [] },
+      declaredBoundary: "micro_compaction",
+    })!;
+    expect(compacted.cacheTelemetry.prefixChange).toBe(PREFIX_CHANGE.MESSAGES_CHANGED);
+    expect(compacted.cacheTelemetry.declaredBoundary).toBe("micro_compaction");
+    expect(compacted.cacheTelemetry.inputTransformations).toEqual([]);
+  });
+
   it("returns null (and records nothing) when the adapter reported no hashes", () => {
     expect(
       PromptCacheTelemetry.recordRequest({ conversationKey: "conv", requestId: "r", provider: "p", model: "m", telemetry: undefined }),
@@ -268,6 +289,21 @@ describe("computeCacheStats", () => {
     ]);
     expect(stats.byModel).toHaveLength(1);
     expect(stats.byModel[0]).toMatchObject({ provider: "google", model: "gemini-3.6-flash", requests: 7, pairs: 4 });
+  });
+
+  it("a zero-cache pair at a declared boundary is attributed to the boundary, not a leak", () => {
+    const stats = computeCacheStats([
+      row({ createdAt: at(0) }),
+      row({
+        createdAt: at(5),
+        agenticIteration: 2,
+        cacheReadInputTokens: 0,
+        cacheTelemetry: { prefixChange: "messages_changed", declaredBoundary: "micro_compaction" },
+      }),
+    ]);
+    expect(stats.missReasons).toEqual([
+      { reason: "micro_compaction", source: "declared", count: 1, share: 1 },
+    ]);
   });
 
   it("an empty window reports zeros and null shares", () => {

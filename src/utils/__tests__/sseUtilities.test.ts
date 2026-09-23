@@ -444,6 +444,39 @@ describe("buildJsonResponseFromEvents", () => {
     });
     expect(result.response!.audioRef).toBe("audio-ref-789");
   });
+
+  // tools-service's generate_image reads /chat?stream=false. Without the
+  // reason, an image the model declined was indistinguishable from a
+  // transient miss, and the agent redrew the same refused subject.
+  it("should carry a refusal's category and explanation", () => {
+    const events: TestEvent[] = [
+      { type: "refusal", category: "IMAGE_SAFETY", explanation: "Unable to show that." },
+      { type: "done", provider: PROVIDERS.GOOGLE },
+    ];
+
+    const result = callBuildJsonResponse(events, {
+      provider: PROVIDERS.GOOGLE,
+    });
+
+    expect(result.response!.refusal).toEqual({
+      category: "IMAGE_SAFETY",
+      explanation: "Unable to show that.",
+    });
+    expect(result.response!.images).toBeUndefined();
+  });
+
+  it("should omit refusal when no refusal event exists", () => {
+    const events: TestEvent[] = [
+      { type: "chunk", content: "Fine." },
+      { type: "done", provider: PROVIDERS.GOOGLE },
+    ];
+
+    const result = callBuildJsonResponse(events, {
+      provider: PROVIDERS.GOOGLE,
+    });
+
+    expect(result.response!.refusal).toBeUndefined();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════

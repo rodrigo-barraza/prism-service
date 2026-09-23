@@ -10,14 +10,10 @@ Self-contained task prompts for the items in `docs/harness_modernization_2026-09
 
 | # | File | Branch slug(s) | Repos | Size | Depends on | Shares hub files with |
 |---|---|---|---|---|---|---|
-| 09 | `09-harness-small-fixes.md` | `loop-small-fixes`, `cron-matcher`, `provider-small-fixes` | service | M | — | 02, 04, 17 |
-| 10 | `10-prefix-stable-requests.md` | `cache-telemetry`, `prefix-stable-requests` | service | L | 02, 06 | 06, 23 (`RequestLogger.ts`), 25 |
-| 11 | `11-routing-and-memory-extraction.md` | `memory-extraction-diet`, `role-model-routing` | service | M | 02 | 17 (`OrchestratorService.ts`) |
 | 12 | `12-permission-rules-and-modes.md` | `permission-rules-store`, `permission-modes`, `auto-mode-classifier` | service, client | L | 05 | 13, 18, 20 (`AutoApprovalEngine.ts`) |
 | 13 | `13-durable-run-state.md` | `persist-pending-decisions`, `resume-parked-turns`, `budget-pause` | service, client | L | 05 | 12, 17 |
 | 17 | `17-subagents-modern.md` | `nonblocking-subagent-dispatch`, `agent-definitions-as-files`, `oracle-and-independent-branches` | service | L | 04, 09 | 11, 21 |
 | 19 | `19-skills-progressive-disclosure.md` | `skills-catalog-and-loader`, `skill-folders-and-plugins`, `workspace-instructions` | service, client | L | 07 | 10 (`system-prompt/index.ts`) |
-| 20 | `20-mcp-modernization.md` | `mcp-sdk-and-trust`, `mcp-oauth-and-elicitation` | service, client | L | 12 (soft) | 12 |
 | 21 | `21-goals-verified-outcomes.md` | `goals-verified-outcomes` | service, client | M | 17 (soft), 13 (soft) | 26 |
 | 22 | `22-security-depth.md` | `memory-provenance`, `quarantined-reader`, `external-input-lane` | service | L | — | 19 (memory/system prompt) |
 | 23 | `23-observability-and-evals.md` | `otel-tracing`, `log-redaction`, `benchmark-reliability` | service | L | — | 10 (`RequestLogger.ts`) |
@@ -57,9 +53,10 @@ The UI parts of 05, 12, 13, 15, 16 and 21 all touch `prism-client/src/components
    ```bash
    "$WT"/node_modules/.bin/tsc --noEmit -p "$WT"/tsconfig.json
    "$WT"/node_modules/.bin/vitest run --root "$WT"   # prism-service: covers src/**/__tests__ AND tests/
-   "$WT"/node_modules/.bin/eslint "$WT"/src
+   (cd "$WT" && ./node_modules/.bin/eslint src)      # prism-client's eslint 9 finds its config from the working directory
+   (cd "$WT" && ./node_modules/.bin/oxlint)          # tools-service lints with oxlint instead
    ```
-   - prism-client: `tsc` is clean on master, and `next build` type-checks (`ignoreBuildErrors: false` since prompt 08), so a new type error fails both. Run `next build` once at the end when you touch client types.
+   - prism-client: `tsc` is clean on master, and `next build` type-checks (`ignoreBuildErrors: false` since prompt 08), so a new type error fails both. Run `next build` once at the end when you touch client types, from inside the worktree: `(cd "$WT" && ./node_modules/.bin/next build)`. Run from elsewhere, Next takes the main checkout as the workspace root and fails its type check with "Cannot find type definition file for 'node'" — master does too.
    - Report pre-existing lint failures separately from yours.
 5. **Test patterns to copy** (prism-service unless noted):
    - **Provider request shapes:** `tests/anthropicProvider.test.ts`. It uses `vi.mock('@anthropic-ai/sdk')` and asserts on the exact payload passed to `messages.create` / `messages.stream`. `tests/googleProvider.test.ts` does the same for Gemini.
@@ -107,6 +104,7 @@ PRISM_SERVICE_PORT=$PORT PRISM_SERVICE_MONGO_DB_NAME=prism_test_<slug> \
   - If your task changes tools-service, boot it from its worktree: `TOOLS_SERVICE_PORT=<port2> TOOLS_SERVICE_MONGO_DB_NAME=tools_test_<slug> node "$TOOLS_WT"/src/boot.ts`.
   - Its workspace roots come from its own Mongo (`loadUserWorkspaceRoots`, `src/routes/AdminRoutes.ts`). Register a scratch git repo under your scratchpad as the only root, and pass it as `workspaceRoot` in the `/agent` body.
   - If your task doesn't change tools-service, use `$PROD_TOOLS_SERVICE_URL`, but only for read-only tools, since tool calls then execute on the NAS.
+  - **`enabledTools` cannot make a turn read-only.** Core harness tools stay callable whatever it lists: `save_memory` (forwarded by the production tools-service to the PRODUCTION prism-service — one landed there on 2026-09-22 and had to be deleted), `execute_python`, `execute_javascript`. Pass them in `disabledTools`, or point the local prism at the stand-in instead: `LOCAL_PRISM_PORT=$PORT STANDIN_PORT=<port2> node "$WT"/scripts/live-tools-standin.mjs` (run it in the background) and `TOOLS_SERVICE_URL=http://localhost:<port2>`. It proxies schema GETs to production, forwards `save_memory` to your local prism through the real trace-header hop, and refuses every other tool call.
   - **Spawning a sub-agent is not read-only**, even for pure research: every spawn asks tools-service to `git worktree add` in the workspace root. For any live test that spawns sub-agents, boot tools-service isolated (a detached worktree of its master is enough when you don't change it) after seeding its test DB: `workspace_config` ← `{_key: "user_roots", roots: ["<scratch git repo>"]}` in `tools_test_<slug>`. Its log then shows that repo as the only local root.
 - **prism-client under test.**
   - **Environment variables do not isolate it.** `next.config.ts` copies every vault secret over `process.env` and inlines the vault's `PRISM_SERVICE_URL`, so `PRISM_SERVICE_URL=http://localhost:$PORT next dev` still drives the PRODUCTION prism-service. Start the stand-in vault from prism-service, which proxies the real one and replaces only the prism-service URLs: `LOCAL_PRISM_PORT=$PORT LOCAL_CLIENT_PORT=<port3> OVERLAY_VAULT_PORT=<port4> node "$WT"/scripts/live-overlay-vault.mjs` (run it in the background).
@@ -121,6 +119,7 @@ PRISM_SERVICE_PORT=$PORT PRISM_SERVICE_MONGO_DB_NAME=prism_test_<slug> \
 An executed prompt is removed when its work lands. Git history keeps the text. The executing session does this on its own branch, in a prism-service commit; create a prism-service worktree for it if the work was client- or tools-only:
 
 - **Single-landing prompt:** delete the file and delete its row above.
-- **Multi-landing prompt** (the sections headed `Landing N — \`slug\``): delete the landed section, and leave a 3-line record at the top of the file saying what it did, the branch, and where the tests are. The last landing deletes the file.
+- **Multi-landing prompt** (the sections headed `Landing N — \`slug\``): delete the landed section, heading included, and leave a 3-line record at the top of the file saying what it did, the branch, and where the tests are. The last landing deletes the file.
+- **Landings retired in parallel** each see the others still open, so none of them deletes the file (prompt 09, 2026-09-22). `tests/promptRetirement.test.ts` goes red in the batch that merges the last one; that batch deletes the file and its row.
 
 **Evidence that a slug landed:** `git -C <repo> log master --oneline --grep "batch: merge <slug>"`. A branch of that name is not evidence, because branches are deleted at teardown. A file still sitting here is not proof of live work; run the prompt's §1 recon first.

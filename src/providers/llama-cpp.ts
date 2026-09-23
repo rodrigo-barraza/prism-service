@@ -245,7 +245,7 @@ export function createLlamaCppProvider(
         const tools = convertToolsToOpenAI(options.tools);
         if (tools) {
           payload.tools = tools;
-          payload.tool_choice = "auto";
+          payload.tool_choice = options.toolChoice === "none" ? "none" : "auto";
         }
 
         const response = await fetchOpenAICompat(
@@ -346,7 +346,7 @@ export function createLlamaCppProvider(
         const tools = convertToolsToOpenAI(options.tools);
         if (tools) {
           payload.tools = tools;
-          payload.tool_choice = "auto";
+          payload.tool_choice = options.toolChoice === "none" ? "none" : "auto";
         }
 
         const prefixHashes = options.cacheTelemetry

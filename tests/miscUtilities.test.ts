@@ -439,7 +439,7 @@ describe('resolveLockedOffToolNames', () => {
 // 4. BenchmarkPresets (src/data/benchmarkPresets.ts)
 // ═══════════════════════════════════════════════════════════════
 
-import { BENCHMARK_PRESETS, type BenchmarkPreset } from '#src/data/benchmarkPresets';
+import { BENCHMARK_PRESETS } from '#src/data/benchmarkPresets';
 import { MATCH_MODES } from '#src/types/benchmark';
 
 describe('BENCHMARK_PRESETS', () => {
@@ -588,7 +588,6 @@ import {
   ALCOHOL_DESCRIPTIONS,
   SOMATIC_KEYWORDS,
   EMOTION_APPRAISAL_PROMPT,
-  type PrimaryEmotion,
 } from '#src/services/somatic/SomaticConstants';
 import { PROVIDERS } from "#src/constants";
 
@@ -696,7 +695,7 @@ describe('SomaticConstants', () => {
 
     it('should contain valid hex color codes', () => {
       const hexColorPattern = /^#[0-9a-fA-F]{6}$/;
-      for (const [emotion, hexColor] of Object.entries(EMOTION_COLORS)) {
+      for (const hexColor of Object.values(EMOTION_COLORS)) {
         expect(hexColor).toMatch(hexColorPattern);
       }
     });
@@ -719,7 +718,7 @@ describe('SomaticConstants', () => {
     });
 
     it('should be evocative color, not a prescriptive script, in every prompt', () => {
-      for (const [emotion, prompt] of Object.entries(EMOTION_BEHAVIOR_PROMPTS)) {
+      for (const prompt of Object.values(EMOTION_BEHAVIOR_PROMPTS)) {
         expect(prompt.length).toBeGreaterThan(40);
         // Scripted VOCABULARY/TONE lists caused verbatim catchphrase
         // parroting in production — moods must describe interior state only.

@@ -75,8 +75,11 @@ export interface InternalToolContext {
   conversationId?: string | null;
   project?: string;
   username?: string;
+  profileId?: string | null;
   /** Persona id of the calling agent — used to scope tool discovery/activation to the persona's reachable universe. */
   agent?: string | null;
+  /** The turn's platform context — a tools-service call made on its behalf carries its Discord scope (DiscordContextHeaders). */
+  agentContext?: unknown;
   isSubAgent?: boolean;
   enabledTools?: string[];
   /** The loop's abort signal (with the per-tool timeout) — ToolExecutor passes it. */

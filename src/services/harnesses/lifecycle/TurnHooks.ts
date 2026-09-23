@@ -171,6 +171,7 @@ export async function openTurnHooks(
       is_sub_agent: subAgent,
       provider: context.providerName,
       model: context.resolvedModel,
+      ...(context.resume ? { resumed: true } : {}),
     }),
   );
 
@@ -181,13 +182,16 @@ export async function openTurnHooks(
   };
 
   // UserPromptSubmit — one of the events allowed to block: a deny here ends
-  // the run before a single token is spent.
-  const promptVerdict = await hooks.run(
-    "userPromptSubmit",
-    payloadFor(HOOK_EVENTS.USER_PROMPT_SUBMIT, context, {
-      prompt: extractLatestUserMessageText(currentMessages),
-    }),
-  );
+  // the run before a single token is spent. A turn re-driven after a restart
+  // submits nothing: its prompt went through this before the restart.
+  const promptVerdict = context.resume
+    ? null
+    : await hooks.run(
+        "userPromptSubmit",
+        payloadFor(HOOK_EVENTS.USER_PROMPT_SUBMIT, context, {
+          prompt: extractLatestUserMessageText(currentMessages),
+        }),
+      );
   if (promptVerdict && promptVerdict.isApproved === false) {
     const reason = reasonOf(promptVerdict, "blocked by a UserPromptSubmit hook");
     logger.warn(`[TurnHooks] Prompt blocked before generation: ${reason}`);
@@ -459,6 +463,19 @@ export async function runPreToolUseStage(
  */
 export function buildDeniedToolResult(toolCall: ToolCall): ToolResult {
   const reason = toolCall._approval?.reason || "policy rule";
+  if (toolCall._approval?.deniedBy === "mode") {
+    // The reason is written for the model: which mode, and what to do instead.
+    return {
+      name: toolCall.name,
+      id: toolCall.id,
+      result: {
+        success: false,
+        error: "PERMISSION_MODE_DENIED",
+        ...(toolCall._approval.mode ? { mode: toolCall._approval.mode } : {}),
+        message: reason,
+      },
+    };
+  }
   if (toolCall._approval?.deniedBy === "hook") {
     return {
       name: toolCall.name,
@@ -490,7 +507,7 @@ export async function firePermissionDenied(
   hooks: AgentHooks | undefined,
   context: AgenticContext,
   toolCall: ToolCall,
-  deniedBy: "rule" | "classifier" | "hook" | ApprovalDecisionSource,
+  deniedBy: "rule" | "classifier" | "hook" | "mode" | ApprovalDecisionSource,
   reason: string,
 ): Promise<void> {
   if (!hooks) return;

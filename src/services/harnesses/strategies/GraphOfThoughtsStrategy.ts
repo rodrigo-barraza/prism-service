@@ -153,7 +153,8 @@ async function runGraphOfThoughtsTurn(
         project,
         agent,
         username,
-        tools: tools.finalTools,
+        // The turn's declared tool block (lifecycle/ToolSurface.ts).
+        ...harness.requestToolOptions(),
       };
 
       // ── Context pressure management ──────────────────────────

@@ -25,8 +25,26 @@ export interface SettingsData {
     [key: string]: string; // Support dynamic string index for provider/model retrieval
   };
   agents: {
+    /**
+     * Role models (routing/RoleModelResolver). `main` fills in only for a
+     * caller that names no model; `subagent` routes every sub-agent that
+     * no agent definition pins; `subAgentEffort` is "" (one step below the
+     * parent when the sub-agent inherits the parent's model — effort
+     * first), "inherit", or a level.
+     */
+    mainProvider: string;
+    mainModel: string;
     subAgentProvider: string;
     subAgentModel: string;
+    subAgentEffort: string;
+    oracleProvider: string;
+    oracleModel: string;
+    compactionProvider: string;
+    compactionModel: string;
+    classifierProvider: string;
+    classifierModel: string;
+    /** "" or a routing preset id (routing/RoutingPresets) — e.g. "lead_sidekick". */
+    routingPreset: string;
     criticProvider: string;
     criticModel: string;
     planProvider: string;
@@ -48,6 +66,14 @@ export interface SettingsData {
   };
   security: {
     allowEnvFiles: boolean;
+  };
+  /**
+   * `defaultMode` — the permission mode a conversation starts in when it
+   * names none (permissions/PermissionModes.ts). `bypass` is never honoured
+   * here: it is chosen per conversation.
+   */
+  permissions?: {
+    defaultMode: string;
   };
   creative?: {
     imageProvider: string;
@@ -83,8 +109,18 @@ const DEFAULTS: SettingsData = {
     embeddingModel: "",
   },
   agents: {
+    mainProvider: "",
+    mainModel: "",
     subAgentProvider: "",
     subAgentModel: "",
+    subAgentEffort: "",
+    oracleProvider: "",
+    oracleModel: "",
+    compactionProvider: "",
+    compactionModel: "",
+    classifierProvider: "",
+    classifierModel: "",
+    routingPreset: "",
     criticProvider: "",
     criticModel: "",
     planProvider: "",
@@ -99,6 +135,9 @@ const DEFAULTS: SettingsData = {
   },
   security: {
     allowEnvFiles: false,
+  },
+  permissions: {
+    defaultMode: "default",
   },
   creative: {
     imageProvider: PROVIDERS.GOOGLE,

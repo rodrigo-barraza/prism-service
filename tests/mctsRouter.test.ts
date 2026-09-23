@@ -19,7 +19,6 @@ import type {
   TeamMember,
   OrchestratorContext,
   SubAgentResult,
-  OrchestratorSpawnParams,
 } from "#src/types/orchestrator";
 
 vi.mock("#src/utils/logger", () => ({

@@ -6,11 +6,14 @@
   },
   "planningMode": {
     "blocked": "PLAN MODE active. Tool [{{blockedNames}}] blocked — only exit_plan_mode works. Write plan as text, then call exit_plan_mode.",
+    "blockedNotReadOnly": "PLAN MODE on. {{blockedNames}} not run — only read-only tools work while plan. Explore read-only, write plan, then call exit_plan_mode.",
     "submitPlan": "Plan written. Now call exit_plan_mode with plan so user review. No repeat as text.",
     "approvalResult": "Plan approved. Proceed with execution. Update todo if applicable.",
     "rejectionStatus": "Plan rejected — cancelled.",
     "rejectionResult": "User no approve plan. Plan not done. No act. Wait for user next message.",
     "planningInstruction": "## PLANNING MODE — TOOL RESTRICTED\n\nPLAN MODE. Only available:\n- **exit_plan_mode** — submit plan\n- **think** — reasoning\n\nAll other tool BLOCKED.\n\n**Steps:**\n1. Analyze request\n2. Design approach as text\n3. Call exit_plan_mode — user reviews before execution\n\nKeep concise. Simple task need brief summary.",
+    "planModeOn": "PLAN MODE on. All tools still listed, but only read-only calls run. Write, run, change state = blocked until plan approved. Explore, write plan as text, then call exit_plan_mode. Keep plan short.",
+    "planModeOff": "PLAN MODE off. Plan approved, all tools run again. Do the plan.",
     "rejectionStatusWithReason": "Plan rejected — cancelled. Reason: {{reason}}"
   },
   "reminderExtractor": {
@@ -46,7 +49,8 @@
   "toolSetUpdated": {
     "header": "[NEW TOOL] {{count}} enabled: {{toolNames}}",
     "availableDocumentation": "Tool ready with documentation:",
-    "usageGuidelines": "## Tool Usage"
+    "usageGuidelines": "## Tool Usage",
+    "removed": "Tool gone from this conversation: {{toolNames}}. Calls no run."
   },
   "validationError": {
     "header": "[VALIDATION ERROR] Edit introduced {{errorCount}} error:",
@@ -94,5 +98,12 @@
     "declined": "User say no to {{toolName}}. Not run. No retry same call; go on without or ask user.",
     "declinedWithReason": "User say no to {{toolName}}. Not run. User reason: {{reason}}. Heed reason; no retry same call.",
     "lapsed": "No decide on {{toolName}} before turn moved on. Not run. No assume ran; go on without or ask user."
+  },
+  "resume": {
+    "retryReason": "Server restart while {{toolName}} run. Maybe half done, result lost. Run again?",
+    "notRerun": "Server restart while {{toolName}} run. Not run again. Maybe half done: no assume done or not done — check first, or ask user.",
+    "interruptedTaskSummary": "[ASYNC TASK INTERRUPTED] Tool \"{{toolName}}\" (task {{taskId}}) still run when server restart. Maybe half done; result unknown. Not run again.",
+    "interruptedSubAgent": "Sub-agent {{agentId}} (\"{{description}}\") still run when server restart. Stop there; work maybe half. resume_subagent go on from transcript.",
+    "interruptedSubAgentsSummary": "[SUB-AGENTS INTERRUPTED] Server restart while {{count}} sub-agent(s) of this chat run or not delivered."
   }
 }

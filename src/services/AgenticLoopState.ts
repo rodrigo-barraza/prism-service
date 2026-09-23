@@ -16,6 +16,10 @@ import type { TokenUsage } from "#src/types/admin";
 import { MEDIA } from "#src/constants";
 import type { ModelRefusal } from "./harnesses/types.ts";
 import type { AnthropicThinkingBlock } from "#src/types/admin";
+import {
+  buildToolExecutionRecord,
+  type ToolExecutionRecord,
+} from "#src/utils/ToolExecutionRecord";
 interface CriteriaScores {
   correctness: number;
   risk: number;
@@ -102,6 +106,19 @@ export default class AgenticLoopState {
    * if lossy truncation has to run.
    */
   truncationReason: string | null;
+  /**
+   * Set when this iteration's request deliberately rewrites what an earlier
+   * request sent (micro-compaction offload, LLM compaction) — recorded on
+   * the request's cache telemetry as a declared boundary, then cleared.
+   */
+  pendingPrefixBoundary: "micro_compaction" | "compaction" | null;
+  /**
+   * Request estimate right after the last micro-compaction eviction — the
+   * next one waits until the request has grown past it (ContextPressureManager).
+   */
+  lastMicroCompactionTokens: number | null;
+  /** Plan mode changed: a notice goes in after the batch's assistant message. */
+  pendingPlanModeNotice: "entered" | "exited" | null;
 
   // ── Turn transcript (lifecycle/TurnTranscript.ts) ───────
   /**
@@ -157,6 +174,11 @@ export default class AgenticLoopState {
   // finalize() awaits them (allSettled) before conversation persistence so
   // the requests-collection rollup sees every iteration of this turn.
   pendingRequestLogWrites: Promise<unknown>[];
+
+  // ── Tool executions awaiting their request row ──────────
+  // ToolExecutor records each executed call; the next logIteration takes
+  // them onto that iteration's row (`toolExecutions`).
+  private toolExecutions: ToolExecutionRecord[];
 
   // ── Conversation outcome ───────────────────────────
   // Set by harnesses before finalization to indicate how the
@@ -244,6 +266,9 @@ export default class AgenticLoopState {
     this.providerInputBaseline = null;
     this.compactionBoundary = null;
     this.truncationReason = null;
+    this.pendingPrefixBoundary = null;
+    this.lastMicroCompactionTokens = null;
+    this.pendingPlanModeNotice = null;
 
     this.turnTranscript = null;
     this.turnTranscriptSeen = new WeakSet();
@@ -255,6 +280,7 @@ export default class AgenticLoopState {
 
     this.toolErrorCounts = new Map();
     this.pendingRequestLogWrites = [];
+    this.toolExecutions = [];
     this.conversationOutcome = "completed";
     this.costBudgetStop = null;
 
@@ -324,5 +350,23 @@ export default class AgenticLoopState {
     }
 
     return { cleanSegments, cleanTextFragments, cleanThinkingFragments };
+  }
+
+  /** Record one executed tool call — its own duration and outcome. */
+  recordToolExecution(
+    toolCall: ToolCall,
+    result: unknown,
+    durationMilliseconds: number,
+  ): void {
+    this.toolExecutions.push(
+      buildToolExecutionRecord(toolCall, result, durationMilliseconds),
+    );
+  }
+
+  /** The tool executions recorded since the last call, for one request row. */
+  takeToolExecutions(): ToolExecutionRecord[] {
+    const taken = this.toolExecutions;
+    this.toolExecutions = [];
+    return taken;
   }
 }

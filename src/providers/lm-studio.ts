@@ -1257,6 +1257,10 @@ export function createLmStudioProvider(
         } else {
           (payload as Record<string, unknown>).tools = tools;
         }
+        // The exhaustion pass keeps the tool block and forbids calls.
+        if (options.toolChoice === "none") {
+          (payload as Record<string, unknown>).tool_choice = "none";
+        }
       }
       logger.info(
         `[LM-Studio] OpenAI-compat streaming (agentic): model=${model}, tools=${((payload as Record<string, unknown>).tools as unknown[] | undefined)?.length || 0}/${options.tools?.length || 0}, ctx=${options._loadedContextLength || "unset"}`,

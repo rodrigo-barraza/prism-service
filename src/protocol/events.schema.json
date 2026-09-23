@@ -1,0 +1,4028 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:prism:protocol:v1:events",
+  "title": "Prism turn event (protocol v1)",
+  "description": "One event of a Prism conversation turn stream (SSE POST /agent, /chat, /conversation; the /ws/chat WebSocket). $defs.SynthesisEvent is one event of the POST /synthesis/generate stream. Generated from src/protocol/events.ts.",
+  "x-protocol-version": 1,
+  "anyOf": [
+    {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "hello"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "protocolVersion": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "type",
+            "protocolVersion"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "subscribed"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "lastSeq": {
+              "type": "number"
+            },
+            "replayedCount": {
+              "type": "number"
+            },
+            "droppedCount": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "lastSeq",
+            "replayedCount",
+            "droppedCount"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "error"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "code": {
+              "type": "string",
+              "enum": [
+                "rate_limited",
+                "overloaded",
+                "refusal",
+                "context_overflow",
+                "auth",
+                "invalid_request",
+                "tool_failure",
+                "internal"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "status": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "type",
+            "code",
+            "message",
+            "retryable"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "user_message"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string",
+              "const": "user"
+            },
+            "content": {
+              "type": "string"
+            },
+            "conversationId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "role",
+            "content",
+            "conversationId",
+            "timestamp"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "chunk"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "content": {
+              "type": "string"
+            },
+            "outputCharacters": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "thinking"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "content": {
+              "type": "string"
+            },
+            "outputCharacters": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "image"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "data": {
+              "type": "string"
+            },
+            "mimeType": {
+              "type": "string"
+            },
+            "minioRef": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "audio"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "data": {
+              "type": "string"
+            },
+            "mimeType": {
+              "type": "string"
+            },
+            "minioRef": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "executableCode"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "code": {
+              "type": "string"
+            },
+            "language": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "code",
+            "language"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "codeExecutionResult"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "output": {
+              "type": "string"
+            },
+            "outcome": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "output",
+            "outcome"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "webSearchResult"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "pageAge": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "type",
+            "results"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "citations"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url",
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "queries": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "sources",
+            "queries"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "refusal"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "category": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "explanation": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "recommendedModel": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "iteration": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "category",
+            "explanation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "toolCall"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "args": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            "responsesItemId": {
+              "type": "string"
+            },
+            "result": {},
+            "status": {
+              "type": "string"
+            },
+            "thoughtSignature": {
+              "type": "string"
+            },
+            "durationMilliseconds": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "args"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "tool_execution"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "streaming",
+                "calling",
+                "done",
+                "error"
+              ]
+            },
+            "tool": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "args": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "responsesItemId": {
+                  "type": "string"
+                },
+                "result": {},
+                "durationMilliseconds": {
+                  "type": "number"
+                },
+                "durationMs": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "args"
+              ],
+              "additionalProperties": false
+            },
+            "toolEmoji": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "toolLabel": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "status",
+            "tool"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "tool_output"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "toolCallId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "event": {
+              "type": "string",
+              "enum": [
+                "start",
+                "stdout",
+                "stderr",
+                "exit"
+              ]
+            },
+            "data": {
+              "type": "string"
+            },
+            "meta": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "required": [
+            "type",
+            "toolCallId",
+            "name",
+            "event"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "approval_required"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "toolCallId": {
+              "type": "string"
+            },
+            "batchId": {
+              "type": "string"
+            },
+            "batchSize": {
+              "type": "number"
+            },
+            "toolCall": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "args": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "args"
+              ],
+              "additionalProperties": false
+            },
+            "tier": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "tierLabel": {
+              "type": "string"
+            },
+            "preview": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "diff"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "diff": {
+                  "type": "string"
+                },
+                "isNewFile": {
+                  "type": "boolean"
+                },
+                "isTruncated": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "kind",
+                "path",
+                "diff"
+              ],
+              "additionalProperties": false
+            },
+            "requestedBy": {
+              "type": "string",
+              "enum": [
+                "hook",
+                "restart"
+              ]
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "protectedPath": {
+              "type": "string"
+            },
+            "alwaysAsks": {
+              "type": "boolean",
+              "const": true
+            },
+            "mode": {
+              "type": "string"
+            },
+            "subAgentId": {
+              "type": "string"
+            },
+            "subAgentDescription": {
+              "type": "string"
+            },
+            "approvalConversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "toolCallId",
+            "batchId",
+            "batchSize",
+            "toolCall"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "approval_decided"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "toolCallId": {
+              "type": "string"
+            },
+            "batchId": {
+              "type": "string"
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "allow",
+                "deny"
+              ]
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "call",
+                "batch",
+                "conversation"
+              ]
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "user",
+                "superseded",
+                "turn_ended"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            },
+            "editedByUser": {
+              "type": "boolean",
+              "const": true
+            },
+            "subAgentId": {
+              "type": "string"
+            },
+            "subAgentDescription": {
+              "type": "string"
+            },
+            "approvalConversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "toolCallId",
+            "batchId",
+            "decision",
+            "scope",
+            "source"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "plan_proposal"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "plan": {
+              "type": "string"
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "autoApproved": {
+              "type": "boolean"
+            },
+            "toolCallId": {
+              "type": "string"
+            },
+            "batchId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "plan",
+            "steps",
+            "autoApproved",
+            "toolCallId",
+            "batchId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "user_question"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "questionId": {
+              "type": "string"
+            },
+            "blocking": {
+              "type": "boolean"
+            },
+            "context": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "questions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "question": {
+                    "type": "string"
+                  },
+                  "header": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "preview": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "preview"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "multiSelect": {
+                    "type": "boolean"
+                  },
+                  "elicitation": {
+                    "type": "object",
+                    "properties": {
+                      "server": {
+                        "type": "string"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "form",
+                          "url"
+                        ]
+                      },
+                      "requestedSchema": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "server",
+                      "mode"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "question",
+                  "header",
+                  "options",
+                  "multiSelect"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "type",
+            "questionId",
+            "blocking",
+            "context",
+            "questions"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "turn_input"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "user_update",
+                "question_answer",
+                "task_completion",
+                "agent_message"
+              ]
+            },
+            "content": {
+              "type": "string"
+            },
+            "images": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "boundary": {
+              "type": "string",
+              "enum": [
+                "iteration_start",
+                "after_tools",
+                "before_end",
+                "turn_end"
+              ]
+            },
+            "iteration": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "kind",
+            "content",
+            "boundary",
+            "iteration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "goal_update"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "change": {
+              "type": "string",
+              "enum": [
+                "set",
+                "progress",
+                "status",
+                "cleared"
+              ]
+            },
+            "goal": {
+              "type": "object",
+              "properties": {
+                "objective": {
+                  "type": "string"
+                },
+                "completionCriteria": {
+                  "type": "string"
+                },
+                "budget": {
+                  "type": "object",
+                  "properties": {
+                    "maxCostDollars": {
+                      "type": "number"
+                    },
+                    "maxTurns": {
+                      "type": "number"
+                    },
+                    "deadline": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "progress": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "percent": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "blockedOn": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "paused",
+                    "completed",
+                    "blocked"
+                  ]
+                },
+                "spentDollars": {
+                  "type": "number"
+                },
+                "turnsUsed": {
+                  "type": "number"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objective",
+                "progress",
+                "status",
+                "spentDollars",
+                "turnsUsed",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "change",
+            "goal"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "todo_update"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "number"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "in_progress",
+                      "completed"
+                    ]
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "content",
+                  "status",
+                  "priority"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "stats": {
+              "type": "object",
+              "properties": {
+                "total": {
+                  "type": "number"
+                },
+                "pending": {
+                  "type": "number"
+                },
+                "in_progress": {
+                  "type": "number"
+                },
+                "completed": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "total",
+                "pending",
+                "in_progress",
+                "completed"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "items",
+            "stats"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "brief_update"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "brief": {
+              "type": "object",
+              "properties": {
+                "summary": {
+                  "type": "string"
+                },
+                "keyFiles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "openQuestions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "timestamp": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "summary",
+                "keyFiles",
+                "openQuestions",
+                "timestamp"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "brief"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "usage_update"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "operation": {
+              "type": "string"
+            },
+            "usage": {
+              "type": "object",
+              "properties": {
+                "inputTokens": {
+                  "type": "number"
+                },
+                "outputTokens": {
+                  "type": "number"
+                },
+                "cacheReadInputTokens": {
+                  "type": "number"
+                },
+                "cacheCreationInputTokens": {
+                  "type": "number"
+                },
+                "reasoningOutputTokens": {
+                  "type": "number"
+                },
+                "totalTokens": {
+                  "type": "number"
+                },
+                "totalInputTokens": {
+                  "type": "number"
+                },
+                "tokensPerSec": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "requests": {
+                  "type": "number"
+                },
+                "estimatedCost": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "byModel": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                      "inputTokens": {
+                        "type": "number"
+                      },
+                      "outputTokens": {
+                        "type": "number"
+                      },
+                      "cacheReadInputTokens": {
+                        "type": "number"
+                      },
+                      "cacheCreationInputTokens": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "inputTokens",
+                      "outputTokens",
+                      "cacheReadInputTokens",
+                      "cacheCreationInputTokens"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "estimatedCost": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "usage"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "context_budget"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "contextWindow": {
+              "type": "number"
+            },
+            "messageTokens": {
+              "type": "number"
+            },
+            "systemPromptTokens": {
+              "type": "number"
+            },
+            "toolSchemaTokens": {
+              "type": "number"
+            },
+            "skillTokens": {
+              "type": "number"
+            },
+            "safetyMarginTokens": {
+              "type": "number"
+            },
+            "totalInputTokens": {
+              "type": "number"
+            },
+            "availableOutputTokens": {
+              "type": "number"
+            },
+            "requestedOutputTokens": {
+              "type": "number"
+            },
+            "isClamped": {
+              "type": "boolean"
+            },
+            "toolCount": {
+              "type": "number"
+            },
+            "source": {
+              "type": "string",
+              "enum": [
+                "estimated",
+                "reported"
+              ]
+            },
+            "lastReportedInputTokens": {
+              "type": "number"
+            },
+            "calibrationRatio": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "contextWindow",
+            "messageTokens",
+            "systemPromptTokens",
+            "toolSchemaTokens",
+            "skillTokens",
+            "safetyMarginTokens",
+            "totalInputTokens",
+            "availableOutputTokens",
+            "isClamped",
+            "toolCount",
+            "source"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "task_notification"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "content": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "string"
+            },
+            "_notificationSource": {
+              "type": "string"
+            },
+            "_notificationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "content",
+            "timestamp",
+            "_notificationSource",
+            "_notificationId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "conversation_state_update"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "pendingBackgroundTasks": {
+              "type": "number"
+            },
+            "isActive": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type",
+            "pendingBackgroundTasks",
+            "isActive"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "permission_mode"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "previousMode": {
+              "type": "string"
+            },
+            "unattended": {
+              "type": "boolean",
+              "const": true
+            },
+            "refused": {
+              "type": "string",
+              "const": "bypass"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "conversationId",
+            "mode",
+            "source"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "memory_consolidation_complete"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "project": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "merged": {
+              "type": "number"
+            },
+            "deleted": {
+              "type": "number"
+            },
+            "errors": {
+              "type": "number"
+            },
+            "closedIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "createdIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "actionsApplied": {
+              "type": "number"
+            },
+            "batchCount": {
+              "type": "number"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "total": {
+              "type": "number"
+            },
+            "trigger": {
+              "type": "string"
+            },
+            "durationMilliseconds": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "project",
+            "merged",
+            "deleted",
+            "errors",
+            "closedIds",
+            "createdIds",
+            "actionsApplied",
+            "batchCount",
+            "summary",
+            "total",
+            "trigger",
+            "durationMilliseconds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "sub_agent_status"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "subAgentId": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string",
+                  "const": "spawned"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "const": "running"
+                },
+                "agentConversationId": {
+                  "type": "string"
+                },
+                "conversationId": {
+                  "type": "string"
+                },
+                "parentConversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "model": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "agentIndex": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "globalSpawnIndex": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "type",
+                "subAgentId",
+                "message",
+                "description"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "sub_agent_status"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "subAgentId": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string",
+                  "const": "phase"
+                },
+                "phase": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "progress": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type",
+                "subAgentId",
+                "message",
+                "phase"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "sub_agent_status"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "subAgentId": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string",
+                  "const": "generation_started"
+                },
+                "timeToFirstToken": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type",
+                "subAgentId",
+                "message",
+                "timeToFirstToken"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "sub_agent_status"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "subAgentId": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string",
+                  "const": "generation_progress"
+                },
+                "outputTokens": {
+                  "type": "number"
+                },
+                "firstChunkTime": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "lastChunkTime": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "tokPerSec": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "totalOutputTokens": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "type",
+                "subAgentId",
+                "message",
+                "outputTokens",
+                "firstChunkTime",
+                "lastChunkTime",
+                "tokPerSec",
+                "totalOutputTokens"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "sub_agent_status"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "subAgentId": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string",
+                  "const": "iteration_progress"
+                },
+                "iteration": {
+                  "type": "number"
+                },
+                "maxIterations": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "type",
+                "subAgentId",
+                "message"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "sub_agent_status"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "subAgentId": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string",
+                  "const": "sub_agents_updated"
+                }
+              },
+              "required": [
+                "type",
+                "subAgentId",
+                "message"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "sub_agent_status"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "subAgentId": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string",
+                  "const": "complete"
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "durationMilliseconds": {
+                  "type": "number"
+                },
+                "toolCount": {
+                  "type": "number"
+                },
+                "usage": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "number"
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "estimatedCost": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "type",
+                "subAgentId",
+                "message",
+                "durationMilliseconds",
+                "toolCount"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "sub_agent_status"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "subAgentId": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string",
+                  "const": "failed"
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "subAgentId",
+                "message",
+                "conversationId",
+                "error"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "sub_agent_status"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "subAgentId": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string",
+                  "const": "merge_back"
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "mergeBack": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "conflict",
+                        "failed"
+                      ]
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "repositoryPath": {
+                      "type": "string"
+                    },
+                    "worktreePath": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "branchDeleted": {
+                      "type": "boolean"
+                    },
+                    "conflictingFiles": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "branch",
+                    "repositoryPath",
+                    "worktreePath",
+                    "branchDeleted"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "type",
+                "subAgentId",
+                "message",
+                "conversationId",
+                "mergeBack"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "sub_agent_tool_execution"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "subAgentId": {
+              "type": "string"
+            },
+            "subAgentDescription": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "streaming",
+                "calling",
+                "done",
+                "error"
+              ]
+            },
+            "tool": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "args": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "responsesItemId": {
+                  "type": "string"
+                },
+                "result": {},
+                "durationMilliseconds": {
+                  "type": "number"
+                },
+                "durationMs": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "args"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "subAgentId",
+            "subAgentDescription",
+            "status",
+            "tool"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "sub_agent_tool_output"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "subAgentId": {
+              "type": "string"
+            },
+            "toolCallId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "event": {
+              "type": "string",
+              "enum": [
+                "start",
+                "stdout",
+                "stderr",
+                "exit"
+              ]
+            },
+            "data": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "subAgentId",
+            "toolCallId",
+            "name",
+            "event"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "done"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "usage": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "inputTokens": {
+                      "type": "number"
+                    },
+                    "outputTokens": {
+                      "type": "number"
+                    },
+                    "cacheReadInputTokens": {
+                      "type": "number"
+                    },
+                    "cacheCreationInputTokens": {
+                      "type": "number"
+                    },
+                    "reasoningOutputTokens": {
+                      "type": "number"
+                    },
+                    "totalTokens": {
+                      "type": "number"
+                    },
+                    "totalInputTokens": {
+                      "type": "number"
+                    },
+                    "tokensPerSec": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "requests": {
+                      "type": "number"
+                    },
+                    "estimatedCost": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "byModel": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "inputTokens": {
+                            "type": "number"
+                          },
+                          "outputTokens": {
+                            "type": "number"
+                          },
+                          "cacheReadInputTokens": {
+                            "type": "number"
+                          },
+                          "cacheCreationInputTokens": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "inputTokens",
+                          "outputTokens",
+                          "cacheReadInputTokens",
+                          "cacheCreationInputTokens"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "estimatedCost": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "tokensPerSec": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timeToGeneration": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "generationTime": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "totalTime": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "thinkingDurationSeconds": {
+              "type": "number"
+            },
+            "contentDurationSeconds": {
+              "type": "number"
+            },
+            "audioRef": {
+              "type": "string"
+            },
+            "traceId": {
+              "type": "string"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "refusal": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "explanation": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "recommendedModel": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "model": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "category",
+                "explanation"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "provider",
+            "model",
+            "usage",
+            "estimatedCost",
+            "totalTime"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "tasks_updated"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "sub_agents_updated"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "memories_updated"
+            },
+            "count": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "generation_started"
+            },
+            "timeToFirstToken": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "timeToFirstToken"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "generation_progress"
+            },
+            "tokPerSec": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "activeRequests": {
+              "type": "number"
+            },
+            "outputTokens": {
+              "type": "number"
+            },
+            "inputTokens": {
+              "type": "number"
+            },
+            "totalTokens": {
+              "type": "number"
+            },
+            "outputCharacters": {
+              "type": "number"
+            },
+            "avgTtft": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "estimatedCost": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "tokPerSec",
+            "activeRequests",
+            "outputTokens",
+            "inputTokens",
+            "totalTokens",
+            "avgTtft",
+            "estimatedCost"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "iteration_progress"
+            },
+            "iteration": {
+              "type": "number"
+            },
+            "maxIterations": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "harness": {
+              "type": "string",
+              "enum": [
+                "tree_of_thought",
+                "graph_of_thoughts"
+              ]
+            },
+            "searchStrategy": {
+              "type": "string",
+              "enum": [
+                "bfs",
+                "dfs"
+              ]
+            },
+            "branchCount": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "iteration",
+            "maxIterations"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "iteration_limit_reached"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "empty_output"
+            },
+            "iteration": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "iteration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "max_tokens_truncated"
+            },
+            "phase": {
+              "type": "string",
+              "const": "truncated"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "phase"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "output_truncation_recovery"
+            },
+            "attempt": {
+              "type": "number"
+            },
+            "maxAttempts": {
+              "type": "number"
+            },
+            "escalatedMaxTokens": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "attempt",
+            "maxAttempts",
+            "escalatedMaxTokens"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "context_exhausted"
+            },
+            "availableOutputTokens": {
+              "type": "number"
+            },
+            "contextWindow": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "availableOutputTokens",
+            "contextWindow"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "context_truncated"
+            },
+            "strategy": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "estimatedTokens": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "strategy",
+            "estimatedTokens"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "cost_limit_reached"
+            },
+            "estimatedCost": {
+              "type": "number"
+            },
+            "maxCostDollars": {
+              "type": "number"
+            },
+            "iteration": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "estimatedCost",
+            "maxCostDollars",
+            "iteration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "repetition_detected"
+            },
+            "iteration": {
+              "type": "number"
+            },
+            "rule": {
+              "type": "string",
+              "const": "repetition"
+            },
+            "retry": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "iteration",
+            "rule",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "semantic_stall_detected"
+            },
+            "iteration": {
+              "type": "number"
+            },
+            "rule": {
+              "type": "string",
+              "const": "semantic-stall"
+            },
+            "retry": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "iteration",
+            "rule",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "system_reminder_injected"
+            },
+            "iteration": {
+              "type": "number"
+            },
+            "interval": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "iteration",
+            "interval"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "skills_injected"
+            },
+            "skills": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "skills"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "tool_set_changed"
+            },
+            "enabledCount": {
+              "type": "number"
+            },
+            "dynamicTools": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "estimatedInvalidatedTokens": {
+              "type": "number"
+            },
+            "preflight": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "enabledCount",
+            "dynamicTools"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "program_completed"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "ok",
+                "syntax_error",
+                "result_not_serialisable",
+                "timeout",
+                "aborted",
+                "program_error"
+              ]
+            },
+            "callCount": {
+              "type": "number"
+            },
+            "durationMilliseconds": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "status",
+            "callCount",
+            "durationMilliseconds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "compaction_started"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "compaction_failed"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "compaction_complete"
+            },
+            "preCompactTokens": {
+              "type": "number"
+            },
+            "postCompactTokens": {
+              "type": "number"
+            },
+            "boundary": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "throughMessageId": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "tokensBefore": {
+                      "type": "number"
+                    },
+                    "tokensAfter": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "throughMessageId",
+                    "createdAt",
+                    "provider",
+                    "model",
+                    "tokensBefore",
+                    "tokensAfter"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "preCompactTokens",
+            "postCompactTokens",
+            "boundary"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "plan_mode_entered"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "plan_mode_exited"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "branching_started"
+            },
+            "branchCount": {
+              "type": "number"
+            },
+            "iteration": {
+              "type": "number"
+            },
+            "searchStrategy": {
+              "type": "string",
+              "enum": [
+                "bfs",
+                "dfs"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "branchCount",
+            "iteration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "branch_selected"
+            },
+            "branchCount": {
+              "type": "number"
+            },
+            "scores": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "index": {
+                    "type": "number"
+                  },
+                  "score": {
+                    "type": "number"
+                  },
+                  "criteria": {
+                    "type": "object",
+                    "properties": {
+                      "correctness": {
+                        "type": "number"
+                      },
+                      "risk": {
+                        "type": "number"
+                      },
+                      "efficiency": {
+                        "type": "number"
+                      },
+                      "completeness": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "correctness",
+                      "risk",
+                      "efficiency",
+                      "completeness"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "index",
+                  "score",
+                  "criteria"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "branchIndex": {
+              "type": "number"
+            },
+            "score": {
+              "type": "number"
+            },
+            "criteriaScores": {
+              "type": "object",
+              "properties": {
+                "correctness": {
+                  "type": "number"
+                },
+                "risk": {
+                  "type": "number"
+                },
+                "efficiency": {
+                  "type": "number"
+                },
+                "completeness": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "correctness",
+                "risk",
+                "efficiency",
+                "completeness"
+              ],
+              "additionalProperties": false
+            },
+            "searchStrategy": {
+              "type": "string",
+              "enum": [
+                "bfs",
+                "dfs"
+              ]
+            },
+            "frontierSize": {
+              "type": "number"
+            },
+            "synthesizing": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "branchCount",
+            "scores"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "branch_backtracked"
+            },
+            "branchIndex": {
+              "type": "number"
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "dfs_sibling_pruned",
+                "proactive_value_threshold"
+              ]
+            },
+            "score": {
+              "type": "number"
+            },
+            "bestScore": {
+              "type": "number"
+            },
+            "threshold": {
+              "type": "number"
+            },
+            "siblingAttempt": {
+              "type": "number"
+            },
+            "maxSiblings": {
+              "type": "number"
+            },
+            "proactiveBacktracks": {
+              "type": "number"
+            },
+            "maxProactiveBacktracks": {
+              "type": "number"
+            },
+            "validationErrors": {
+              "type": "number"
+            },
+            "restoredCheckpoint": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "branchIndex"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "synthesis_started"
+            },
+            "branchCount": {
+              "type": "number"
+            },
+            "iteration": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "branchCount",
+            "iteration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "worktree_entered"
+            },
+            "branch": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "branch",
+            "path"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "worktree_exited"
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "merge",
+                "discard"
+              ]
+            },
+            "branch": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "action",
+            "branch"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "turn_input_applied"
+            },
+            "inputId": {
+              "type": "string"
+            },
+            "boundary": {
+              "type": "string",
+              "enum": [
+                "iteration_start",
+                "after_tools",
+                "before_end",
+                "turn_end"
+              ]
+            },
+            "iteration": {
+              "type": "number"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "user_update",
+                "question_answer",
+                "task_completion",
+                "agent_message"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "inputId",
+            "boundary",
+            "iteration",
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "hook_context_applied"
+            },
+            "inputId": {
+              "type": "string"
+            },
+            "boundary": {
+              "type": "string",
+              "enum": [
+                "iteration_start",
+                "after_tools",
+                "before_end",
+                "turn_end"
+              ]
+            },
+            "iteration": {
+              "type": "number"
+            },
+            "_hookName": {
+              "type": "string"
+            },
+            "_hookEvent": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "inputId",
+            "boundary",
+            "iteration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "question_pending"
+            },
+            "questionId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "questionId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "turn_resumed"
+            },
+            "iteration": {
+              "type": "number"
+            },
+            "attempt": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "iteration",
+            "attempt"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "hook_system_message"
+            },
+            "text": {
+              "type": "string"
+            },
+            "hookName": {
+              "type": "string"
+            },
+            "hookEvent": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "text",
+            "hookName",
+            "hookEvent"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "stop_hook_cap_reached"
+            },
+            "continuations": {
+              "type": "number"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "continuations",
+            "reason"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "status"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "message": {
+              "type": "string",
+              "const": "stop_hook_continue"
+            },
+            "continuation": {
+              "type": "number"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message",
+            "continuation",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "status"
+        },
+        "seq": {
+          "type": "number"
+        },
+        "message": {
+          "type": "string",
+          "pattern": "^(?!(?:tasks_updated|sub_agents_updated|memories_updated|generation_started|generation_progress|iteration_progress|iteration_limit_reached|empty_output|max_tokens_truncated|output_truncation_recovery|context_exhausted|context_truncated|cost_limit_reached|repetition_detected|semantic_stall_detected|system_reminder_injected|skills_injected|tool_set_changed|program_completed|compaction_started|compaction_failed|compaction_complete|plan_mode_entered|plan_mode_exited|branching_started|branch_selected|branch_backtracked|synthesis_started|worktree_entered|worktree_exited|turn_input_applied|hook_context_applied|question_pending|turn_resumed|hook_system_message|stop_hook_cap_reached|stop_hook_continue)$)"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "progress": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "type",
+        "message"
+      ],
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "SynthesisEvent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "hello"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "protocolVersion": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "type",
+            "protocolVersion"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "error"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "code": {
+              "type": "string",
+              "enum": [
+                "rate_limited",
+                "overloaded",
+                "refusal",
+                "context_overflow",
+                "auth",
+                "invalid_request",
+                "tool_failure",
+                "internal"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "status": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "type",
+            "code",
+            "message",
+            "retryable"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "synthesis_start"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "turn_start"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "assistant",
+                "user"
+              ]
+            },
+            "index": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "role",
+            "index"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "chunk"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "content": {
+              "type": "string"
+            },
+            "outputCharacters": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "thinking"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "content": {
+              "type": "string"
+            },
+            "outputCharacters": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "type",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "turn_complete"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "assistant",
+                "user"
+              ]
+            },
+            "message": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "thinking": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "content"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "role",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "done"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "synthesisRunId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "conversationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

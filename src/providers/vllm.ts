@@ -149,7 +149,7 @@ export function createVllmProvider(
         const tools = convertToolsToOpenAI(options.tools);
         if (tools) {
           payload.tools = tools;
-          payload.tool_choice = "auto";
+          payload.tool_choice = options.toolChoice === "none" ? "none" : "auto";
         }
 
         // Thinking hard switch — vLLM extension for Qwen3/reasoning models
@@ -248,7 +248,7 @@ export function createVllmProvider(
         const tools = convertToolsToOpenAI(options.tools);
         if (tools) {
           payload.tools = tools;
-          payload.tool_choice = "auto";
+          payload.tool_choice = options.toolChoice === "none" ? "none" : "auto";
         }
 
         // Thinking hard switch — vLLM extension for Qwen3/reasoning models

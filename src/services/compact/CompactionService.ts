@@ -27,6 +27,7 @@ import ToolResultOffloadService, {
   type OffloadMetadata,
 } from "./ToolResultOffloadService.ts";
 import { findRecencyBoundary } from "./RecencyProtection.ts";
+import { markDerivedMessage } from "./MessageLineage.ts";
 import {
   buildCompactionSummaryMessage,
   resolveBoundaryAnchorId,
@@ -36,6 +37,10 @@ import { SYSTEM_MESSAGE_TAGS } from "#src/utils/SystemMessageTags";
 import type { ChatMessage as AdminChatMessage } from "#src/types/admin";
 import type { ChatMessage, GenerateTextResult } from "#src/types/provider";
 import type { EmitFunction } from "#src/services/harnesses/types";
+import {
+  untrustedInputProvenance,
+  type ProvenanceMessage,
+} from "#src/services/memory/MemoryProvenance";
 
 // ────────────────────────────────────────────────────────────
 // CompactionService — LLM-Powered Conversation Summarization
@@ -286,12 +291,14 @@ export default class CompactionService {
       return skip("no_shrink_cooldown");
     }
 
-    // ── Resolve the compaction model through the utility role ──
+    // ── Resolve the compaction model through its role ──
     // Silently skipping compaction means silent context blowups (the loop
     // keeps growing until the provider rejects the request), so the chain
-    // is never empty while any model exists: env/DB utility config →
-    // the conversation's own model → local-instance/cheap-cloud defaults.
-    const roleChain = await ModelRoleRouter.resolveChain(MODEL_ROLES.UTILITY, {
+    // is never empty while any model exists: the agent's compaction pin →
+    // env/DB compaction config → env/DB utility config → the
+    // conversation's own model → local-instance/cheap-cloud defaults.
+    const roleChain = await ModelRoleRouter.resolveChain(MODEL_ROLES.COMPACTION, {
+      agents: [options.agent],
       fallback:
         options.fallbackProvider && options.fallbackModel
           ? {
@@ -381,7 +388,7 @@ export default class CompactionService {
             },
           );
         },
-        { role: MODEL_ROLES.UTILITY, operation: "compact:summarize" },
+        { role: MODEL_ROLES.COMPACTION, operation: "compact:summarize" },
       ));
     } catch (error: unknown) {
       success = false;
@@ -484,8 +491,19 @@ export default class CompactionService {
     // Insert the summary as a user message with a marker. It names the last
     // message it covers — the boundary the next turn loads through.
     const throughMessageId = resolveBoundaryAnchorId(droppedSpan);
+    // Memory provenance: a summary of untrusted input is untrusted input.
+    const taint = untrustedInputProvenance(
+      droppedSpan as unknown as ProvenanceMessage[],
+    );
+    const inputProvenance = taint
+      ? { source: taint.source, trust: taint.trust }
+      : null;
     compactedMessages.push(
-      buildCompactionSummaryMessage(summaryWithRecovery, throughMessageId),
+      buildCompactionSummaryMessage(
+        summaryWithRecovery,
+        throughMessageId,
+        inputProvenance,
+      ),
     );
 
     // Carry active deviation-rule reminders from the dropped span across
@@ -494,8 +512,12 @@ export default class CompactionService {
       ...collectDroppedDeviationReminders(messages, recentTail),
     );
 
-    // Append recent tail (last few turns the model is actively reasoning about)
-    compactedMessages.push(...recentTail);
+    // Append recent tail (last few turns the model is actively reasoning about).
+    // Its Anthropic thinking blocks stay behind: each one's signature binds
+    // it to the full history it was produced under, which the summary just
+    // replaced — replayed after the swap, the API drops it (or 400s when
+    // binding mismatches are errors). Text and tool calls stay verbatim.
+    compactedMessages.push(...recentTail.map(withoutBoundThinking));
 
     const postCompactTokenCount = estimateTotalTokens(compactedMessages);
 
@@ -532,6 +554,7 @@ export default class CompactionService {
           model: compactionModel,
           tokensBefore: preCompactTokenCount,
           tokensAfter: postCompactTokenCount,
+          ...(inputProvenance && { inputProvenance }),
         }
       : null;
     if (!boundary) {
@@ -826,4 +849,17 @@ async function validateSummaryAgainstTail(
     `[CompactionService] Summary judge patched ${additions.split("\n").length} omission(s) into the summary`,
   );
   return `${summaryText}\n\n## Validation additions (facts the continuation depends on)\n${additions}`;
+}
+
+/**
+ * A retained message without the thinking that binds to the pre-compaction
+ * history: `thinkingBlocks` and the legacy signature go (the Anthropic
+ * adapter only replays a thinking block that has one); the thinking text
+ * stays for display. Persistence still writes the original (MessageLineage).
+ */
+function withoutBoundThinking(message: AdminChatMessage): AdminChatMessage {
+  if (!message.thinkingBlocks?.length && !message.thinkingSignature) return message;
+  const { thinkingBlocks: _thinkingBlocks, thinkingSignature: _thinkingSignature, ...rest } =
+    message;
+  return markDerivedMessage(rest as AdminChatMessage, message);
 }

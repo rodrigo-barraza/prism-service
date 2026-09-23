@@ -1,6 +1,7 @@
 import { TOOLS_SERVICE_URL } from "#config";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
-import MCPClientService from "#src/services/MCPClientService";
+import MCPClientService, { type MCPCallOptions } from "#src/services/MCPClientService";
+import { createLoopElicitHandler } from "#src/services/mcp/McpElicitation";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import {
   partitionByDiscoverableUniverse,
@@ -15,6 +16,7 @@ import {
 } from "@rodrigo-barraza/utilities-library";
 import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
 import { createAbortController } from "#src/utils/AbortController";
+import { traceHeaders } from "#src/services/Tracing";
 import {
   DOMAINS,
   TOOL_NAMES,
@@ -35,6 +37,7 @@ import {
   AGENT_DIRECTIVES,
 } from "#src/constants";
 import FileService from "#src/services/FileService";
+import { redirectArgumentsToWorktree } from "./WorktreePathRewrite.ts";
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import { registerToolCapabilities } from "#src/services/permissions/ToolCapabilities";
 import SettingsService from "#src/services/SettingsService";
@@ -45,6 +48,7 @@ import {
 } from "#src/utils/VoiceCatalog";
 import { Bm25ToolIndex } from "@rodrigo-barraza/utilities-library/search";
 import type { OrchestratorContext, TeamMember } from "#src/types/orchestrator";
+import { ROUTING_PRESETS } from "#src/services/routing/RoutingPresetIds";
 import {
   type ToolSchemaFull,
   type ToolExecutionContext,
@@ -56,6 +60,8 @@ import {
   type ToolEndpoint,
 } from "./types.ts";
 import { INTERNAL_TOOL_EMOJIS } from "./InternalToolEmojis.ts";
+import { buildDiscordContextHeaders } from "./DiscordContextHeaders.ts";
+import { recordSaveMemoryProvenance } from "#src/services/memory/SaveMemoryProvenance";
 
 // ────────────────────────────────────────────────────────────
 // Schema Cache — fetched from tools-api at startup
@@ -376,6 +382,11 @@ async function executeToolGeneric(
   // Build caller-context headers for tools-api telemetry
   const contextHeaders = buildContextHeaders(context);
 
+  // A sub-agent in a worktree works in it: paths into its parent's
+  // checkout move into the worktree (WorktreePathRewrite), and tools-service
+  // resolves relative paths and runs commands there.
+  resolvedArgs = withWorktreeRedirect(resolvedArgs, context, contextHeaders);
+
   // Body-carrying methods send args as JSON body
   const bodyMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
   if (schema.endpoint.method && bodyMethods.has(schema.endpoint.method)) {
@@ -389,39 +400,6 @@ async function executeToolGeneric(
     if (context.project) body.project = context.project;
     if (context.agent) body.agent = context.agent;
     if (context.username) body.username = context.username;
-
-    // Worktree path rewriting — redirect file paths to the worktree directory
-    // when the session has an active worktree.
-    if (
-      context.agentConversationId &&
-      activeWorktrees.has(context.agentConversationId)
-    ) {
-      const worktreeState = activeWorktrees.get(context.agentConversationId)!;
-      const rewritePath = (
-        targetPath: string | number | boolean | object | null | undefined,
-      ): string | number | boolean | object | null | undefined => {
-        if (typeof targetPath !== "string") return targetPath;
-        if (targetPath.startsWith(worktreeState.originalRoot)) {
-          return (
-            worktreeState.worktreePath +
-            targetPath.slice(worktreeState.originalRoot.length)
-          );
-        }
-        return targetPath;
-      };
-
-      // Rewrite common path fields used by file/git/shell tools
-      if (body.path) body.path = rewritePath(body.path as string);
-      if (body.filePath) body.filePath = rewritePath(body.filePath as string);
-      if (body.oldPath) body.oldPath = rewritePath(body.oldPath as string);
-      if (body.newPath) body.newPath = rewritePath(body.newPath as string);
-      if (body.cwd) body.cwd = rewritePath(body.cwd as string);
-      if (body.directory) body.directory = rewritePath(body.directory as string);
-
-      // Inject workspace override header so tools-api sandbox validation passes
-      contextHeaders[IDENTITY_HEADERS.workspaceOverride] =
-        worktreeState.worktreePath;
-    }
 
     return fetchJsonWithBody(
       url,
@@ -437,9 +415,27 @@ async function executeToolGeneric(
 }
 
 /**
- * Build X-context headers from the caller context object.
- * These are consumed by tools-api's ToolCallLoggerMiddleware.
+ * A worktree session's arguments, redirected into its worktree, with the
+ * workspace-override header set (tools-service resolves relative paths and
+ * runs commands there). Any other session's arguments pass through.
+ */
+function withWorktreeRedirect(
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+  contextHeaders: Record<string, string>,
+): Record<string, unknown> {
+  const worktreeState = context.agentConversationId
+    ? activeWorktrees.get(context.agentConversationId)
+    : undefined;
+  if (!worktreeState) return args;
+  contextHeaders[IDENTITY_HEADERS.workspaceOverride] = worktreeState.worktreePath;
+  return redirectArgumentsToWorktree(args, worktreeState);
+}
 
+/**
+ * Build X-context headers from the caller context object.
+ * These are consumed by tools-api's ToolCallLoggerMiddleware — and, on a
+ * Discord turn, by its Discord scope enforcement (x-discord-*).
  */
 function buildContextHeaders(
   context: ToolExecutionContext = {},
@@ -466,7 +462,11 @@ function buildContextHeaders(
   }
   if (context._providerName) headers["X-Provider"] = context._providerName;
   if (context._resolvedModel) headers["X-Model"] = context._resolvedModel;
-  return headers;
+  // A Discord turn's guild/channel/requester, from its agentContext only —
+  // tools-service scopes the Discord tools to them.
+  Object.assign(headers, buildDiscordContextHeaders(context.agentContext));
+  // W3C traceparent of the tool call's span, when tracing is on (Tracing).
+  return { ...headers, ...traceHeaders() };
 }
 
 async function fetchJson(
@@ -548,6 +548,19 @@ async function fetchJsonWithBody(
 // Orchestrator Tool Schemas — Prism-local, not routed to tools-api
 // ────────────────────────────────────────────────────────────
 
+/** Longest agent description the spawn tools' roster carries, per agent. */
+const AGENT_ROSTER_DESCRIPTION_MAXIMUM_CHARACTERS = 160;
+
+/** An agent's description for the roster: its first sentence, clipped. */
+function summarizeAgentDescription(description: string | undefined): string {
+  const text = (description ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const firstSentence = /^(.+?[.!?])(\s|$)/.exec(text)?.[1] ?? text;
+  return firstSentence.length > AGENT_ROSTER_DESCRIPTION_MAXIMUM_CHARACTERS
+    ? `${firstSentence.slice(0, AGENT_ROSTER_DESCRIPTION_MAXIMUM_CHARACTERS - 1).trimEnd()}…`
+    : firstSentence;
+}
+
 /**
  * Dynamically builds the `agent` parameter description for the
  * create_subagents schema by reading all registered persona IDs from
@@ -557,9 +570,13 @@ async function fetchJsonWithBody(
 function buildAgentParameterDescription(locale?: string, toolName: string = "create_subagents"): string {
   const activeLocale = locale || PromptLocaleService.getDefaultLocale();
   const registeredAgents = AgentPersonaRegistry.list();
+  // Name AND description: the name alone never said when to pick an agent.
   const agentNames = registeredAgents
-    .map((entry) => `'${entry.name}'`)
-    .join(", ");
+    .map((entry) => {
+      const summary = summarizeAgentDescription(entry.description);
+      return summary ? `'${entry.name}' — ${summary}` : `'${entry.name}'`;
+    })
+    .join("; ");
 
   const agentKey = toolName === "create_subagent"
     ? "orchestrator.tools.create_subagent.parameters.agent"
@@ -1757,11 +1774,25 @@ export default class ToolOrchestratorService {
       );
     }
 
+    // save_memory reaches /agent-memories through tools-service, which
+    // forwards the text but not the loop — record what the loop had read
+    // so the route can quarantine a write made after untrusted input.
+    if (name === TOOL_NAMES.SAVE_MEMORY) {
+      recordSaveMemoryProvenance(context);
+    }
+
     // Route MCP tools to MCPClientService — thread the loop's abort signal
     // so user stops / per-tool timeouts actually cancel the in-flight call.
     if (MCPClientService.isMCPTool(name)) {
+      const serverName = MCPClientService.parseMCPToolName(name)?.serverName;
+      const elicit = serverName ? createLoopElicitHandler(context, serverName) : undefined;
       return ToolOrchestratorService.executeMCPTool(name, args, {
         signal: context.signal,
+        scope: { username: context.username, profileId: context.profileId },
+        conversationId: context.conversationId,
+        project: context.project,
+        // A server that asks for input mid-call gets a question card.
+        ...(elicit && { elicit }),
       });
     }
 
@@ -2125,16 +2156,62 @@ export default class ToolOrchestratorService {
       autoApprove: context._autoApprove === true,
       policies: context._policies,
       permissionRules: context._permissionRules,
+      permissionMode: context._permissionMode,
       enableCriticGate: context._enableCriticGate,
       criticModel: context._criticModel,
       maxCostDollars: context._maxCostDollars,
       sharedCostBudget: context._sharedCostBudget,
+      routingPreset: context._routingPreset ?? null,
     };
 
     switch (name) {
       case TOOL_NAMES.CREATE_SUBAGENT: {
         // Wrap flat singular args into the createTeam format (single member, no topology)
         const singularArgs = args as { description?: string; prompt?: string; files?: string[]; model?: string; agent?: string };
+
+        // lead_sidekick: the lead's delegations all go to ONE sidekick that
+        // keeps its own context — a later create_subagent continues it.
+        const sidekickScope =
+          orchestratorContext.routingPreset === ROUTING_PRESETS.LEAD_SIDEKICK &&
+          (orchestratorContext.recursionDepth ?? 0) === 0 &&
+          orchestratorContext.conversationId &&
+          orchestratorContext.project &&
+          orchestratorContext.username
+            ? {
+                conversationId: orchestratorContext.conversationId,
+                project: orchestratorContext.project,
+                username: orchestratorContext.username,
+              }
+            : null;
+        const leadSidekick = sidekickScope
+          ? await import("#src/services/routing/LeadSidekick")
+          : null;
+        if (sidekickScope && leadSidekick) {
+          const sidekickId = await leadSidekick.findSidekick(sidekickScope);
+          if (sidekickId) {
+            const continued = await OrchestratorService.resumeAgent(
+              sidekickId,
+              singularArgs.prompt || "",
+              orchestratorContext as OrchestratorContext,
+            );
+            if (!("error" in continued)) {
+              logger.info(
+                `[ToolOrchestrator] lead_sidekick: continued sidekick ${sidekickId} of ${sidekickScope.conversationId}`,
+              );
+              return { ...continued, sidekick: { agent_id: sidekickId, continued: true } };
+            }
+            if (String(continued.error).includes("currently running")) {
+              return {
+                error:
+                  `Your sidekick ${sidekickId} is still working on your previous delegation. ` +
+                  `Call wait_for_tasks with ["${sidekickId}"] for its brief, or send_subagent_message to add to its task.`,
+              };
+            }
+            // Gone (expired, failed): the next sidekick starts fresh.
+            leadSidekick.forgetSidekick(sidekickScope.conversationId);
+          }
+        }
+
         const teamName = (singularArgs.description || "subagent").toLowerCase().replace(/\s+/g, "_").slice(0, 32);
         const wrappedArgs = {
           name: teamName,
@@ -2150,6 +2227,14 @@ export default class ToolOrchestratorService {
           wrappedArgs as unknown as { name: string; members: TeamMember[] },
           orchestratorContext as OrchestratorContext,
         );
+        const spawnedAgentId = Array.isArray(singleResult)
+          ? singleResult
+              .map((agentResult) => ("agent_id" in agentResult ? agentResult.agent_id : undefined))
+              .find((agentId): agentId is string => typeof agentId === "string" && agentId !== "")
+          : undefined;
+        if (sidekickScope && leadSidekick && spawnedAgentId) {
+          await leadSidekick.rememberSidekick({ ...sidekickScope, agentId: spawnedAgentId });
+        }
 
         const singleCallerDepth = orchestratorContext.recursionDepth ?? 0;
         if (singleCallerDepth > 0) {
@@ -2245,7 +2330,7 @@ export default class ToolOrchestratorService {
   static async executeMCPTool(
     fullName: string,
     args: Record<string, unknown> = {},
-    options: { signal?: AbortSignal; timeoutMilliseconds?: number } = {},
+    options: MCPCallOptions = {},
   ) {
     const parsed = MCPClientService.parseMCPToolName(fullName);
     if (!parsed) {
@@ -2258,8 +2343,9 @@ export default class ToolOrchestratorService {
       options,
     );
   }
-  static getMCPToolSchemas() {
-    return MCPClientService.getToolSchemas();
+  /** Approved MCP tools of the servers `scope` sees (default: the request's). */
+  static getMCPToolSchemas(scope?: MCPCallOptions["scope"]) {
+    return MCPClientService.getToolSchemas(scope);
   }
 
   /**
@@ -2344,7 +2430,10 @@ export default class ToolOrchestratorService {
       }
     }
 
-    const mcpSchemas = MCPClientService.getToolSchemas();
+    const mcpSchemas = MCPClientService.getToolSchemas({
+      username: context.username,
+      profileId: context.profileId,
+    });
     if (mcpSchemas.length === 0) return toolsApiResult;
 
     const queryText = typeof args.query === "string" ? args.query.trim() : "";
@@ -2498,6 +2587,7 @@ export default class ToolOrchestratorService {
 
     const url = `${TOOLS_SERVICE_URL}${streamPath}`;
     const contextHeaders = buildContextHeaders(context);
+    resolvedArgs = withWorktreeRedirect(resolvedArgs, context, contextHeaders);
 
     try {
       // Combine session abort signal with a 65s timeout.

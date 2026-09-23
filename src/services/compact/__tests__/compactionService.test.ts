@@ -206,14 +206,15 @@ describe("CompactionService", () => {
   ];
 
   it("returns null only when the utility role chain is truly empty (no config, no fallback, no defaults)", async () => {
-    vi.mocked(SettingsService.getSection).mockResolvedValueOnce(null as any);
+    // Compaction reads its own knob (agents) first, then the utility knob (memory).
+    vi.mocked(SettingsService.getSection).mockResolvedValueOnce(null as any).mockResolvedValueOnce(null as any);
     const result = await CompactionService.compactConversation(sampleMessages, {
       project: "test-proj",
       username: "rodrigo",
     });
     expect(result).toBeNull();
 
-    vi.mocked(SettingsService.getSection).mockResolvedValueOnce({
+    vi.mocked(SettingsService.getSection).mockResolvedValueOnce({} as any).mockResolvedValueOnce({
       extractionProvider: "",
       extractionModel: "",
     });
@@ -225,7 +226,8 @@ describe("CompactionService", () => {
   });
 
   it("is NOT silently disabled — unset settings fall back to the conversation model via the utility role", async () => {
-    vi.mocked(SettingsService.getSection).mockResolvedValueOnce({
+    // Compaction reads its own knob (agents) first, then the utility knob (memory).
+    vi.mocked(SettingsService.getSection).mockResolvedValueOnce({} as any).mockResolvedValueOnce({
       extractionProvider: "",
       extractionModel: "",
     });
@@ -253,12 +255,42 @@ describe("CompactionService", () => {
   });
 
   it("should return null if settings check throws and nothing else resolves", async () => {
-    vi.mocked(SettingsService.getSection).mockRejectedValueOnce(new Error("Database disconnected"));
+    vi.mocked(SettingsService.getSection)
+      .mockRejectedValueOnce(new Error("Database disconnected"))
+      .mockRejectedValueOnce(new Error("Database disconnected"));
     const result = await CompactionService.compactConversation(sampleMessages, {
       project: "test-proj",
       username: "rodrigo",
     });
     expect(result).toBeNull();
+  });
+
+  it("replays the kept tail without thinking bound to the replaced history", async () => {
+    const thinkingBlocks = [{ type: "thinking", thinking: "reasoning", signature: "sig_tail" }];
+    const messagesWithThinking = sampleMessages.map((message, index) =>
+      index === sampleMessages.length - 1
+        ? { ...message, thinking: "reasoning", thinkingSignature: "sig_tail", thinkingBlocks }
+        : message,
+    );
+    mockGenerateText.mockResolvedValueOnce({
+      text: "<summary>Summary of the dropped span.</summary>",
+      usage: { inputTokens: 100, outputTokens: 50 },
+    });
+    mockGenerateText.mockResolvedValueOnce({ text: "<ok/>", usage: { inputTokens: 10, outputTokens: 2 } });
+
+    const result = await CompactionService.compactConversation(messagesWithThinking as never, {
+      project: "test-proj",
+      username: "rodrigo",
+    });
+
+    expect(result).not.toBeNull();
+    const kept = result!.compactedMessages[result!.compactedMessages.length - 1] as Record<string, unknown>;
+    expect(kept.content).toBe("Assistant response 5");
+    expect(kept.thinkingBlocks).toBeUndefined();
+    expect(kept.thinkingSignature).toBeUndefined();
+    expect(kept.thinking).toBe("reasoning");
+    // The loop's copy is derived — persistence still writes the original.
+    expect((messagesWithThinking[messagesWithThinking.length - 1] as Record<string, unknown>).thinkingBlocks).toBe(thinkingBlocks);
   });
 
   it("carries deviation-rule reminders across the compaction boundary", async () => {

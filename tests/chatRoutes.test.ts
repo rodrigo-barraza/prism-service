@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import supertest from 'supertest';
-import { app, MOCK_GENERATE_TEXT, MOCK_GENERATE_TEXT_STREAM } from './setup.ts';
+import { app, MOCK_GENERATE_TEXT_STREAM } from './setup.ts';
 import agentRouter from '#src/routes/AgentRoutes';
 import { PROVIDERS } from '#src/constants';
 import { ProviderError } from '#src/utils/errors';
@@ -110,6 +110,64 @@ describe('ChatRoutes Integration', () => {
     });
   });
 
+  describe('traceId', () => {
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+    it.each([
+      ['mints a server-side traceId for /chat when the request brings none', undefined],
+      ['keeps the traceId a /chat caller sent', 'client-trace-1'],
+    ])('%s', async (_case, traceId) => {
+      const { default: RequestLogger } = await import('#src/services/RequestLogger');
+      MOCK_GENERATE_TEXT_STREAM.mockImplementation(async function* () {
+        yield 'traced';
+      });
+
+      const response = await agent
+        .post('/chat?stream=false')
+        .set('x-project', 'test')
+        .set('x-username', 'testuser')
+        .send({
+          provider: PROVIDERS.GOOGLE,
+          model: 'gemini-3.5-flash',
+          messages: [{ role: 'user', content: 'Hello assistant' }],
+          ...(traceId && { traceId }),
+        });
+
+      expect(response.status).toBe(200);
+      const loggedTraceId = vi.mocked(RequestLogger.logChatGeneration).mock.calls.at(-1)?.[0]?.traceId;
+      if (traceId) expect(loggedTraceId).toBe(traceId);
+      else expect(loggedTraceId).toMatch(UUID);
+    });
+
+    it.each([
+      ['mints a server-side traceId for the /agent loop when the request brings none', undefined],
+      ['hands the /agent loop the traceId the caller sent', 'client-trace-2'],
+    ])('%s', async (_case, traceId) => {
+      const { default: AgenticLoopService } = await import('#src/services/AgenticLoopService');
+      let loopTraceId: unknown;
+      vi.mocked(AgenticLoopService.runAgenticLoop).mockImplementationOnce(async (opts: any) => {
+        loopTraceId = opts.traceId;
+        opts.emit({ type: 'done', conversationId: opts.conversationId });
+        return { messages: [] } as never;
+      });
+
+      const response = await agent
+        .post('/agent?stream=false')
+        .set('x-project', 'test')
+        .set('x-username', 'testuser')
+        .send({
+          provider: PROVIDERS.OPENAI,
+          agent: 'CODING',
+          messages: [{ role: 'user', content: 'Help me write code' }],
+          ...(traceId && { traceId }),
+        });
+
+      expect(response.status).toBe(200);
+      if (traceId) expect(loopTraceId).toBe(traceId);
+      else expect(loopTraceId).toMatch(UUID);
+    });
+  });
+
   describe('POST /chat — Streaming', () => {
     it('should return text/event-stream with SSE events', async () => {
       MOCK_GENERATE_TEXT_STREAM.mockImplementation(async function* () {
@@ -189,6 +247,39 @@ describe('ChatRoutes Integration', () => {
       expect(AgentSessionRegistry.isActive(seen.conversationId!)).toBe(false);
     });
 
+    it.each([
+      ['streaming', '/agent'],
+      ['non-streaming', '/agent?stream=false'],
+    ])('mirrors each event of a %s turn that brings no conversationId to a viewer exactly once', async (_mode, path) => {
+      const { default: AgenticLoopService } = await import('#src/services/AgenticLoopService');
+      const { default: WebSocketConnectionRegistry } = await import('#src/websocket/WebSocketConnectionRegistry');
+      const viewerSocket = { readyState: 1, OPEN: 1 } as never;
+      const viewed: string[] = [];
+      vi.mocked(AgenticLoopService.runAgenticLoop).mockImplementationOnce(async (opts: any) => {
+        // A viewer (second tab, /admin/chat) subscribed to the minted id mid-turn.
+        WebSocketConnectionRegistry.register(opts.conversationId, viewerSocket, (event) => {
+          viewed.push(event.type);
+        });
+        opts.emit({ type: 'chunk', content: 'once' });
+        opts.emit({ type: 'done', conversationId: opts.conversationId });
+        return { messages: [] } as never;
+      });
+
+      const response = await agent
+        .post(path)
+        .set('x-project', 'test')
+        .set('x-username', 'testuser')
+        .send({
+          provider: PROVIDERS.OPENAI,
+          agent: 'CODING',
+          messages: [{ role: 'user', content: 'Help me write code' }],
+        });
+      WebSocketConnectionRegistry.deregisterByWebSocket(viewerSocket);
+
+      expect(response.status).toBe(200);
+      expect(viewed).toEqual(['chunk', 'done']);
+    });
+
     it('should trigger agent loop in streaming mode', async () => {
       const response = await agent
         .post('/agent')
@@ -224,6 +315,7 @@ describe('ChatRoutes Integration', () => {
 
   describe('Error handling & Isolation', () => {
     it('should propagate service errors with proper status code (500 via JSON)', async () => {
+      // oxlint-disable-next-line require-yield -- throws on the first pull, like a provider rejecting the request
       MOCK_GENERATE_TEXT_STREAM.mockImplementation(async function* () {
         throw new ProviderError(PROVIDERS.GOOGLE, 'API key invalid', 401);
       });
@@ -241,5 +333,61 @@ describe('ChatRoutes Integration', () => {
       expect(response.status).toBe(500);
       expect(response.text).toContain('API key invalid');
     });
+  });
+});
+
+// prompt 13, Landing 2: a turn a restart interrupted is started again from its request.
+describe('handleAgent — what a restart needs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('hands the loop the request it can be started again from (no messages) and, on a re-drive, the resume payload', async () => {
+    const { default: AgenticLoopService } = await import('#src/services/AgenticLoopService');
+    const { handleAgent } = await import('#src/routes/ChatRoutes');
+    let seen: { request?: Record<string, unknown>; resume?: unknown } = {};
+    const capture = async (opts: any) => {
+      seen = { request: opts.request, resume: opts.resume };
+      return { messages: [] } as never;
+    };
+    vi.mocked(AgenticLoopService.runAgenticLoop)
+      .mockImplementationOnce(capture)
+      .mockImplementationOnce(capture);
+    const resume = { pass: { iteration: 2, toolCalls: [], calls: {} }, inputs: [], notices: [], attempt: 1 };
+
+    await handleAgent(
+      {
+        provider: PROVIDERS.OPENAI,
+        agent: 'CODING',
+        project: 'test',
+        username: 'testuser',
+        conversationId: 'resumed-conversation',
+        autoApprove: false,
+        messages: [{ role: 'user', content: 'Help me write code' }],
+        _resume: resume,
+      },
+      () => {},
+    );
+    expect(seen.request).toMatchObject({
+      provider: PROVIDERS.OPENAI,
+      agent: 'CODING',
+      conversationId: 'resumed-conversation',
+      autoApprove: false,
+    });
+    expect(seen.request).not.toHaveProperty('messages');
+    expect(seen.request).not.toHaveProperty('_resume');
+    expect(seen.resume).toEqual(resume);
+
+    await handleAgent(
+      {
+        provider: PROVIDERS.OPENAI,
+        agent: 'CODING',
+        project: 'test',
+        username: 'testuser',
+        messages: [{ role: 'user', content: 'A fresh turn' }],
+      },
+      () => {},
+    );
+    expect(seen.resume).toBeNull();
   });
 });

@@ -189,9 +189,12 @@ export function maybeInjectContextLedger(
   );
   if (!ledgerText) return;
 
+  // Turn-scoped: each ledger supersedes the last, and where the provider
+  // can (clear_at) an earlier copy stops rendering instead of being removed.
   currentMessages.push({
     role: "system",
     content: wrapSystemMessage(SYSTEM_MESSAGE_TAGS.CONTEXT_LEDGER, ledgerText),
+    turnScoped: true,
   });
   logger.info(
     `[${harnessLabel}] Context ledger injected at iteration ${iteration} ` +

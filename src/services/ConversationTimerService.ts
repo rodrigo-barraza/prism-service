@@ -551,7 +551,10 @@ const ConversationTimerService = {
           agenticLoopEnabled: true,
           functionCallingEnabled: true,
           planFirst: false,
-          autoApprove: true,
+          // Nobody watches a timer run: what would ask is denied, and the
+          // conversation's own mode holds (dontAsk when it names none). A
+          // conversation the user set to "auto-approve" keeps that.
+          unattended: true,
           minContextLength: MINIMUM_CONTEXT_LENGTH,
           // Calibrates the first compaction-trigger estimate of this turn.
           ...(readCompactionState(updatedConversation).calibrationRatio && {

@@ -83,6 +83,9 @@
   "execute_skill": {
     "missingSkillId": "skillId is required"
   },
+  "load_skill": {
+    "missingName": "name is required"
+  },
   "delete_skill": {
     "missingSkillId": "skillId is required"
   },
@@ -93,7 +96,9 @@
     "noConversation": "Cannot dispatch async task: no conversation context available.",
     "noToolName": "Missing required parameter 'toolName'. Specify which tool to run asynchronously.",
     "concurrencyLimit": "Maximum concurrent async tasks ({{max}}) reached for this conversation. Wait for a task to complete or cancel one.",
-    "disallowedTool": "Tool \"{{toolName}}\" cannot be dispatched asynchronously. It is either interactive, already async, or manages async state itself."
+    "disallowedTool": "Tool \"{{toolName}}\" cannot be dispatched asynchronously. It is either interactive, already async, or manages async state itself.",
+    "notEnabled": "Tool \"{{toolName}}\" is not enabled in this conversation, so it cannot be dispatched asynchronously either.",
+    "denied": "Tool \"{{toolName}}\" is denied by policy, so it cannot be dispatched asynchronously either: {{reason}}"
   },
   "cancel_async_task": {
     "noTaskId": "Missing required parameter 'taskId'. Use list_async_tasks to find the task ID.",

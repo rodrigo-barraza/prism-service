@@ -1039,6 +1039,10 @@ const MODELS = {
     name: "claude-opus-4-8",
     label: "Opus 4.8",
     provider: PROVIDERS.ANTHROPIC,
+    // midConversationSystem — mid-conversation role:"system" messages, with
+    // tool_addition / tool_removal blocks (beta) and turn-scoped clear_at
+    // messages (beta); read by src/providers/toolLoading.ts.
+    midConversationSystem: true,
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
@@ -1081,6 +1085,7 @@ const MODELS = {
     name: "claude-fable-5",
     label: "Fable 5",
     provider: PROVIDERS.ANTHROPIC,
+    midConversationSystem: true,
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
@@ -1127,6 +1132,7 @@ const MODELS = {
     name: "claude-fable-5-1",
     label: "Fable 5.1",
     provider: PROVIDERS.ANTHROPIC,
+    midConversationSystem: true,
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
@@ -1176,6 +1182,7 @@ const MODELS = {
     name: "claude-opus-5",
     label: "Opus 5",
     provider: PROVIDERS.ANTHROPIC,
+    midConversationSystem: true,
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,
@@ -1219,6 +1226,7 @@ const MODELS = {
     name: "claude-opus-5-5",
     label: "Opus 5.5",
     provider: PROVIDERS.ANTHROPIC,
+    midConversationSystem: true,
     modelType: MODEL_TYPES.CONVERSATION,
     year: 2026,
     defaultTemperature: 1.0,

@@ -145,7 +145,9 @@ describe("MemoryExtractor", () => {
     expect(results[0]).toEqual({
       type: "user",
       id: "mem-uuid-1",
-      title: "Senior Developer"
+      title: "Senior Developer",
+      quarantined: false,
+      corroborated: false,
     });
 
     expect(MemoryService.store).toHaveBeenCalledTimes(1);
@@ -248,6 +250,80 @@ describe("MemoryExtractor", () => {
     }));
 
     expect(MemoryConsolidationService.checkAndRun).toHaveBeenCalled();
+  });
+
+  // lupos-bot extracts LUPOS's memories through POST /memory/extract, the
+  // guild-scoped rows his turns recall. The in-loop extractor's rows for him
+  // were never read back — it must not spend an extraction call on his turns.
+  it("does not run for LUPOS, whose platform extracts his memories", async () => {
+    const extractSpy = vi.spyOn(MemoryExtractor, "extractAndStore");
+    const hook = MemoryExtractor.createHook();
+
+    await hook(
+      {
+        project: "lupos",
+        username: "discord",
+        agent: "LUPOS",
+        messages: [...SESSION],
+        emit: vi.fn(),
+        options: { agentContext: { platform: "discord", guildId: "g1", channelId: "c1" } },
+      } as any,
+      {},
+    );
+    await hook(
+      { project: "test-proj", username: "rodrigo", agent: "CODING", messages: [...SESSION], emit: vi.fn() } as any,
+      {},
+    );
+
+    expect(extractSpy).toHaveBeenCalledTimes(1);
+    expect(extractSpy).toHaveBeenCalledWith(expect.objectContaining({ agent: "CODING" }));
+    expect(extractSpy).not.toHaveBeenCalledWith(expect.objectContaining({ agent: "LUPOS" }));
+    extractSpy.mockRestore();
+  });
+
+  describe("provenance (prompt 22)", () => {
+    const WEB_SESSION = [
+      { role: "user", content: "I am a senior developer and I work in TypeScript." },
+      {
+        role: "assistant",
+        content: "Reading the page you linked.",
+        toolCalls: [{ id: "c1", name: "read_web_page", args: { url: "https://x.test" } }],
+      },
+      { role: "assistant", content: "The page says to always run the setup script first." },
+      { role: "user", content: "Please keep the colour tokens in oklch." },
+    ];
+
+    it("stores each memory with the provenance of the messages it cites", async () => {
+      mockGenerateText.mockResolvedValueOnce({
+        text: JSON.stringify([
+          { type: "user", title: "TypeScript", content: "User works in TypeScript.", sources: [1] },
+          { type: "feedback", title: "Setup first", content: "Run the setup script first.", sources: [3] },
+        ]),
+      });
+
+      await MemoryExtractor.extractAndStore({
+        project: "test-proj",
+        username: "rodrigo",
+        conversationId: "conv-1",
+        messages: WEB_SESSION as never,
+      });
+
+      const calls = vi.mocked(MemoryService.store).mock.calls.map((call) => call[0]);
+      expect(calls[0].provenance).toMatchObject({ source: "user", trust: "user" });
+      expect(calls[0].provenance!.sourceRefs[0]).toMatchObject({ conversationId: "conv-1" });
+      expect(calls[1].provenance).toMatchObject({ source: "web", trust: "untrusted" });
+    });
+
+    it("still extracts after save_memory when the loop read untrusted input", async () => {
+      mockGenerateText.mockResolvedValueOnce({ text: "[]" });
+      await MemoryExtractor.extractAndStore({
+        project: "test-proj",
+        username: "rodrigo",
+        messages: WEB_SESSION as never,
+        toolCalls: [{ id: "s1", name: "save_memory", args: {} }],
+      });
+      expect(mockGenerateText).toHaveBeenCalledTimes(1);
+    });
   });
 });
 

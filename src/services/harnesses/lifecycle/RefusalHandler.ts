@@ -4,9 +4,10 @@ import type {
   EmitFunction,
   ModelRefusal,
 } from "#src/services/harnesses/types";
+import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
 
 /** SSE event that ends a turn a provider safety classifier declined. */
-export const MODEL_REFUSAL_EVENT = "refusal";
+export const MODEL_REFUSAL_EVENT = PROTOCOL_EVENT_TYPES.REFUSAL;
 
 /**
  * A safety-classifier refusal (Anthropic `stop_reason: "refusal"`) is an

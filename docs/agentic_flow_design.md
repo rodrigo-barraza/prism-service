@@ -20,7 +20,7 @@ The Prism Client Agent executes a robust 11-step loop for every user interaction
    - ✅ Available tools (domain-grouped with full parameter details)
    - ✅ Environment info (date/time, OS, workspace)
    - ✅ Project directory tree from `tools-api` (cached 1 minute)
-   - ✅ Project skills (embedding-based relevance filtering via `fetchSkills()`, cosine similarity threshold 0.3)
+   - ✅ Skill catalog — one `name: description` line per skill in scope, in name order; bodies load through `load_skill` (`fetchSkillCatalog()`; embedding relevance ≥ 0.3 only highlights names in the per-turn context)
    - ✅ Session memory from past conversations via `AgentMemoryService` (embedding-based search)
 5. ✅ **API Streaming**: Starts a streaming connection via `provider.generateTextStream()` or `provider.generateTextStreamLive()` for Live API models. Local GPU models serialized via `LocalModelQueue` mutex.
 6. ✅ **Token Parsing**: Chunk processing loop handles: `text`, `thinking`, `thinking_signature`, `toolCall`, `image`, `executableCode`, `codeExecutionResult`, `webSearchResult`, `audio`, `status`, and `usage` chunk types. Anthropic `thinking_signature` is captured and round-tripped for multi-turn tool use conversations.
@@ -83,7 +83,7 @@ All use POST + SSE streaming with 65s timeout, stdout/stderr separation, and exi
 
 ### ✅ Skills System
 
-Database-backed per-project skills stored in `agent_skills` MongoDB collection. Full CRUD via REST API (`/skills`), managed through the **SkillsPanel** tab in Prism Client's Agent page. `SystemPromptAssembler.fetchSkills()` queries enabled skills and injects them as `## Project Skills` context blocks into the system prompt, filtered by embedding-based relevance (cosine similarity ≥ 0.3 threshold). `AgenticLoopService` emits a `skills_injected` status event listing loaded skill names for the UI. **Files**: `prism/src/routes/skills.js`, `SystemPromptAssembler.js`, `prism-client/src/components/SkillsPanel.js`.
+Database-backed skills stored in the `agent_skills` MongoDB collection, scoped by project × user × profile (and optionally bound to one persona). `SkillService` is the one reader and writer: `toSkill` maps both stored schemas (the panel's `content` documents and the older `prompt`/`skillId` documents from `create_skill` and the Claude config importer) onto one `Skill` type. Full CRUD via REST API (`/skills`), managed through the **SkillsPanel** tab in Prism Client's Agent page. Progressive disclosure: the system prompt carries a `<skills>` catalog — one `name: description` line per skill, in name order so the cached prefix stays stable — and the model reads a body with the `load_skill` tool when a task matches. Embedding relevance (cosine ≥ 0.3) only highlights up to three catalog names in the per-turn context message; bodies are never injected. The harness emits a `skills_injected` status event listing the highlighted names. **Files**: `src/services/SkillService.ts`, `src/routes/SkillsRoutes.ts`, `src/services/tool-definitions/SkillTools.ts`, `src/services/system-prompt/SkillMemoryScorer.ts`, `prism-client/src/components/SkillsPanelComponent.tsx`.
 
 ### 🔲 Prompt Templates & Slash Commands
 
@@ -888,10 +888,10 @@ The following CC patterns were adopted into Prism's memory architecture:
 
 **Prism** (`SkillsPanel` + `SystemPromptAssembler`):
 
-- MongoDB-backed per-project skills with CRUD API
-- Embedding-based relevance filtering (cosine similarity ≥ 0.3)
-- Injected into system prompt via `SystemPromptAssembler.fetchSkills()`
-- `skills_injected` status event for UI
+- MongoDB-backed skills scoped by project × user × profile, with CRUD API
+- A name + description catalog in the system prompt; bodies on demand via `load_skill`
+- Embedding relevance (cosine ≥ 0.3) highlights catalog names per turn, never injects bodies
+- `skills_injected` status event (the highlighted names) for UI
 
 **Comparison**: Different approaches — CC uses filesystem convention (drop a skill file in a directory), Prism uses database + embeddings. CC's `mcpSkillBuilders.ts` is interesting — it auto-generates skills from connected MCP servers, which we don't do.
 

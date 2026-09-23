@@ -177,7 +177,7 @@ describe("SGLang provider — streaming", () => {
     const calledUrls = fetchMock.mock.calls.map(([url]) => String(url));
     expect(calledUrls).toEqual([`${BASE_URL}/v1/models`, `${BASE_URL}/v1/chat/completions`]);
     for (const [, init] of fetchMock.mock.calls) {
-      expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer sk-local");
+      expect((init?.headers as Record<string, string> | undefined)?.Authorization).toBe("Bearer sk-local");
     }
   });
 

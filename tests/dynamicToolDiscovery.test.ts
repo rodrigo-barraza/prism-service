@@ -1,7 +1,6 @@
 import "./setup.ts";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
-import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import {
   extractDiscoverableDomains,
   extractDomainKeywords,

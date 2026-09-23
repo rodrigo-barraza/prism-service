@@ -204,7 +204,10 @@ export interface GenerateTextResult {
   citations?: import("#src/types/admin").MessageCitations;
   /** Anthropic thinking blocks, verbatim and in order. */
   thinkingBlocks?: AnthropicThinkingBlock[];
-  /** Anthropic safety-classifier refusal — `text` is then empty. */
+  /**
+   * A declined response — Anthropic's safety classifier, or a Gemini image
+   * model that returned no image for a forced generation — `text` is then empty.
+   */
   refusal?: { category: string | null; explanation: string | null };
   /** The model that served the response when a fallback did. */
   servedModel?: string;

@@ -211,7 +211,6 @@ vi.mock("../lifecycle/SystemReminderInjector.ts", () => ({
 }));
 vi.mock("../lifecycle/CostBudgetEnforcer.ts", () => ({ checkCostBudget: vi.fn().mockReturnValue(false) }));
 vi.mock("../lifecycle/PlanModeController.ts", () => ({
-  blockUnauthorizedToolCalls: vi.fn(),
   handleExitPlanMode: vi.fn(),
   checkForPlanModeEntry: vi.fn().mockResolvedValue(undefined),
 }));

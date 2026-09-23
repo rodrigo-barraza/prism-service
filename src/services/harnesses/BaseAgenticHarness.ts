@@ -18,6 +18,7 @@ import {
   withTotalInputTokens,
 } from "#src/utils/CostCalculator";
 import { calculateTokensPerSec } from "#src/utils/math";
+import { endChatSpan, startChatSpan } from "#src/services/Tracing";
 import { getPricing, MODALITY_TYPES } from "#src/config";
 import ContextWindowManager from "#src/services/ContextWindowManager";
 import ContextBudgetTracker from "./ContextBudgetTracker.ts";
@@ -51,6 +52,7 @@ import {
   collectTurnMessages,
 } from "./lifecycle/TurnTranscript.ts";
 import { routeStreamChunk } from "./lifecycle/StreamChunkRouter.ts";
+import { recordTurnCheckpoint } from "./lifecycle/TurnRunRecorder.ts";
 import { substituteToolOutputTokens } from "./lifecycle/ToolOutputSubstituter.ts";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
@@ -64,8 +66,18 @@ import {
 
 import ToolContext from "#src/services/ToolContext";
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
+import ToolSurface, {
+  buildToolActivation,
+  describeBridgedTools,
+  type ToolSetDiff,
+} from "./lifecycle/ToolSurface.ts";
+import { serverContextEditingFor } from "./lifecycle/ServerContextEditing.ts";
+import {
+  resolveToolLoadingMode,
+  TOOL_LOADING_MODES,
+} from "#src/providers/toolLoading";
+import { isDiscoveryTool } from "#src/services/ToolDiscoveryScope";
 
-import WebhookEventBus from "#src/services/WebhookEventBus";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import AgenticToolResolver from "#src/services/AgenticToolResolver";
 import { ToolDocFormatter } from "#src/services/system-prompt/ToolDocFormatter";
@@ -84,9 +96,23 @@ import type {
   ConversationMessage,
   StreamChunk,
   StreamStateSnapshot,
+  ToolCall,
+  ToolSchema,
   UsageAccumulator,
 } from "./types.ts";
 
+
+/**
+ * The call a tool-set change came from: the batch's last discovery call
+ * (discover_and_enable_tools, enable_tools, search_tools), else its last call.
+ */
+function sourceToolCallIdOf(toolCalls: ToolCall[] | undefined): string | null {
+  if (!toolCalls || toolCalls.length === 0) return null;
+  const discoveryCall = [...toolCalls]
+    .reverse()
+    .find((toolCall) => isDiscoveryTool(toolCall.name));
+  return (discoveryCall ?? toolCalls[toolCalls.length - 1]).id ?? null;
+}
 
 /**
  * BaseAgenticHarness — abstract base class that defines the contract
@@ -112,7 +138,10 @@ export default class BaseAgenticHarness {
 
   protected context: AgenticContext;
   protected state: AgenticLoopState;
+  /** `finalTools` are the tools the model may call now (declared + activated). */
   protected tools: ResolvedTools;
+  /** The tool list every request of the turn declares (lifecycle/ToolSurface.ts). */
+  protected toolSurface: ToolSurface;
   protected trackerConversationId: string;
   protected deviationEngine: DeviationRuleEngine;
   protected budgetTracker: ContextBudgetTracker | null;
@@ -148,6 +177,14 @@ export default class BaseAgenticHarness {
       context.agentConversationId ||
       "") as string;
     this.deviationEngine = new DeviationRuleEngine();
+    this.toolSurface = new ToolSurface({
+      mode: resolveToolLoadingMode(context.providerName, context.resolvedModel),
+      loadedTools: tools.finalTools,
+      activatableTools:
+        tools.discoverableTools ?? this.fallbackActivatableTools(),
+      initiallyEnabled: this.initiallyEnabledToolNames(tools),
+      discoveryAvailable: tools.finalTools.some((tool) => isDiscoveryTool(tool.name)),
+    });
 
     // Budget tracker is lazily initialized when the context window
     // first becomes available — see ensureBudgetTracker().
@@ -174,21 +211,93 @@ export default class BaseAgenticHarness {
 
   private static readonly toolDocFormatter = new ToolDocFormatter();
 
+  /** Never deactivated by disable_tools: the core tools, Prism's own, MCP. */
+  private static isProtectedTool(toolName: string): boolean {
+    return (
+      BaseAgenticHarness.CORE_AGENTIC_SET.has(toolName) ||
+      BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(toolName) ||
+      InternalToolRegistry.has(toolName) ||
+      toolName.startsWith("mcp__")
+    );
+  }
+
   /**
-   * Check ToolContext for a dirty flag set by enable_tools / disable_tools.
-   * If set, re-filter `this.tools` from the full schema catalog using the
-   * dynamic enabled set stored in ToolContext.
+   * What may be activated when the resolver did not say (callers that build
+   * ResolvedTools by hand): the catalog, minus what this agent can never
+   * call — the same filter the mid-loop rebuild used.
+   */
+  private fallbackActivatableTools(): ToolSchema[] {
+    try {
+      const isSubAgent = !!this.context.parentAgentConversationId;
+      const hasNativeThinking = AgenticToolResolver.detectNativeThinking(
+        this.context.modelDefinition || undefined,
+        this.context.providerName,
+        this.context.resolvedModel,
+        this.context.options?.thinkingEnabled as boolean | undefined,
+      );
+      const catalog = [
+        ...ToolOrchestratorService.getToolSchemas(),
+        ...ToolOrchestratorService.getMCPToolSchemas({
+          username: this.context.username,
+          profileId: this.context.profileId,
+        }).map((mcpTool) => {
+          const { _mcpServer, _mcpOriginalName, ...schema } =
+            mcpTool as unknown as Record<string, unknown>;
+          return schema as unknown as ToolSchema;
+        }),
+      ] as unknown as ToolSchema[];
+      return catalog.filter(
+        (tool) =>
+          !(hasNativeThinking && tool.name === TOOL_NAMES.THINK) &&
+          !(isSubAgent && BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name)),
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  /** The dynamic enabled set this turn starts from (disable_tools diffs against it). */
+  private initiallyEnabledToolNames(tools: ResolvedTools): string[] {
+    try {
+      const stored = ToolContext.getStore(
+        this.context.agentConversationId as string,
+      ).get("dynamicEnabledTools");
+      if (Array.isArray(stored)) return stored as string[];
+    } catch {
+      // no tool context (tests, one-off callers)
+    }
+    return tools.resolvedEnabledTools ?? tools.finalTools.map((tool) => tool.name);
+  }
+
+  /** The tool options every request of this turn carries. */
+  requestToolOptions() {
+    return this.toolSurface.requestToolOptions();
+  }
+
+  /** Tool names the model may call now (plus the bridge). */
+  callableToolNames(): Set<string> {
+    return this.toolSurface.callableNames(this.tools.finalTools);
+  }
+
+  /**
+   * Check ToolContext for a dirty flag set by enable_tools / disable_tools /
+   * discover_and_enable_tools, and apply the change WITHOUT touching the
+   * request's tool block: activated tools become callable, deactivated ones
+   * stop being callable, and one tool-update system message is appended —
+   * carrying the new tools' documentation and the `toolActivation` the
+   * provider adapter renders natively (providers/toolLoading.ts). In bridge
+   * mode the message also carries their parameter schemas, since they are
+   * called through `tool_call`.
    *
-   * When tools are added, injects a documentation addendum into
-   * currentMessages so the model receives human-readable descriptions
-   * and parameter docs for dynamically activated tools (the initial
-   * system prompt is only assembled on iteration 1 and never rebuilt).
+   * `sourceToolCalls` is the batch that caused the change; its discovery
+   * call (or else its last call) is where `tool_reference` blocks attach.
    *
-   * Returns true if the tool set was mutated.
+   * Returns true if the callable tool set changed.
    */
   checkAndApplyToolSetChanges(
     currentMessages?: ConversationMessage[],
-    lastPassUsage?: UsageAccumulator | null,
+    _lastPassUsage?: UsageAccumulator | null,
+    sourceToolCalls?: ToolCall[],
   ): boolean {
     const conversationId = this.context.agentConversationId;
     const toolContextStore = ToolContext.getStore(conversationId);
@@ -201,175 +310,115 @@ export default class BaseAgenticHarness {
       | null;
     if (!Array.isArray(dynamicEnabledArray)) return false;
 
-    const dynamicEnabledSet = new Set(dynamicEnabledArray);
-
-    const previousToolNames = new Set(
-      (this.tools.finalTools as Array<{ name: string }>).map(
-        (tool) => tool.name,
-      ),
+    const diff = this.toolSurface.diff(
+      dynamicEnabledArray,
+      this.tools.finalTools,
+      BaseAgenticHarness.isProtectedTool,
     );
-
-    const allSchemas = [
-      ...ToolOrchestratorService.getToolSchemas(),
-      ...ToolOrchestratorService.getMCPToolSchemas().map((mcpTool) => {
-        const { _mcpServer, _mcpOriginalName, ...schema } =
-          mcpTool as unknown as Record<string, unknown>;
-        return schema as { name: string; [key: string]: unknown };
-      }),
-    ] as Array<{ name: string; [key: string]: unknown }>;
-
-    const isSubAgent = !!this.context.parentAgentConversationId;
-
-    // When the model has native thinking, the think tool is redundant —
-    // re-apply the same exclusion that AgenticToolResolver.resolve() does
-    // during initial resolution, so dynamic tool set mutations don't
-    // accidentally re-introduce it.
-    const hasNativeThinking = AgenticToolResolver.detectNativeThinking(
-      this.context.modelDefinition || undefined,
-      this.context.providerName,
-      this.context.resolvedModel,
-      this.context.options?.thinkingEnabled as boolean | undefined,
-    );
-
-    const filteredTools = allSchemas.filter((tool) => {
-      if (hasNativeThinking && tool.name === TOOL_NAMES.THINK) return false;
-      return (
-        dynamicEnabledSet.has(tool.name) ||
-        tool.name.startsWith("mcp__") ||
-        BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) ||
-        (!isSubAgent &&
-          BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name)) ||
-        InternalToolRegistry.has(tool.name)
+    if (diff.unavailable.length > 0) {
+      logger.info(
+        `[BaseAgenticHarness] Not activatable this turn (outside the declared catalog): [${diff.unavailable.join(", ")}]`,
       );
-    }) as unknown as ResolvedTools["finalTools"];
-
+    }
+    const removedNames = new Set(diff.removed);
     this.tools = {
-      finalTools: filteredTools,
+      ...this.tools,
+      finalTools: [
+        ...this.tools.finalTools.filter((tool) => !removedNames.has(tool.name)),
+        ...diff.added,
+      ],
       resolvedEnabledTools: dynamicEnabledArray,
     };
-
-    // Tool definitions serialize AHEAD of messages in provider payloads, so a
-    // mid-loop tool-set swap invalidates the entire prompt-cache prefix. The
-    // cost was previously silent — surface it so cache-thrash is diagnosable.
-    // The last pass's total input (remainder + cache read + cache write) is
-    // the prefix the next iteration must re-prefill from scratch.
-    const estimatedInvalidatedTokens = lastPassUsage
-      ? (Number(lastPassUsage.inputTokens) || 0) +
-        (Number(lastPassUsage.cacheReadInputTokens) || 0) +
-        (Number(lastPassUsage.cacheCreationInputTokens) || 0)
-      : null;
-    logger.warn(
-      `[AgenticLoop] Tool set changed mid-loop at iteration ${this.state.iterations} ` +
-        `(${previousToolNames.size} → ${filteredTools.length} tools) — ` +
-        `this busts the provider prompt-cache prefix for subsequent iterations` +
-        (estimatedInvalidatedTokens !== null
-          ? ` (~${estimatedInvalidatedTokens} prefix tokens invalidated).`
-          : `.`),
-    );
-
-    WebhookEventBus.emit("request.cache_invalidated", {
-      agentConversationId: conversationId,
-      conversationId: this.context.conversationId,
-      provider: this.context.providerName,
-      model: this.context.resolvedModel,
-      iteration: this.state.iterations,
-      previousToolCount: previousToolNames.size,
-      newToolCount: filteredTools.length,
-      estimatedInvalidatedTokens,
-      reason: "tool_set_changed",
-    });
+    if (diff.added.length === 0 && diff.removed.length === 0) return false;
 
     this.context.emit({
       type: SERVER_SENT_EVENT_TYPES.STATUS,
       message: STATUS_MESSAGES.TOOL_SET_CHANGED,
-      enabledCount: filteredTools.length,
+      enabledCount: this.tools.finalTools.length,
       dynamicTools: dynamicEnabledArray,
-      ...(estimatedInvalidatedTokens !== null && {
-        estimatedInvalidatedTokens,
-      }),
+      toolLoadingMode: this.toolSurface.mode,
     });
 
-    // Compute newly added tools and inject documentation addendum
-    const newlyAddedToolSchemas = (
-      filteredTools as unknown as Array<{
-        name: string;
-        [key: string]: unknown;
-      }>
-    ).filter(
-      (tool) =>
-        !previousToolNames.has(tool.name) &&
-        !BaseAgenticHarness.CORE_AGENTIC_SET.has(tool.name) &&
-        !BaseAgenticHarness.CORE_ORCHESTRATOR_SET.has(tool.name) &&
-        !InternalToolRegistry.has(tool.name),
-    );
-
-    if (currentMessages && newlyAddedToolSchemas.length > 0) {
-      const activeLocale =
-        (this.context.options?.locale as string | undefined) ||
-        PromptLocaleService.getDefaultLocale();
-      const addendumDocumentation =
-        BaseAgenticHarness.toolDocFormatter.buildToolDescriptions(
-          newlyAddedToolSchemas.map((tool) => tool.name),
-          undefined,
-          undefined,
-          newlyAddedToolSchemas.map((tool) => tool.name),
-          undefined,
-          undefined,
-          activeLocale,
-        );
-
-      if (addendumDocumentation) {
-        const toolNamesList = newlyAddedToolSchemas
-          .map((tool) => tool.name)
-          .join(", ");
-
-        const policyAddendum = getToolPolicyAddendum(
-          newlyAddedToolSchemas.map((tool) => tool.name),
-          activeLocale,
-        );
-
-        const headerText = PromptLocaleService.get(
-          activeLocale,
-          "harness.toolSetUpdated.header",
-          {
-            count: String(newlyAddedToolSchemas.length),
-            toolNames: toolNamesList,
-          },
-        );
-        const availableText = PromptLocaleService.get(
-          activeLocale,
-          "harness.toolSetUpdated.availableDocumentation",
-        );
-        const guidelinesHeader = PromptLocaleService.get(
-          activeLocale,
-          "harness.toolSetUpdated.usageGuidelines",
-        );
-
-        currentMessages.push({
-          role: "system",
-          content: wrapSystemMessage(
-            SYSTEM_MESSAGE_TAGS.TOOL_UPDATE,
-            `${headerText}\n\n` +
-              `${availableText}\n\n` +
-              addendumDocumentation +
-              (policyAddendum
-                ? `\n\n${guidelinesHeader}\n\n${policyAddendum}`
-                : ""),
-          ),
-        });
-
-        logger.info(
-          `[BaseAgenticHarness] Injected documentation addendum for ${newlyAddedToolSchemas.length} newly activated tools: [${toolNamesList}]` +
-            (policyAddendum ? ` (with policy guidance)` : ""),
-        );
-      }
+    if (currentMessages) {
+      currentMessages.push(
+        this.buildToolUpdateMessage(diff, sourceToolCallIdOf(sourceToolCalls)),
+      );
     }
 
     logger.info(
-      `[BaseAgenticHarness] Tool set mutated: ${filteredTools.length} tools active (${dynamicEnabledArray.length} dynamic)`,
+      `[BaseAgenticHarness] Tool set changed without touching the request (${this.toolSurface.mode}): ` +
+        `+[${diff.added.map((tool) => tool.name).join(", ")}] -[${diff.removed.join(", ")}] — ` +
+        `${this.tools.finalTools.length} callable`,
     );
 
     return true;
+  }
+
+  /** The appended tool-update message for a tool-set change. */
+  private buildToolUpdateMessage(
+    diff: ToolSetDiff,
+    sourceToolCallId: string | null,
+  ): ConversationMessage {
+    const activeLocale =
+      (this.context.options?.locale as string | undefined) ||
+      PromptLocaleService.getDefaultLocale();
+    const sections: string[] = [];
+    if (diff.added.length > 0) {
+      const addedNames = diff.added.map((tool) => tool.name);
+      sections.push(
+        PromptLocaleService.get(activeLocale, "harness.toolSetUpdated.header", {
+          count: String(addedNames.length),
+          toolNames: addedNames.join(", "),
+        }),
+      );
+      if (this.toolSurface.mode === TOOL_LOADING_MODES.BRIDGE) {
+        sections.push(describeBridgedTools(diff.added));
+      }
+      const addendumDocumentation =
+        BaseAgenticHarness.toolDocFormatter.buildToolDescriptions(
+          addedNames,
+          undefined,
+          undefined,
+          addedNames,
+          undefined,
+          undefined,
+          activeLocale,
+        );
+      if (addendumDocumentation) {
+        sections.push(
+          PromptLocaleService.get(
+            activeLocale,
+            "harness.toolSetUpdated.availableDocumentation",
+          ),
+          addendumDocumentation,
+        );
+      }
+      const policyAddendum = getToolPolicyAddendum(addedNames, activeLocale);
+      if (policyAddendum) {
+        sections.push(
+          PromptLocaleService.get(
+            activeLocale,
+            "harness.toolSetUpdated.usageGuidelines",
+          ),
+          policyAddendum,
+        );
+      }
+    }
+    if (diff.removed.length > 0) {
+      sections.push(
+        PromptLocaleService.get(activeLocale, "harness.toolSetUpdated.removed", {
+          toolNames: diff.removed.join(", "),
+        }),
+      );
+    }
+    return {
+      role: "system",
+      content: wrapSystemMessage(
+        SYSTEM_MESSAGE_TAGS.TOOL_UPDATE,
+        sections.join("\n\n"),
+      ),
+      toolActivation: buildToolActivation(diff, sourceToolCallId),
+    };
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -644,11 +693,17 @@ export default class BaseAgenticHarness {
     // 3. Tool schemas (serialized JSON function definitions)
     const toolSchemas = this.tools.finalTools;
 
-    // 4. Injected skills text (lives inside the messages array; the tracker
-    //    carves it out of the message estimate as its own budget category)
+    // 4. Skills — the per-turn highlight (inside the messages array) and
+    //    the catalog (inside the system prompt); the tracker carves each out
+    //    of its host estimate as the skills budget category
     const skillsText =
       (this.context.options?._skillsText as string | undefined) || "";
     const skillTokens = skillsText ? estimateTokens(skillsText) : 0;
+    const skillCatalogText =
+      (this.context.options?._skillCatalogText as string | undefined) || "";
+    const skillCatalogTokens = skillCatalogText
+      ? estimateTokens(skillCatalogText)
+      : 0;
 
     // Delegate budget computation and SSE emission to the tracker
     if (tracker) {
@@ -659,6 +714,7 @@ export default class BaseAgenticHarness {
           toolSchemas,
           requestedMaxTokens,
           skillTokens,
+          skillCatalogTokens,
         );
 
       this.lastEstimatedTotalInputTokens = adjustedInput;
@@ -671,7 +727,7 @@ export default class BaseAgenticHarness {
           `messages=${estimatedMessageTokens}${calibrationRatio !== null ? ` (calibrated ×${calibrationRatio.toFixed(3)})` : ""}, ` +
           `systemPrompt=${estimateTokens(systemPromptText)} (${systemPromptText.length} chars), ` +
           `toolSchemas=${toolSchemas.length > 0 ? estimateTokens(JSON.stringify(toolSchemas)) : 0} (${toolSchemas.length} tools), ` +
-          `skills=${skillTokens}, ` +
+          `skills=${skillTokens + skillCatalogTokens} (catalog ${skillCatalogTokens}), ` +
           `adjusted=${adjustedInput}, available=${availableForOutput}, ` +
           `requested=${requestedMaxTokens}, ` +
           `willClamp=${requestedMaxTokens ? requestedMaxTokens > availableForOutput : false}`,
@@ -830,6 +886,9 @@ export default class BaseAgenticHarness {
           this.context.providerName,
         ),
       },
+      // Claude clears old tool results server-side instead of the client
+      // rewriting them into offload stubs (ContextPressureManager).
+      ...serverContextEditingFor(this.context),
     };
 
     for (const optionKey of [
@@ -937,10 +996,44 @@ export default class BaseAgenticHarness {
   // ── Stream consumption ────────────────────────────────────
 
   /**
+   * Consume a pass's LLM stream as its `chat` span (Tracing), which runs
+   * from the start of the pass to the end — or failure — of the stream.
+   */
+  public async consumeStream(
+    stream: AsyncIterable<unknown>,
+    pass: PassState,
+    allowedToolNames: Set<string>,
+  ): Promise<void> {
+    const iteration = this.state.iterations;
+    const chatSpan = startChatSpan(this.context, pass, {
+      iteration,
+      // The id of the requests-collection row this pass writes (logIteration).
+      requestId: this.context.requestId
+        ? `${this.context.requestId}-${iteration}`
+        : pass.requestId,
+    });
+    try {
+      await this.routeStreamChunks(stream, pass, allowedToolNames);
+    } catch (error: unknown) {
+      endChatSpan(chatSpan, pass, { costUsd: this.estimatePassCost(pass), error });
+      throw error;
+    }
+    endChatSpan(chatSpan, pass, { costUsd: this.estimatePassCost(pass) });
+  }
+
+  /** A pass's estimated cost at its model's text pricing (null when unpriced). */
+  private estimatePassCost(pass: PassState): number | null {
+    const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[
+      this.context.resolvedModel
+    ];
+    return calculateTextCost(pass.usage, pricing);
+  }
+
+  /**
    * Consume an LLM stream, routing each chunk through `processStreamChunk`.
    * Handles abort signals, mid-stream deviation rules, and stream teardown.
    */
-  public async consumeStream(
+  private async routeStreamChunks(
     stream: AsyncIterable<unknown>,
     pass: PassState,
     allowedToolNames: Set<string>,
@@ -1193,6 +1286,8 @@ export default class BaseAgenticHarness {
     } = this.context;
     const state = this.state;
     const pricing = getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[resolvedModel];
+    // The tools this iteration ran, each with its own duration and outcome.
+    const toolExecutions = state.takeToolExecutions();
 
     const passTotalSec = (performance.now() - pass.start) / 1000;
     const passGenerationSec =
@@ -1218,12 +1313,15 @@ export default class BaseAgenticHarness {
 
     // Hashes of what the adapter sent, compared with the previous request
     // of this agent conversation (null when the adapter reported none).
+    const declaredBoundary = state.pendingPrefixBoundary;
+    state.pendingPrefixBoundary = null;
     const cacheTelemetryFields = PromptCacheTelemetry.recordRequest({
       conversationKey: this.cacheTelemetryKey(),
       requestId: `${this.context.requestId}-${state.iterations}`,
       provider: providerName,
       model: resolvedModel,
       telemetry: pass.requestTelemetry,
+      declaredBoundary,
     });
 
     // Two-phase completion: if we pre-inserted a pending skeleton on
@@ -1260,6 +1358,7 @@ export default class BaseAgenticHarness {
       toolCalls: pass.pendingToolCalls as ToolCallPayload[],
       outputCharacters: pass.outputCharacters,
       agenticIteration: state.iterations,
+      ...(toolExecutions.length > 0 && { toolExecutions }),
       ...cacheTelemetryFields,
     };
 
@@ -1342,6 +1441,7 @@ export default class BaseAgenticHarness {
             : null,
         usage: pass.usage,
       },
+      ...(toolExecutions.length > 0 && { toolExecutions }),
       ...cacheTelemetryFields,
     };
 
@@ -1384,7 +1484,10 @@ export default class BaseAgenticHarness {
   // ── Per-iteration pass state factory ──────────────────────
 
   /** Create a fresh per-iteration pass state object. */
-  createPassState(passOptions: AgenticOptions): PassState {
+  createPassState(
+    passOptions: AgenticOptions,
+    { replayed = false }: { replayed?: boolean } = {},
+  ): PassState {
     const {
       resolvedModel,
       providerName,
@@ -1399,29 +1502,32 @@ export default class BaseAgenticHarness {
       requestId,
     } = this.context;
 
-    const pendingPromise = RequestLogger.insertPending({
-      requestId: `${requestId}-${this.state.iterations}`,
-      endpoint: "/agent",
-      operation: "agent:iteration",
-      project,
-      username,
-      profileId,
-      clientIp: this.context.clientIp,
-      agent: agent || null,
-      harness: (passOptions?.harness as string) || null,
-      provider: providerName,
-      model: resolvedModel,
-      conversationId,
-      traceId: traceId || null,
-      agentConversationId: agentConversationId || null,
-      parentAgentConversationId: parentAgentConversationId || null,
-      agenticIteration: this.state.iterations,
-    }).catch((error: Error) => {
-      logger.error(
-        `[BaseAgenticHarness] Failed to insert pending request: ${errorMessage(error)}`,
-      );
-      return null;
-    });
+    // A replayed pass (ResumedPass) makes no request: nothing to log.
+    const pendingPromise = replayed
+      ? Promise.resolve(null)
+      : RequestLogger.insertPending({
+          requestId: `${requestId}-${this.state.iterations}`,
+          endpoint: "/agent",
+          operation: "agent:iteration",
+          project,
+          username,
+          profileId,
+          clientIp: this.context.clientIp,
+          agent: agent || null,
+          harness: (passOptions?.harness as string) || null,
+          provider: providerName,
+          model: resolvedModel,
+          conversationId,
+          traceId: traceId || null,
+          agentConversationId: agentConversationId || null,
+          parentAgentConversationId: parentAgentConversationId || null,
+          agenticIteration: this.state.iterations,
+        }).catch((error: Error) => {
+          logger.error(
+            `[BaseAgenticHarness] Failed to insert pending request: ${errorMessage(error)}`,
+          );
+          return null;
+        });
 
     const passState: PassState = {
       streamedText: "",
@@ -1440,6 +1546,7 @@ export default class BaseAgenticHarness {
       options: passOptions,
       requestId: null, // set after tracker registration
       pendingRequestDocumentIdPromise: pendingPromise,
+      ...(replayed ? { replayed: true } : {}),
     };
     // A new pass: the previous pass's thinking blocks already went out with
     // its own assistant message; the loop state tracks the newest pass only.
@@ -1461,7 +1568,10 @@ export default class BaseAgenticHarness {
    * Called at the top of each loop iteration. Writes to a transient
    * `turnCheckpoint` field (never `messages`, so live clients see no
    * mid-turn duplication); the finalize append atomically clears it, and
-   * startup recovery merges any orphaned checkpoint into `messages`.
+   * startup recovery merges any orphaned checkpoint into `messages` — or,
+   * when the turn can be picked up again, re-drives it (TurnResumeService).
+   * The checkpoint carries its iteration: a recorded pass older than it is
+   * already in these messages.
    *
    * Best-effort: a failed checkpoint must never break the turn.
    */
@@ -1479,16 +1589,24 @@ export default class BaseAgenticHarness {
       const sanitizedMessages = sanitizeMessagesForPersistence(
         newTurnMessages as MessagePayload[],
       );
-      if (sanitizedMessages.length === 0) return;
-      const { default: ConversationService } =
-        await import("#src/services/ConversationService");
-      await ConversationService.saveTurnCheckpoint(
-        conversationId,
-        project,
-        username,
-        sanitizedMessages,
-        getCollectionOpts(project, agent) || {},
-      );
+      // A re-driven turn starts with nothing new (its earlier messages were
+      // persisted at boot); its checkpoint still marks it unfinished.
+      if (sanitizedMessages.length > 0 || this.context.resume) {
+        const { default: ConversationService } =
+          await import("#src/services/ConversationService");
+        await ConversationService.saveTurnCheckpoint(
+          conversationId,
+          project,
+          username,
+          sanitizedMessages,
+          {
+            ...(getCollectionOpts(project, agent) || {}),
+            iteration: this.state.iterations,
+            allowEmpty: !!this.context.resume,
+          },
+        );
+      }
+      await recordTurnCheckpoint(this.context, this.state);
     } catch (error: unknown) {
       logger.warn(
         `[BaseAgenticHarness] Turn checkpoint failed for ${conversationId}: ${errorMessage(error)}`,

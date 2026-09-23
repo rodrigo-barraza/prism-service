@@ -5,6 +5,7 @@ import { resolveScope } from "#src/utils/ProfileScope";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROVIDERS } from "#src/constants";
+import { PERMISSION_MODES, isPermissionMode } from "#src/services/permissions/PermissionModes";
 import { MODELS } from "#src/config";
 
 const router = express.Router();
@@ -83,7 +84,14 @@ router.post(
       recurrenceRule,
       toolConfig,
       conversationId,
+      permissionMode,
     } = req.body;
+
+    if (permissionMode != null && !isPermissionMode(permissionMode)) {
+      return res.status(400).json({
+        error: `permissionMode must be one of ${PERMISSION_MODES.join(", ")}`,
+      });
+    }
 
     const finalProvider = provider || PROVIDERS.ANTHROPIC;
     const finalModel = model || MODELS.SONNET_45.name;
@@ -109,6 +117,7 @@ router.post(
         cronExpression,
         recurrenceRule,
         toolConfig,
+        ...(permissionMode != null && { permissionMode }),
         // Optional target conversation — the task then continues it.
         conversationId:
           typeof conversationId === "string" && conversationId.trim()

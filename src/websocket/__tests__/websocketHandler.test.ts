@@ -93,6 +93,7 @@ import {
 } from "#src/utils/DirectViewerBroadcast";
 import WebSocketConnectionRegistry from "#src/websocket/WebSocketConnectionRegistry";
 import type { SseEvent } from "#src/types/SseTypes";
+import { PROTOCOL_VERSION } from "#src/protocol/events";
 
 // ── Helper Mock Classes ───────────────────────────────────────────────
 class MockWebSocket {
@@ -210,8 +211,28 @@ describe("WebSocket Handler Suite", () => {
       mockSocket.emit("message", "invalid-json");
 
       expect(mockSocket.send).toHaveBeenCalledWith(
-        JSON.stringify({ type: "error", message: "Invalid JSON" })
+        JSON.stringify({
+          type: "error",
+          code: "invalid_request",
+          message: "Invalid JSON",
+          retryable: false,
+          status: 400,
+        })
       );
+    });
+
+    it("greets every connection with the protocol version before anything else", () => {
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      mockWss.emitConnection(mockSocket, {
+        url: "/ws/chat",
+        headers: { host: "localhost" },
+        socket: { remoteAddress: "127.0.0.1" },
+      });
+
+      expect(mockSocket.send.mock.calls.map(([raw]) => JSON.parse(raw as string))).toEqual([
+        { type: "hello", protocolVersion: PROTOCOL_VERSION },
+      ]);
     });
 
     describe("subscribe", () => {
@@ -221,8 +242,11 @@ describe("WebSocket Handler Suite", () => {
         socket: { remoteAddress: "127.0.0.1" },
       };
 
+      /** Frames after the connection's `hello` greeting. */
       function sentFrames(socket: MockWebSocket): Array<Record<string, any>> {
-        return socket.send.mock.calls.map(([raw]) => JSON.parse(raw as string));
+        const [hello, ...frames] = socket.send.mock.calls.map(([raw]) => JSON.parse(raw as string));
+        expect(hello).toEqual({ type: "hello", protocolVersion: PROTOCOL_VERSION });
+        return frames;
       }
 
       function openSubscriber(): MockWebSocket {

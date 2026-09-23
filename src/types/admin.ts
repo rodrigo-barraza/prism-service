@@ -410,5 +410,9 @@ export interface ChatMessage {
   isCompactSummary?: boolean;
   /** On a compaction summary: the id of the last message it covers. */
   compactionThroughMessageId?: string;
+  /** Mid-conversation tool activation (system messages only; never persisted). */
+  toolActivation?: import("./ProviderTypes.ts").ToolActivation;
+  /** A one-turn system nudge (rendered `clear_at` where supported). */
+  turnScoped?: boolean;
   [key: string]: unknown;
 }

@@ -12,6 +12,8 @@ import { type SseEvent } from "#src/types/SseTypes";
 import type { ChatRequest } from "#src/types/schemas";
 import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
 import { withDirectViewerBroadcast } from "./DirectViewerBroadcast.ts";
+import { helloEvent, type ErrorEvent } from "#src/protocol/events";
+import { toErrorEvent } from "#src/protocol/errors";
 
 // Direct-viewer broadcast + live-turn replay live in DirectViewerBroadcast.ts —
 // ChatRoutes and the WebSocket handler need them too, and importing them from
@@ -63,13 +65,19 @@ export function buildJsonResponseFromEvents(
 ) {
   const errorEvent = events.find((event: SseEvent) => event.type === "error");
   if (errorEvent) {
-    return {
-      error: new ProviderError(
-        "server",
-        errorEvent.message || "Unknown error",
-        500,
-      ),
-    };
+    // The HTTP status stays 500 for every failure (API callers rely on it);
+    // the protocol's typed code and retryability ride along in the body.
+    const error = new ProviderError(
+      "server",
+      errorEvent.message || "Unknown error",
+      500,
+    );
+    const { code, retryable } = errorEvent as Partial<ErrorEvent>;
+    if (code) {
+      error.code = code;
+      error.retryable = retryable === true;
+    }
+    return { error };
   }
 
   const doneEvent =
@@ -133,6 +141,10 @@ export function buildJsonResponseFromEvents(
       status: event.status,
     }));
 
+  // A declined response (a Gemini image model that drew nothing, a
+  // safety classifier): the reason a JSON caller would otherwise never see.
+  const refusalEvent = events.find((event: SseEvent) => event.type === "refusal");
+
   const audioEvents = events
     .filter((event: SseEvent) => event.type === "audio")
     .map((event: SseEvent) => ({
@@ -154,6 +166,12 @@ export function buildJsonResponseFromEvents(
       model: doneEvent.model || requestBody.model,
       usage: doneEvent.usage || null,
       estimatedCost: doneEvent.estimatedCost ?? null,
+      ...(refusalEvent && {
+        refusal: {
+          category: refusalEvent.category ?? null,
+          explanation: refusalEvent.explanation ?? null,
+        },
+      }),
       ...(doneEvent.audioRef && { audioRef: doneEvent.audioRef }),
       ...(doneEvent.traceId && { traceId: doneEvent.traceId }),
       ...(doneEvent.conversationId && {
@@ -225,6 +243,12 @@ export async function handleSseRequest(
 
   const connectionStartTime = Date.now();
   const connectionController = createAbortController();
+  const emitToConnection = createSseEmitter(res, connectionController.signal);
+
+  // Every stream opens with the protocol version. It belongs to this
+  // connection only: viewers get their own on connect, and the replay
+  // buffer never holds it.
+  emitToConnection(helloEvent());
 
   // Heartbeat: SSE comment frames every 15s so clients can distinguish a
   // quiet-but-alive stream (long prefill, slow tool) from a dead socket.
@@ -251,13 +275,12 @@ export async function handleSseRequest(
       logger.warn(
         `[SSE] Rejected concurrent agent turn for conversation ${conversationId} — a generation is already running`,
       );
-      const emitRejection = createSseEmitter(res, connectionController.signal);
-      emitRejection({
-        type: "error",
-        code: "GENERATION_IN_PROGRESS",
-        message:
+      emitToConnection(
+        toErrorEvent(
           "A generation is already running for this conversation. Stop it first (POST /agent/stop) or wait for it to finish.",
-      } as unknown as SseEvent);
+          { code: "invalid_request", status: 409 },
+        ),
+      );
       stopHeartbeat();
       res.end();
       return;
@@ -292,10 +315,7 @@ export async function handleSseRequest(
   try {
     await handler(
       params,
-      withDirectViewerBroadcast(
-        conversationId,
-        createSseEmitter(res, connectionController.signal),
-      ),
+      withDirectViewerBroadcast(conversationId, emitToConnection),
       {
         signal: stopController.signal,
       },

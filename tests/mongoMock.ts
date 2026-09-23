@@ -1,4 +1,3 @@
-import { vi } from "vitest";
 
 /**
  * Shared MongoDB Mock Engine
@@ -146,12 +145,13 @@ export function createMockCollection(initialData: any[] = []) {
       const cursor = {
         project: () => cursor,
         limit: () => cursor,
+        skip: () => cursor,
         sort: (criteria: any) => {
           sortCriteria = criteria;
           return cursor;
         },
         toArray: async () => {
-          let results = Array.from(documents.values()).filter(doc => evaluateMongoExpression(doc, query));
+          const results = Array.from(documents.values()).filter(doc => evaluateMongoExpression(doc, query));
           if (sortCriteria) {
             const [field, order] = Object.entries(sortCriteria)[0];
             results.sort((a, b) => {
