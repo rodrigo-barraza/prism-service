@@ -216,7 +216,9 @@ describe("prepareMessages — thinking blocks", () => {
 
 // ── Consecutive Same-Role Merging ────────────────────────────
 describe("prepareMessages — consecutive role merging", () => {
-  it("merges consecutive string-content user messages", async () => {
+  // One block per message, never a joined string: a cache entry ends on a
+  // block boundary, and the next turn must find the history it cached.
+  it("merges consecutive string-content user messages into one block each", async () => {
     const result = await prepareMessages([
       makeMessage({ role: "user", content: "First message" }),
       makeMessage({ role: "user", content: "Second message" }),
@@ -224,8 +226,10 @@ describe("prepareMessages — consecutive role merging", () => {
 
     expect(result.messages).toHaveLength(1);
     expect(result.messages[0].role).toBe("user");
-    expect(result.messages[0].content).toContain("First message");
-    expect(result.messages[0].content).toContain("Second message");
+    expect(result.messages[0].content).toEqual([
+      { type: "text", text: "First message" },
+      { type: "text", text: "Second message" },
+    ]);
   });
 
   it("merges consecutive array-content messages by concatenating blocks", async () => {
@@ -564,8 +568,9 @@ describe("prepareMessages — mid-conversation system role retention", () => {
     );
     const mergedUser = result.messages[result.messages.length - 1];
     expect(mergedUser.role).toBe("user");
-    expect(mergedUser.content).toContain("operational-context");
-    expect(mergedUser.content).toContain("Start now");
+    const mergedText = JSON.stringify(mergedUser.content);
+    expect(mergedText).toContain("operational-context");
+    expect(mergedText).toContain("Start now");
   });
 
   it("demotes a system message that does not follow a user turn", async () => {

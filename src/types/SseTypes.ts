@@ -23,6 +23,8 @@ export interface SseEvent {
   audioRef?: string;
   traceId?: string;
   conversationId?: string;
+  /** done: how long the turn's prompt prefix stays cached, and until when. */
+  promptCache?: { lifeSeconds: number; expiresAt: string };
   /** A `refusal` event's reason code and the provider's explanation. */
   category?: string | null;
   explanation?: string | null;

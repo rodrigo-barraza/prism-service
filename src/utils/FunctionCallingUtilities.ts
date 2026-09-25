@@ -327,6 +327,8 @@ interface ExpandedMessage {
   toolActivation?: ChatMessage["toolActivation"];
   /** A one-turn system nudge (clear_at where the provider supports it). */
   turnScoped?: boolean;
+  /** Context injected before this turn's user message (cache boundary). */
+  turnContext?: boolean;
 }
 
 /**
@@ -523,6 +525,7 @@ export function expandMessagesForFunctionCall(
         ...(message.pdf && message.pdf.length > 0 ? { pdf: message.pdf } : {}),
         ...(message.toolActivation ? { toolActivation: message.toolActivation } : {}),
         ...(message.turnScoped === true ? { turnScoped: true } : {}),
+        ...(message.turnContext === true ? { turnContext: true } : {}),
         ...(message.documents && message.documents.length > 0
           ? { documents: message.documents }
           : {}),

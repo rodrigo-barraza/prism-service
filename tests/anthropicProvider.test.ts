@@ -189,10 +189,13 @@ describe('Anthropic Provider Adapter', () => {
     const payload = mockMessagesCreate.mock.calls[0][0];
     expect(payload.messages).toHaveLength(1); // Consecutive user role messages will be merged!
     expect(payload.messages[0].role).toBe('user');
-    // Last (only) message becomes a cacheable text block carrying the moving breakpoint
-    const lastContent = payload.messages[0].content;
-    const lastText = Array.isArray(lastContent) ? lastContent[0].text : lastContent;
-    expect(lastText).toContain('Hello\n\n<tool-update>New tools registered</tool-update>\n\nContinue');
+    // One block per merged message (a cache entry ends on a block boundary);
+    // the last one carries the moving breakpoint.
+    expect(payload.messages[0].content).toEqual([
+      { type: 'text', text: 'Hello' },
+      { type: 'text', text: '<tool-update>New tools registered</tool-update>' },
+      { type: 'text', text: 'Continue', cache_control: { type: 'ephemeral' } },
+    ]);
   });
 
   it('maps tool use and tool results correctly', async () => {

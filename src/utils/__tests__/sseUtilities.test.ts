@@ -87,6 +87,15 @@ type TestEvent = SseEvent;
 
 // ═══════════════════════════════════════════════════════════════
 describe("buildJsonResponseFromEvents", () => {
+  it("passes the done event's promptCache through (Lupos's non-streaming path)", () => {
+    const promptCache = { lifeSeconds: 600, expiresAt: "2026-09-25T20:40:57.000Z" };
+    const result = callBuildJsonResponse(
+      [{ type: "chunk", content: "hi" }, { type: "done", provider: PROVIDERS.GOOGLE, model: "gemini-3.8-flash", promptCache }],
+      { provider: PROVIDERS.GOOGLE, model: "gemini-3.8-flash" },
+    );
+    expect(result.response!.promptCache).toEqual(promptCache);
+  });
+
   it("should assemble text from chunk events", () => {
     const events: TestEvent[] = [
       { type: "chunk", content: "Hello " },
