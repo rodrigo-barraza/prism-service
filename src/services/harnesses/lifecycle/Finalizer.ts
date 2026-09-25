@@ -19,6 +19,7 @@ import ToolContext from "#src/services/ToolContext";
 import { appendAndFinalize } from "#src/utils/ConversationUtilities";
 import { getRequestContext } from "#src/utils/RequestContext";
 import { DEFAULT_PROFILE_ID } from "#src/utils/ProfileScope";
+import { promptCacheWindow } from "#src/providers/ModelProfiles";
 import {
   COLLECTIONS,
   FILE_CATEGORIES,
@@ -108,6 +109,11 @@ export interface FinalizerPayload {
   refusal?: ModelRefusal;
   /** The model that served the response when a fallback did (request row). */
   servedModel?: string;
+  /**
+   * When the turn's last provider request started (epoch ms): the done
+   * event's `promptCache.expiresAt` counts the model's cache life from it.
+   */
+  promptCacheStartedAt?: number | null;
   /**
    * The turn's latest compaction boundary — persisted as the document's
    * `compaction` so the next turn loads summary + tail (CompactionBoundary.ts).
@@ -204,6 +210,7 @@ export async function finalizeTextGeneration(
     refusal,
     servedModel,
     compactionBoundary,
+    promptCacheStartedAt,
   }: FinalizerPayload,
   overrideMessagesToAppend: MessagePayload[] | null = null,
   finalizerOptions?: { deferDoneEmission?: boolean },
@@ -603,6 +610,7 @@ export async function finalizeTextGeneration(
       ...(traceId && { traceId }),
       ...(conversationId && { conversationId }),
       ...(refusal && { refusal }),
+      ...promptCacheWindow(providerName, resolvedModel, promptCacheStartedAt),
     };
 
     if (finalizerOptions?.deferDoneEmission) {
@@ -618,6 +626,7 @@ export async function finalizeTextGeneration(
 }
 
 export { getCollectionOpts };
+
 
 /**
  * Expand assistant messages with embedded tool call results into the
@@ -762,6 +771,8 @@ export function sanitizeMessagesForPersistence(
       swapMessageContent(cloned);
       delete cloned._isIdentityPrompt;
       delete cloned._isInjectedContext;
+      // Only THIS turn's injected context marks the cache boundary.
+      delete cloned.turnContext;
       // The next turn declares the activated tool outright; replaying the
       // activation would load it twice. The message's text is kept.
       delete cloned.toolActivation;

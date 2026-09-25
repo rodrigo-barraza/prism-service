@@ -291,6 +291,7 @@ async function prepareGenerationContext(
     maxRecursionDepth,
     maxCostDollars,
     agentContext,
+    promptCacheKey,
     // Multi-workspace: user-selected workspace root path (absolute fs path).
     workspaceRoot,
     // Workspace toggle: when false, workspace tools are excluded from the agent session.
@@ -367,6 +368,7 @@ async function prepareGenerationContext(
     ...(typeof maxCostDollars === "number" &&
       maxCostDollars > 0 && { maxCostDollars }),
     ...(agentContext != null && { agentContext }),
+    ...(promptCacheKey && { promptCacheKey }),
     ...(criticModel != null && { criticModel }),
     ...(workspaceEnabled != null && { workspaceEnabled }),
     ...(harness != null && { harness }),

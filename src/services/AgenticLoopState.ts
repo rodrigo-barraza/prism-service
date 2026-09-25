@@ -57,6 +57,11 @@ export default class AgenticLoopState {
   streamedAudioChunks: string[];
   audioSampleRate: number;
   lastRateLimits: Record<string, unknown> | null;
+  /**
+   * When the turn's latest provider request started (epoch ms) — the
+   * moment the prompt cache it wrote or read starts counting down from.
+   */
+  lastProviderRequestStartedAt: number | null;
 
   // ── Display segment tracking ────────────────────────────
   // Mirrors the client-side contentSegments system so the
@@ -255,6 +260,7 @@ export default class AgenticLoopState {
     this.streamedAudioChunks = [];
     this.audioSampleRate = MEDIA.LOOP_STATE_AUDIO_SAMPLE_RATE_HZ;
     this.lastRateLimits = null;
+    this.lastProviderRequestStartedAt = null;
 
     this.displaySegments = [];
     this.displayTextFragments = [];
