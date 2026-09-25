@@ -32,6 +32,7 @@ import type { DecisionOwner } from "./PendingDecisionStore.ts";
 import { decisionOwnerOf } from "./conversation/ConversationRunState.ts";
 import { endTurnRun } from "./harnesses/lifecycle/TurnRunRecorder.ts";
 import { runPreflightToolDiscovery } from "./harnesses/lifecycle/PreflightToolDiscovery.ts";
+import { getCurrentDynamicTools } from "./tool-definitions/utils/DynamicToolHelpers.ts";
 import {
   SERVER_SENT_EVENT_TYPES,
   STATUS_MESSAGES,
@@ -195,22 +196,16 @@ export default class AgenticLoopService {
           context,
           resolvedTools,
         });
-    if (
-      preflight.enabledTools.length > 0 &&
-      (await AgenticLoopService.activatesPreflightPicks(context, resolvedTools, preflight.enabledTools))
-    ) {
-      // The declared tools stay the persona's own set; the harness activates
-      // the picks after assembling the system prompt (the dirty flag is what
-      // a discovery call sets), so every conversation of this persona sends
-      // the same tools and system prompt — a cached prefix across
-      // conversations, not only within one.
-      ToolContext.set(resolvedAgentConversationId, "toolSetDirty", true);
-      context.emit({
-        type: SERVER_SENT_EVENT_TYPES.STATUS,
-        message: STATUS_MESSAGES.TOOL_SET_CHANGED,
-        enabledCount: resolvedTools.finalTools.length + preflight.enabledTools.length,
-        dynamicTools: preflight.enabledTools,
-        preflight: true,
+    const activatedPicks =
+      preflight.enabledTools.length > 0
+        ? await AgenticLoopService.preflightActivation(context, resolvedTools, preflight.enabledTools)
+        : null;
+    if (activatedPicks) {
+      AgenticLoopService.applyPreflightActivation(context, {
+        agentConversationId: resolvedAgentConversationId,
+        declaredCount: resolvedTools.finalTools.length,
+        picks: preflight.enabledTools,
+        activatedPicks,
       });
     } else if (preflight.enabledTools.length > 0) {
       // Re-resolve so the enlarged dynamic set flows through the exact same
@@ -482,29 +477,78 @@ export default class AgenticLoopService {
   }
 
   /**
-   * Whether this turn's pre-flight picks reach the model as an activation
-   * instead of joining the declared tools (Persona.activatePreflightTools).
-   * Only where an activation needs no tool call to hang on — the `tool_call`
-   * bridge (Gemini, local models) — and only when the surface will declare
-   * the bridge (a discovery tool is loaded) and every pick is activatable.
-   * Anything else keeps today's path: re-resolve, declare the picks.
+   * The pre-flight picks that reach the model as an activation instead of
+   * joining the declared tools (Persona.activatePreflightTools), or null
+   * when they join the declared tools. Only where an activation needs no
+   * tool call to hang on — the `tool_call` bridge (Gemini, local models) —
+   * and only when the surface will declare the bridge (a discovery tool is
+   * loaded). Anything else keeps today's path: re-resolve, declare the picks.
+   *
+   * A pick outside the activatable set is dropped, never declared: it is
+   * outside the persona's discoverable universe, so discovery could not
+   * enable it either, and declaring it would rewrite the tools block and
+   * system prompt every conversation of the persona shares — a prompt-cache
+   * miss from token zero (Lupos, 2026-09-25: `trim_video` did that to one
+   * turn in five). The result may be empty: nothing to activate.
    */
-  static async activatesPreflightPicks(
+  static async preflightActivation(
     context: AgenticContext,
     resolvedTools: { finalTools: ReadonlyArray<{ name: string }>; discoverableTools?: ReadonlyArray<{ name: string }> },
     picks: string[],
-  ): Promise<boolean> {
-    if (!context.agent || context.options.isSubAgent) return false;
+  ): Promise<string[] | null> {
+    if (!context.agent || context.options.isSubAgent) return null;
     const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
-    if (AgentPersonaRegistry.get(context.agent)?.activatePreflightTools !== true) return false;
+    if (AgentPersonaRegistry.get(context.agent)?.activatePreflightTools !== true) return null;
     const { resolveToolLoadingMode, TOOL_LOADING_MODES } = await import("#src/providers/toolLoading");
     if (resolveToolLoadingMode(context.providerName, context.resolvedModel) !== TOOL_LOADING_MODES.BRIDGE) {
-      return false;
+      return null;
     }
     const { isDiscoveryTool } = await import("./ToolDiscoveryScope.ts");
-    if (!resolvedTools.finalTools.some((tool) => isDiscoveryTool(tool.name))) return false;
+    if (!resolvedTools.finalTools.some((tool) => isDiscoveryTool(tool.name))) return null;
     const activatable = new Set((resolvedTools.discoverableTools ?? []).map((tool) => tool.name));
-    return picks.every((toolName) => activatable.has(toolName));
+    return picks.filter((toolName) => activatable.has(toolName));
+  }
+
+  /**
+   * Route pre-flight picks through activation. The declared tools stay the
+   * persona's own set; the harness activates `activatedPicks` after
+   * assembling the system prompt (the dirty flag is what a discovery call
+   * sets), so every conversation of this persona sends the same tools and
+   * system prompt — a cached prefix across conversations, not only within
+   * one. The picks preflightActivation left out leave the conversation's
+   * dynamic set, which pre-flight had already merged them into.
+   */
+  static applyPreflightActivation(
+    context: AgenticContext,
+    {
+      agentConversationId,
+      declaredCount,
+      picks,
+      activatedPicks,
+    }: { agentConversationId: string; declaredCount: number; picks: string[]; activatedPicks: string[] },
+  ): void {
+    const activated = new Set(activatedPicks);
+    const droppedPicks = picks.filter((toolName) => !activated.has(toolName));
+    if (droppedPicks.length > 0) {
+      const dropped = new Set(droppedPicks);
+      ToolContext.set(
+        agentConversationId,
+        "dynamicEnabledTools",
+        getCurrentDynamicTools(agentConversationId).filter((toolName) => !dropped.has(toolName)),
+      );
+      logger.info(
+        `[AgenticLoopService] Pre-flight picks outside ${context.agent}'s activatable set dropped (declaring them would change the cached tools and system prompt): [${droppedPicks.join(", ")}]`,
+      );
+    }
+    if (activatedPicks.length === 0) return;
+    ToolContext.set(agentConversationId, "toolSetDirty", true);
+    context.emit({
+      type: SERVER_SENT_EVENT_TYPES.STATUS,
+      message: STATUS_MESSAGES.TOOL_SET_CHANGED,
+      enabledCount: declaredCount + activatedPicks.length,
+      dynamicTools: activatedPicks,
+      preflight: true,
+    });
   }
 
   /**
