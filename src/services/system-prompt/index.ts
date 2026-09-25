@@ -1151,6 +1151,7 @@ export function injectSystemPromptContext(
           SYSTEM_MESSAGE_TAGS.PLATFORM_CONTEXT,
           platformContextMessage,
         ),
+        turnContext: true,
       });
     }
   }
@@ -1171,6 +1172,7 @@ export function injectSystemPromptContext(
           SYSTEM_MESSAGE_TAGS.SELF_CONTEXT,
           selfContextMessage,
         ),
+        turnContext: true,
       });
     }
   }
@@ -1233,6 +1235,7 @@ export function injectSystemPromptContext(
           role: "system",
           content: systemContextBlock,
           _isInjectedContext: true,
+          turnContext: true,
         });
       }
     }

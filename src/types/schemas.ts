@@ -147,6 +147,11 @@ export const ChatRequestSchema = z
     // (AgenticLoopService turns it into a SharedCostBudget). <= 0 = no cap.
     maxCostDollars: z.number().nullable().optional(),
     agentContext: z.unknown().nullable().optional(),
+    // A key shared by the client's requests that share a prompt prefix across
+    // conversations (Lupos: one per Discord channel). Routes OpenAI's
+    // prompt_cache_key and Kimi's session affinity; unset, each conversation
+    // is its own key.
+    promptCacheKey: z.string().min(1).max(64).nullable().optional(),
     workspaceRoot: z.string().nullable().optional(),
     workspaceEnabled: z.boolean().nullable().optional(),
     criticModel: z.string().nullable().optional(),

@@ -1,4 +1,5 @@
 import { getModelByName } from "#src/config";
+import { moonshotCacheTtl } from "#config";
 import { PROVIDERS } from "#src/constants";
 import {
   isLocalProvider,
@@ -24,6 +25,10 @@ import {
  *   toolChoice          the tool_choice modes it accepts (Fable 5.1 and
  *                       Opus 5.5 reject forced choice: "any"/"tool" → "auto")
  *   caching             the prompt-caching mechanisms the provider offers
+ *   cacheLifeSeconds    how long a cached prefix stays readable after the
+ *                       request that last wrote or read it STARTED — what a
+ *                       client that re-sends a prefix across turns (Lupos's
+ *                       channel sessions) should expect to find warm
  *   guidedToolArguments how tool-call arguments are constrained to their
  *                       schema on self-hosted servers (vLLM `strict` tools,
  *                       llama-server's own lazy grammar), when supported
@@ -92,9 +97,37 @@ export interface ModelProfile {
   efforts: string[] | null;
   toolChoice: ToolChoiceMode[];
   caching: CachingMechanism[];
+  /**
+   * Seconds a cached prefix stays readable after the request that last
+   * wrote or read it started; null when the provider caches nothing.
+   */
+  cacheLifeSeconds: number | null;
   guidedToolArguments: GuidedToolArguments | null;
   budget: BudgetPreset;
 }
+
+/**
+ * Cache lives per mechanism, in seconds from the start of the request that
+ * last wrote or read the prefix.
+ *   - Anthropic: the 5-minute TTL of the `{type:"ephemeral"}` markers
+ *     applyCacheBreakpoints writes (a read refreshes it).
+ *   - Gemini implicit: no documented lifetime. Measured on Lupos's
+ *     production turns (prism `requests`, 2026-09-23..25, gemini-3.8-flash):
+ *     same-prefix follow-ups hit 5 of 6 times within 7.5 min and 0 of 2 at
+ *     10–25 min; since 2026-07-20, 2 hits in 111 follow-ups 12–60 min apart.
+ *   - OpenAI automatic prefix: "Entries typically remain active for around
+ *     5 to 10 minutes of inactivity, up to one hour" (prompt-caching guide);
+ *     Prism sends no `prompt_cache_retention`.
+ *   - Local KV prefix reuse: held until the server evicts it for memory —
+ *     no clock, so an hour stands for "as long as the box keeps it".
+ */
+export const CACHE_LIFE_SECONDS = {
+  anthropicEphemeral: 5 * 60,
+  anthropicHour: 60 * 60,
+  geminiImplicit: 10 * 60,
+  openAiAutomatic: 10 * 60,
+  localKvPrefix: 60 * 60,
+} as const;
 
 const ALL_SAMPLING: SamplingParameter[] = [
   "temperature",
@@ -152,6 +185,7 @@ function localProfile(model: string, provider: string, baseType: string): ModelP
     efforts: effortsOf(getModelByName(model) as CatalogRecord),
     toolChoice: ALL_TOOL_CHOICE,
     caching: ["kv_prefix"],
+    cacheLifeSeconds: CACHE_LIFE_SECONDS.localKvPrefix,
     guidedToolArguments,
     budget: BUDGET_PRESETS[lightweight ? "lightweight" : "standard"],
   };
@@ -170,6 +204,7 @@ export function getModelProfile(model: string, provider: string): ModelProfile {
     efforts: effortsOf(record),
     toolChoice: ALL_TOOL_CHOICE,
     caching: [],
+    cacheLifeSeconds: null,
     guidedToolArguments: null,
     budget: BUDGET_PRESETS.standard,
   };
@@ -184,17 +219,21 @@ export function getModelProfile(model: string, provider: string): ModelProfile {
       }
       if (flag(record, "noForcedToolChoice")) profile.toolChoice = ["auto", "none"];
       profile.caching = ["cache_breakpoints"];
+      profile.cacheLifeSeconds = CACHE_LIFE_SECONDS.anthropicEphemeral;
       break;
     case PROVIDERS.GOOGLE:
       // Deprecated from Gemini 3.6 Flash / 3.5 Flash-Lite on.
       if (flag(record, "lockedSampling")) profile.rejectedParameters = ["temperature", "topP", "topK"];
       profile.toolChoice = ["auto", "any", "none"];
       profile.caching = ["implicit", "explicit_cached_content"];
+      // Prism creates no cachedContents: the implicit cache is the one in play.
+      profile.cacheLifeSeconds = CACHE_LIFE_SECONDS.geminiImplicit;
       break;
     case PROVIDERS.OPENAI:
       // gpt-6-astra: reasoning-only sampling, whatever the effort.
       if (flag(record, "lockedSampling")) profile.rejectedParameters = [...ALL_SAMPLING];
       profile.caching = ["automatic_prefix"];
+      profile.cacheLifeSeconds = CACHE_LIFE_SECONDS.openAiAutomatic;
       break;
     case PROVIDERS.MOONSHOT:
       // Kimi K3: temperature 1.0 / top_p 0.95 / penalties 0 are fixed.
@@ -203,6 +242,13 @@ export function getModelProfile(model: string, provider: string): ModelProfile {
       profile.caching = flag(record, "anthropicCompatible")
         ? ["top_level_cache_control", "automatic_prefix"]
         : ["automatic_prefix"];
+      // The Anthropic-compatible route writes MOONSHOT_CACHE_TTL; the
+      // OpenAI-compatible one documents no lifetime — OpenAI's stands in.
+      profile.cacheLifeSeconds = flag(record, "anthropicCompatible")
+        ? moonshotCacheTtl() === "1h"
+          ? CACHE_LIFE_SECONDS.anthropicHour
+          : CACHE_LIFE_SECONDS.anthropicEphemeral
+        : CACHE_LIFE_SECONDS.openAiAutomatic;
       break;
     default:
       break;
@@ -271,4 +317,27 @@ export function applyModelProfile<T extends Record<string, unknown>>(
     }
   }
   return changed ? (result as T) : options;
+}
+
+/**
+ * `promptCache` for the done event: how long the prefix this turn last sent
+ * stays readable on the provider that served it, and when that runs out —
+ * for a client that re-sends the prefix on its next turn (Lupos's channel
+ * sessions keep one only while it is warm). Nothing when the model caches
+ * nothing or no request ran.
+ */
+export function promptCacheWindow(
+  providerName: string | undefined,
+  resolvedModel: string | undefined,
+  startedAt: number | null | undefined,
+): { promptCache?: { lifeSeconds: number; expiresAt: string } } {
+  if (!providerName || !resolvedModel || !startedAt) return {};
+  const lifeSeconds = getModelProfile(resolvedModel, providerName).cacheLifeSeconds;
+  if (!lifeSeconds) return {};
+  return {
+    promptCache: {
+      lifeSeconds,
+      expiresAt: new Date(startedAt + lifeSeconds * 1000).toISOString(),
+    },
+  };
 }

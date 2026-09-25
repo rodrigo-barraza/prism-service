@@ -291,6 +291,8 @@ export interface AgenticOptions {
   thinkingBudget?: number;
   webSearch?: boolean;
   agentContext?: unknown;
+  /** The client's prompt-cache routing key (schemas.ts `promptCacheKey`). */
+  promptCacheKey?: string;
   maxSubAgentIterations?: number;
   minContextLength?: number;
   tools?: ToolSchema[];

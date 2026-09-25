@@ -1089,7 +1089,13 @@ function demoteSystemMessage(message: ChatMessage): void {
   }
 }
 
-/** Merge consecutive same-role messages into a single turn. */
+/**
+ * Merge consecutive same-role messages into a single turn. User messages
+ * keep one block each, never one joined string: a cache entry can only end
+ * on a block boundary, and a client that re-sends its history next turn
+ * (Lupos: every Discord message is a user message) needs the boundary it
+ * cached — the block before this turn's injected context — to still be one.
+ */
 function mergeConsecutiveSameRole(messages: ChatMessage[]): ChatMessage[] {
   return messages.reduce((acc: ChatMessage[], current: ChatMessage) => {
     if (acc.length && acc[acc.length - 1].role === current.role) {
@@ -1105,7 +1111,8 @@ function mergeConsecutiveSameRole(messages: ChatMessage[]): ChatMessage[] {
       // Handle merging when content might be string or array
       if (
         typeof previous.content === "string" &&
-        typeof current.content === "string"
+        typeof current.content === "string" &&
+        current.role !== "user"
       ) {
         previous.content += `\n\n${current.content}`;
       } else {
@@ -1212,15 +1219,16 @@ export async function prepareMessages(
   // Either way the harness wraps their content in semantic XML tags
   // (see utils/SystemMessageTags.ts), so demoted messages remain
   // distinguishable from genuine user input.
+  const kept = conversation.filter(
+    (chatMessage: ChatMessage) =>
+      chatMessage.role === "user" ||
+      chatMessage.role === "assistant" ||
+      chatMessage.role === "tool" ||
+      chatMessage.role === "system",
+  );
+  const firstTurnContext = kept.findIndex((message) => message.turnContext === true);
   const cleaned = await Promise.all(
-    conversation
-      .filter(
-        (chatMessage: ChatMessage) =>
-          chatMessage.role === "user" ||
-          chatMessage.role === "assistant" ||
-          chatMessage.role === "tool" ||
-          chatMessage.role === "system",
-      )
+    kept
       .map(async (message: ChatMessage) => {
         // Convert tool role messages to tool_result user messages for Anthropic
         if (message.role === "tool") {
@@ -1444,6 +1452,7 @@ export async function prepareMessages(
         return { role: message.role, content: message.content || " " };
       }),
   );
+  if (firstTurnContext > 0) tagCacheBoundary(cleaned[firstTurnContext - 1]);
 
   // Merge consecutive same-role messages
   let merged = mergeConsecutiveSameRole(cleaned);
@@ -1799,6 +1808,38 @@ export function resolveSystemPrompt(
 const EPHEMERAL_CACHE = { type: "ephemeral" } as const;
 
 /**
+ * Tags the last block of the prefix the next turn re-sends — the message
+ * just before this turn's injected context (ChatMessage.turnContext). A
+ * symbol key: it rides the block through merging and never reaches the
+ * payload or the prefix hashes (JSON drops it).
+ */
+const CACHE_BOUNDARY = Symbol("prism.anthropic.cacheBoundary");
+
+type CacheableMessage = { content?: unknown; [key: string]: unknown };
+
+/** A block that may carry cache_control (never thinking, never empty text). */
+function acceptsCacheControl(block: Record<string, unknown>): boolean {
+  if (block.type === "thinking" || block.type === "redacted_thinking") return false;
+  if (block.type === "text" && !String(block.text ?? "").trim()) return false;
+  return true;
+}
+
+function tagCacheBoundary(message: CacheableMessage | undefined): void {
+  if (!message) return;
+  if (typeof message.content === "string") {
+    if (!message.content.trim()) return;
+    message.content = [{ type: "text", text: message.content }];
+  }
+  if (!Array.isArray(message.content)) return;
+  const blocks = message.content as Array<Record<string | symbol, unknown>>;
+  for (let blockIndex = blocks.length - 1; blockIndex >= 0; blockIndex--) {
+    if (!acceptsCacheControl(blocks[blockIndex] as Record<string, unknown>)) continue;
+    blocks[blockIndex][CACHE_BOUNDARY] = true;
+    return;
+  }
+}
+
+/**
  * Attach real prompt-cache breakpoints to the request.
  *
  * The Anthropic API only honors `cache_control` on system blocks, tool
@@ -1806,11 +1847,18 @@ const EPHEMERAL_CACHE = { type: "ephemeral" } as const;
  * `cache_control` key on the payload root was silently ignored, so prompt
  * caching was effectively disabled for every agentic turn.
  *
- * Breakpoints (≤4 allowed; we use up to 3):
+ * Breakpoints (≤4 allowed; we use up to 4):
  *   1. Last tool definition   → caches the (large, stable) tool schema block
  *   2. System prompt block    → caches the assembled system prompt
- *   3. Last message block     → moving marker; each turn re-hits the prefix
- *      cached by the previous turn's marker and extends it.
+ *   3. Turn boundary          → the block before this turn's injected
+ *      context (tagCacheBoundary): the history the NEXT turn re-sends. A
+ *      read can land only where a request wrote, and the moving marker
+ *      below always sits after the injected context the next turn drops —
+ *      so without this one a client that rebuilds each turn (Lupos) never
+ *      reads its history back. The next turn's own boundary finds it by
+ *      the 20-block lookback.
+ *   4. Last message block     → moving marker; each request of the turn
+ *      re-hits the prefix cached by the previous one and extends it.
  */
 export function applyCacheBreakpoints(payload: Record<string, unknown>): void {
   // 1. Tools — serialize first in the prompt; mark the last loaded
@@ -1838,6 +1886,7 @@ export function applyCacheBreakpoints(payload: Record<string, unknown>): void {
     | Array<{ content: unknown; [key: string]: unknown }>
     | undefined;
   if (!Array.isArray(messages) || messages.length === 0) return;
+  markCacheBoundary(messages);
   let lastIndex = messages.length - 1;
   while (lastIndex > 0 && messages[lastIndex].clear_at !== undefined) lastIndex--;
   const lastMessage = messages[lastIndex];
@@ -1861,6 +1910,21 @@ export function applyCacheBreakpoints(payload: Record<string, unknown>): void {
       if (block.type === "thinking" || block.type === "redacted_thinking")
         continue;
       if (block.type === "text" && !String(block.text ?? "").trim()) continue;
+      blocks[blockIndex] = { ...block, cache_control: EPHEMERAL_CACHE };
+      return;
+    }
+  }
+}
+
+/** Breakpoint 3: cache_control on the block tagCacheBoundary tagged. */
+function markCacheBoundary(messages: Array<{ content: unknown }>): void {
+  for (const message of messages) {
+    if (!Array.isArray(message.content)) continue;
+    const blocks = message.content as Array<Record<string | symbol, unknown>>;
+    for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
+      const block = blocks[blockIndex];
+      if (block[CACHE_BOUNDARY] !== true) continue;
+      if (block.cache_control || !acceptsCacheControl(block as Record<string, unknown>)) return;
       blocks[blockIndex] = { ...block, cache_control: EPHEMERAL_CACHE };
       return;
     }
