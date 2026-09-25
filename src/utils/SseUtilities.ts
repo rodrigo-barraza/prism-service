@@ -177,6 +177,7 @@ export function buildJsonResponseFromEvents(
       ...(doneEvent.conversationId && {
         conversationId: doneEvent.conversationId,
       }),
+      ...(doneEvent.promptCache && { promptCache: doneEvent.promptCache }),
     },
   };
 }

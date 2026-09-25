@@ -47,6 +47,7 @@ import {
   declaredBillionParameters,
   effortWithinProfile,
   getModelProfile,
+  promptCacheWindow,
 } from "#src/providers/ModelProfiles";
 import type { ChatMessage } from "#src/types/provider";
 
@@ -162,6 +163,28 @@ describe("ModelProfiles — effort and tool_choice", () => {
     expect(getModelProfile("kimi-k2.6", "moonshot").caching).toEqual(["automatic_prefix"]);
     expect(getModelProfile("gpt-6-sol", "openai").caching).toEqual(["automatic_prefix"]);
     expect(getModelProfile("gemini-3.8-flash", "google").caching).toContain("implicit");
+  });
+
+  // What a client re-sending a prefix next turn can expect to find warm
+  // (Lupos's channel sessions end with it) — per mechanism, CACHE_LIFE_SECONDS.
+  it("gives each provider's cache life", () => {
+    expect(getModelProfile("claude-sonnet-5", "anthropic").cacheLifeSeconds).toBe(300);
+    expect(getModelProfile("gemini-3.8-flash", "google").cacheLifeSeconds).toBe(600);
+    expect(getModelProfile("gpt-6-sol", "openai").cacheLifeSeconds).toBe(600);
+    expect(getModelProfile("kimi-k3", "moonshot").cacheLifeSeconds).toBe(300);
+    expect(getModelProfile("kimi-k2.6", "moonshot").cacheLifeSeconds).toBe(600);
+    expect(getModelProfile("google/gemma-4-12b-it", "vllm").cacheLifeSeconds).toBe(3600);
+  });
+
+  it("dates the done event's promptCache from the turn's last request start", () => {
+    const startedAt = Date.parse("2026-09-25T20:30:57.000Z");
+    expect(promptCacheWindow("google", "gemini-3.8-flash", startedAt)).toEqual({
+      promptCache: { lifeSeconds: 600, expiresAt: "2026-09-25T20:40:57.000Z" },
+    });
+    expect(promptCacheWindow("anthropic", "claude-sonnet-5", startedAt).promptCache?.expiresAt).toBe(
+      "2026-09-25T20:35:57.000Z",
+    );
+    expect(promptCacheWindow("google", "gemini-3.8-flash", null)).toEqual({});
   });
 });
 

@@ -58,6 +58,13 @@ export interface ChatMessage {
    * once a later user message exists, and stays in the transcript.
    */
   turnScoped?: boolean;
+  /**
+   * Context the system-prompt assembler placed before this turn's user
+   * message (platform, self, time/memories). What precedes the first such
+   * message is the prefix the next turn re-sends, so the Anthropic adapter
+   * puts a cache breakpoint just before it. Never persisted.
+   */
+  turnContext?: boolean;
   name?: string;
   images?: string[];
   audio?: string[];

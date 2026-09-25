@@ -414,5 +414,7 @@ export interface ChatMessage {
   toolActivation?: import("./ProviderTypes.ts").ToolActivation;
   /** A one-turn system nudge (rendered `clear_at` where supported). */
   turnScoped?: boolean;
+  /** Context injected before this turn's user message (never persisted). */
+  turnContext?: boolean;
   [key: string]: unknown;
 }

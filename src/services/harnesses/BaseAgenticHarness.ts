@@ -905,9 +905,13 @@ export default class BaseAgenticHarness {
       signal: signal ? AbortSignal.any([signal, passAbort.signal]) : passAbort.signal,
       // Set when this harness records input a provider applies mid-stream.
       turnInputKey: this.nativeTurnInputKey(),
-      // Stable per-conversation prompt-cache key (used by OpenAI as
-      // prompt_cache_key for cache-shard routing; ignored elsewhere).
+      // Stable prompt-cache key (used by OpenAI as prompt_cache_key for
+      // cache-shard routing; ignored elsewhere): the client's own when its
+      // conversations share a prefix (Lupos's turns in one channel are a
+      // new conversation each), else the conversation's.
       promptCacheKey:
+        (typeof this.context.options?.promptCacheKey === "string" &&
+          this.context.options.promptCacheKey) ||
         this.context.agentConversationId ||
         (this.context.conversationId as string | undefined) ||
         undefined,
@@ -945,8 +949,9 @@ export default class BaseAgenticHarness {
     // previously had none). Retries fire only when zero chunks were yielded —
     // once output reached the consumer, a retry would duplicate streamed text
     // and re-execute tool calls.
-    const createStream = () =>
-      modelDefinition?.liveAPI && provider.generateTextStreamLive
+    const createStream = () => {
+      this.state.lastProviderRequestStartedAt = Date.now();
+      return modelDefinition?.liveAPI && provider.generateTextStreamLive
         ? provider.generateTextStreamLive(
             expandedMessages,
             resolvedModel,
@@ -957,6 +962,7 @@ export default class BaseAgenticHarness {
             resolvedModel,
             providerOptions,
           );
+    };
 
     // Context-overflow recovery: the pre-flight clamp works from a chars/4
     // heuristic that dense content (JSON, hex, code) can undershoot far
@@ -1785,6 +1791,7 @@ export default class BaseAgenticHarness {
             : null,
         totalSec: (now - requestStart) / 1000,
         rateLimits: state.lastRateLimits,
+        promptCacheStartedAt: state.lastProviderRequestStartedAt,
         contentSegments: cleanSegments,
         textFragments: cleanTextFragments,
         thinkingFragments: cleanThinkingFragments,
