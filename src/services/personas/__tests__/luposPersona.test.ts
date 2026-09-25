@@ -200,17 +200,21 @@ describe("Lupos persona Discord actions section", () => {
     }
   });
 
-  // lupos-bot delivers a reminder to the asker only, caps pending ones at
-  // five per member, and refuses a nickname on anyone but the bot. The text
-  // must promise nothing the routes will not do.
+  // lupos-bot delivers a reminder to the asker or to the one member named in
+  // `pingUserId` (never a role or @everyone), caps pending ones at five per
+  // asker and three from others per member, and refuses a nickname on anyone
+  // but the bot. The text must promise nothing the routes will not do.
   it.each(["en", "caveman"])("states the reminder and nickname limits the bot enforces (%s)", (locale) => {
     const section = extractSection(
       policyWith(DISCORD_ACTION_TOOLS, locale),
       HEADINGS[locale],
     );
     expect(section).toMatch(/ONLY when someone ask/);
+    expect(section).toContain("`pingUserId`");
     expect(section).toMatch(/nobody else/);
+    expect(section).toMatch(/never (a )?role or @everyone/);
     expect(section).toContain("5 pending");
+    expect(section).toMatch(/3 from other people/);
     expect(section).toMatch(/plain word/);
     expect(section).toContain("OWN name");
     expect(section).toMatch(/[Nn]ever (a )?slur/);
