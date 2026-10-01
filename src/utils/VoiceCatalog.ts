@@ -2,19 +2,30 @@ import { VOICES, DEFAULT_VOICES, getDefaultModels, MODALITY_TYPES } from "#src/c
 import { PROVIDERS } from "#src/constants";
 import PromptLocaleService from "#src/services/PromptLocaleService";
 
-type VoiceEntry = { name: string; gender: string; description: string };
+type VoiceEntry = {
+  name: string;
+  gender: string;
+  description: string;
+  label?: string;
+};
 
 const TTS_VOICE_CATALOG_PLACEHOLDER = "{{TTS_VOICE_CATALOG}}";
 
+/** ElevenLabs models that perform inline audio tags (incl. sound effects). */
+const ELEVENLABS_AUDIO_TAG_MODEL = /^eleven_v[34]/;
+
+// Static catalogs only. Inworld and ElevenLabs are built per call: their
+// text depends on the active model, and reading VOICES at import time would
+// break every module that imports this one under a partial config mock.
 const VOICE_CATALOGS: Record<string, string> = {
-  [PROVIDERS.INWORLD]: "",
   [PROVIDERS.OPENAI]: buildOpenAICatalog(),
   [PROVIDERS.GOOGLE]: buildGoogleCatalog(),
-  [PROVIDERS.ELEVENLABS]: buildElevenLabsCatalog(),
 };
 
 function genderLabel(gender: string): string {
-  return gender === "Male" ? "M" : "F";
+  if (gender === "Male") return "M";
+  if (gender === "Female") return "F";
+  return "N";
 }
 
 function buildInworldCatalog(model?: string): string {
@@ -108,26 +119,36 @@ function buildGoogleCatalog(): string {
   });
 }
 
-function buildElevenLabsCatalog(): string {
-  const voiceDescriptions: Record<string, string> = {
-    Rachel: "warm conversational young F — DEFAULT",
-    Bella: "soft soothing intimate F — meditation",
-    Antoni: "deep authoritative M — news/presentations",
-    Josh: "young clear M",
-    Arnold: "strong deep M",
-    Adam: "clear mid-range M",
-    Sam: "articulate M",
-  };
-  const entries = Object.entries(voiceDescriptions).map(
-    ([name, description]) => `${name} (${description})`,
-  );
-  return PromptLocaleService.get(
+/**
+ * ElevenLabs voices by label — the provider maps a label back to the voice
+ * ID the API needs. Models that perform audio tags (Eleven v3/v4) get the
+ * tag guide appended, sound effects included.
+ */
+function buildElevenLabsCatalog(model?: string): string {
+  const voices = (VOICES[PROVIDERS.ELEVENLABS] || []) as VoiceEntry[];
+  const defaultVoice = DEFAULT_VOICES[PROVIDERS.ELEVENLABS];
+  const entries = voices.map((voice) => {
+    const isDefault = voice.name === defaultVoice;
+    return `${voice.label ?? voice.name} (${voice.description}, ${genderLabel(voice.gender)}${isDefault ? " — DEFAULT" : ""})`;
+  });
+  const catalog = PromptLocaleService.get(
     "en",
     "voice-catalog.catalogFormat.elevenlabs",
     {
       voices: entries.join(", "),
     },
   );
+
+  const activeModel =
+    model ||
+    getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.AUDIO).elevenlabs ||
+    "";
+  if (!ELEVENLABS_AUDIO_TAG_MODEL.test(activeModel)) return catalog;
+
+  return `${catalog} ${PromptLocaleService.get(
+    "en",
+    "voice-catalog.elevenlabsAudioTags",
+  )}`;
 }
 
 export function getVoiceCatalogForProvider(
@@ -137,7 +158,11 @@ export function getVoiceCatalogForProvider(
   if (provider === PROVIDERS.INWORLD) {
     return buildInworldCatalog(model);
   }
-  return VOICE_CATALOGS[provider] || VOICE_CATALOGS[PROVIDERS.ELEVENLABS];
+  if (provider === PROVIDERS.ELEVENLABS) {
+    return buildElevenLabsCatalog(model);
+  }
+  // An unknown provider falls back to ElevenLabs at its default model.
+  return VOICE_CATALOGS[provider] || buildElevenLabsCatalog();
 }
 
 export function injectVoiceCatalog(

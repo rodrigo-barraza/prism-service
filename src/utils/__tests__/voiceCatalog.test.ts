@@ -6,11 +6,16 @@ vi.mock('#src/config', () => ({
       { name: 'Dennis', gender: 'Male', description: 'A warm baritone, friendly' },
       { name: 'Luna', gender: 'Female', description: 'A bright soprano, energetic' },
     ],
+    elevenlabs: [
+      { name: 'N2lVS1w4EtoT3dr4eOWO', label: 'Callum', gender: 'Male', description: 'Husky, gravelly American trickster with an unsettling edge' },
+      { name: 'SAz9YHcvj6GT2YYXdXww', label: 'River', gender: 'Neutral', description: 'Relaxed, neutral, informative American' },
+    ],
   },
   DEFAULT_VOICES: {
     inworld: 'Dennis',
+    elevenlabs: 'N2lVS1w4EtoT3dr4eOWO',
   },
-  getDefaultModels: () => ({ inworld: 'inworld-tts-2' }),
+  getDefaultModels: () => ({ inworld: 'inworld-tts-2', elevenlabs: 'eleven_v4' }),
   MODALITY_TYPES: {
     TEXT: 'text',
     AUDIO: 'audio',
@@ -55,10 +60,28 @@ describe('VoiceCatalog', () => {
       expect(catalog).toContain('Puck');
     });
 
-    it('returns a catalog string for ElevenLabs', () => {
+    it('lists ElevenLabs voices by label, never by ID, with the default marked', () => {
       const catalog = getVoiceCatalogForProvider(PROVIDERS.ELEVENLABS);
       expect(catalog).toContain('ElevenLabs voices');
-      expect(catalog).toContain('Rachel');
+      expect(catalog).toContain(
+        'Callum (Husky, gravelly American trickster with an unsettling edge, M — DEFAULT)',
+      );
+      expect(catalog).toContain('River (Relaxed, neutral, informative American, N)');
+      expect(catalog).not.toContain('N2lVS1w4EtoT3dr4eOWO');
+    });
+
+    it('ElevenLabs v3/v4 (the default here) include the audio-tag guide with sound effects', () => {
+      for (const model of [undefined, 'eleven_v4', 'eleven_v3']) {
+        const catalog = getVoiceCatalogForProvider(PROVIDERS.ELEVENLABS, model);
+        expect(catalog).toContain('audio tags');
+        expect(catalog).toContain('Sound effects are rendered into the audio');
+      }
+    });
+
+    it('older ElevenLabs models get no audio-tag guide', () => {
+      const catalog = getVoiceCatalogForProvider(PROVIDERS.ELEVENLABS, 'eleven_turbo_v2');
+      expect(catalog).toContain('Callum');
+      expect(catalog).not.toContain('audio tags');
     });
 
     it('returns a catalog string for Inworld', () => {

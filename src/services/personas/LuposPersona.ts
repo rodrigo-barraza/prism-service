@@ -218,6 +218,11 @@ export const LUPOS_TOOL_POLICY_SECTIONS: ToolPolicySection[] = [
   },
   {
     content: (locale) =>
+      PromptLocaleService.get(locale, "personas.lupos.toolPolicySoundEffects"),
+    requires: ["generate_sound_effect"],
+  },
+  {
+    content: (locale) =>
       PromptLocaleService.get(locale, "personas.lupos.toolPolicyVideo"),
     requires: [TOOL_NAMES.TRIM_VIDEO],
   },
@@ -518,6 +523,7 @@ const LUPOS_ALLOWED_TOOLS = [
   "remix_audio",
   TOOL_NAMES.SYNTHESIZE_SPEECH,
   "synthesize_speech_local",
+  "generate_sound_effect",
   "transcribe_audio",
   TOOL_NAMES.TRIM_VIDEO,
   "download_video",

@@ -59,6 +59,7 @@ process.on("uncaughtException", (error: Error, origin: string) => {
 import chatRouter from "./routes/ChatRoutes.ts";
 import agentRouter from "./routes/AgentRoutes.ts";
 import audioRouter from "./routes/AudioRoutes.ts";
+import soundEffectRouter from "./routes/SoundEffectRoutes.ts";
 import embedRouter from "./routes/EmbedRoutes.ts";
 import configRouter, { localConfigRouter } from "./routes/ConfigRoutes.ts";
 import conversationsRouter from "./routes/ConversationsRoutes.ts";
@@ -138,6 +139,7 @@ const ENDPOINTS = {
     "/agent",
     "/text-to-audio",
     "/audio-to-text",
+    "/text-to-sound-effect",
     "/embed",
     "/conversations",
     "/memory",
@@ -206,6 +208,7 @@ app.use("/chat", chatRouter);
 app.use("/agent", agentRouter);
 app.use("/text-to-audio", audioRouter);
 app.use("/audio-to-text", audioRouter);
+app.use("/text-to-sound-effect", soundEffectRouter);
 app.use("/embed", embedRouter);
 app.use("/conversations", conversationBranchRouter);
 app.use("/conversations", conversationsRouter);
