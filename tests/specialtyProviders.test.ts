@@ -45,11 +45,11 @@ describe('Specialty Providers (ElevenLabs, Inworld)', () => {
         headers: new Headers({ 'Content-Type': 'audio/mpeg' })
       });
 
-      const result = await elevenlabsProvider.generateSpeech('Hello voice world', 'voice-id-123', { stability: 0.7 });
+      const result = await elevenlabsProvider.generateSpeech('Hello voice world', 'JBFqnCBsd6RMkjVDRZzb', { stability: 0.7 });
       expect(result.contentType).toBe('audio/mpeg');
       expect(result.stream).toBe('Elevenlabs audio stream');
 
-      const call = fetchSpy.mock.calls.find((c: any) => String(c[0]).includes('/text-to-speech/voice-id-123/stream'));
+      const call = fetchSpy.mock.calls.find((c: any) => String(c[0]).includes('/text-to-speech/JBFqnCBsd6RMkjVDRZzb/stream'));
       expect(call).toBeDefined();
       const body = JSON.parse(call[1].body);
       expect(body.text).toBe('Hello voice world');
@@ -63,7 +63,7 @@ describe('Specialty Providers (ElevenLabs, Inworld)', () => {
         yield 'How are you?';
       };
 
-      const stream = elevenlabsProvider.generateSpeechStream(textStream(), 'voice-id-123');
+      const stream = elevenlabsProvider.generateSpeechStream(textStream(), 'JBFqnCBsd6RMkjVDRZzb');
 
       // In ElevenLabs generateSpeechStream, it waits for WS connection, sends initial config, sentence chunks, and yields raw audio.
       // Let's emulate the events of ElevenLabs WS stream:
