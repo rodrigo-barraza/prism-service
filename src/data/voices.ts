@@ -53,15 +53,138 @@ const GOOGLE_VOICES = [
   { name: "Zubenelgenubi", gender: "Male" },
 ];
 
+// ElevenLabs' default (premade) voices, GET /v2/voices?voice_type=default
+// on 2026-10-01. `name` is the voice ID the API takes; the agent-facing
+// catalog lists `label`, which the provider maps back to the ID. Only
+// default voices: a free-plan key cannot use Voice Library voices or create
+// voices through the API ("paid_plan_required").
 const ELEVENLABS_VOICES = [
-  { name: "21m00Tcm4TlvDq8ikWAM", label: "Rachel", gender: "Female" },
-  { name: "EXAVITQu4vr4xnSDxMaL", label: "Bella", gender: "Female" },
-  { name: "ErXwobaYiN019PkySvjV", label: "Antoni", gender: "Male" },
-  { name: "MF3mGyEYCl7XYWbV9V6O", label: "Elli", gender: "Female" },
-  { name: "TxGEqnHWrfWFTfGW9XjX", label: "Josh", gender: "Male" },
-  { name: "VR6AewLTigWG4xSOukaG", label: "Arnold", gender: "Male" },
-  { name: "pNInz6obpgDQGcFmaJgB", label: "Adam", gender: "Male" },
-  { name: "yoZ06aMxZJJ28mfd3POQ", label: "Sam", gender: "Male" },
+  {
+    name: "pNInz6obpgDQGcFmaJgB",
+    label: "Adam",
+    gender: "Male",
+    description: "Brash, dominant American tenor with aggressive confidence",
+  },
+  {
+    name: "Xb7hH8MSUJpSbSDYk0k2",
+    label: "Alice",
+    gender: "Female",
+    description: "Clear, engaging British educator",
+  },
+  {
+    name: "hpp4J3VqNfWAUOO0d1Us",
+    label: "Bella",
+    gender: "Female",
+    description: "Warm, bright, professional American narrator",
+  },
+  {
+    name: "pqHfZKP75CvOlQylNhV4",
+    label: "Bill",
+    gender: "Male",
+    description: "Wise, mature, comforting older American storyteller",
+  },
+  {
+    name: "nPczCjzI2devNBz1zQrb",
+    label: "Brian",
+    gender: "Male",
+    description: "Deep, resonant, comforting American narrator",
+  },
+  {
+    name: "N2lVS1w4EtoT3dr4eOWO",
+    label: "Callum",
+    gender: "Male",
+    description: "Husky, gravelly American trickster with an unsettling edge",
+  },
+  {
+    name: "IKne3meq5aSn9XLyUdCD",
+    label: "Charlie",
+    gender: "Male",
+    description: "Deep, confident, energetic young Australian",
+  },
+  {
+    name: "iP95p4xoKVk53GoZ742B",
+    label: "Chris",
+    gender: "Male",
+    description: "Charming, down-to-earth American conversationalist",
+  },
+  {
+    name: "onwK4e9ZLuTAKqWW03F9",
+    label: "Daniel",
+    gender: "Male",
+    description: "Steady, strong British broadcaster",
+  },
+  {
+    name: "cjVigY5qzO86Huf0OWal",
+    label: "Eric",
+    gender: "Male",
+    description: "Smooth, trustworthy American tenor in his forties",
+  },
+  {
+    name: "JBFqnCBsd6RMkjVDRZzb",
+    label: "George",
+    gender: "Male",
+    description: "Warm, captivating British storyteller",
+  },
+  {
+    name: "SOYHLrjzK2X1ezoPC6cr",
+    label: "Harry",
+    gender: "Male",
+    description: "Fierce, rough young American warrior",
+  },
+  {
+    name: "cgSgspJ2msm6clMCkdW9",
+    label: "Jessica",
+    gender: "Female",
+    description: "Playful, bright, warm young American",
+  },
+  {
+    name: "FGY2WhTYpPnrIDTdsKH5",
+    label: "Laura",
+    gender: "Female",
+    description: "Enthusiastic young American with a quirky attitude",
+  },
+  {
+    name: "TX3LPaxmHKxFdv7VOQHJ",
+    label: "Liam",
+    gender: "Male",
+    description: "Energetic, warm young American creator",
+  },
+  {
+    name: "pFZP5JQG7iQjIQuC4Bku",
+    label: "Lily",
+    gender: "Female",
+    description: "Velvety, warm British actress",
+  },
+  {
+    name: "XrExE9yKIg1WjnnlVkGX",
+    label: "Matilda",
+    gender: "Female",
+    description: "Knowledgeable, professional American alto",
+  },
+  {
+    name: "SAz9YHcvj6GT2YYXdXww",
+    label: "River",
+    gender: "Neutral",
+    description: "Relaxed, neutral, informative American",
+  },
+  {
+    name: "CwhRBWXzGAHq8TQ4Fs17",
+    label: "Roger",
+    gender: "Male",
+    description: "Laid-back, casual, resonant American",
+  },
+  {
+    name: "EXAVITQu4vr4xnSDxMaL",
+    label: "Sarah",
+    gender: "Female",
+    description: "Mature, reassuring, confident young American",
+  },
+  {
+    name: "bIHbv24MWmeRgasZH58o",
+    label: "Will",
+    gender: "Male",
+    description: "Relaxed, optimistic young American",
+  },
 ];
 
 const INWORLD_VOICES = [
@@ -905,7 +1028,11 @@ const VOICES = {
 const DEFAULT_VOICES = {
   [PROVIDERS.OPENAI]: "echo",
   [PROVIDERS.GOOGLE]: "Kore",
-  [PROVIDERS.ELEVENLABS]: "21m00Tcm4TlvDq8ikWAM",
+  // Callum: Lupos's voice, chosen 2026-10-01 over the other default
+  // voices by blind A/B on Lupos lines rendered with eleven_v4. The old
+  // default, "Rachel" (21m00Tcm4TlvDq8ikWAM), now resolves to a Voice
+  // Library voice a free-plan key cannot use.
+  [PROVIDERS.ELEVENLABS]: "N2lVS1w4EtoT3dr4eOWO",
   [PROVIDERS.INWORLD]: "Dennis",
 };
 export { VOICES, DEFAULT_VOICES };

@@ -252,6 +252,22 @@ export interface SpeechResult {
   contentType: string;
 }
 
+export interface SoundEffectOptions {
+  /** Sound-effect model; the provider's own default when omitted. */
+  model?: string;
+  /** Clip length in seconds (ElevenLabs: 0.5–30); the model decides when omitted. */
+  durationSeconds?: number;
+  /** Render a seamless loop (ambience beds). */
+  loop?: boolean;
+  /** 0–1: how literally the prompt is followed versus creative variation. */
+  promptInfluence?: number;
+}
+
+export interface SoundEffectResult {
+  audio: Buffer;
+  contentType: string;
+}
+
 export interface HealthCheckResult {
   ok: boolean;
   status: string;
@@ -346,6 +362,10 @@ export interface Provider {
     voice?: string,
     options?: ProviderOptions,
   ): AsyncGenerator<Buffer | Uint8Array, void, unknown>;
+  generateSoundEffect?(
+    prompt: string,
+    options?: SoundEffectOptions,
+  ): Promise<SoundEffectResult>;
   transcribeAudio?(
     audioBuffer: Buffer,
     mimeType: string,

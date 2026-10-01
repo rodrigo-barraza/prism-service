@@ -1906,6 +1906,21 @@ const MODELS = {
     outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: false,
   },
+  ELEVEN_V4: {
+    description:
+      "ElevenLabs' most expressive text-to-speech model (2026-09-28): natural-language audio tags direct delivery ([whispers], [snarls]), non-verbals ([laughs]) and sound effects rendered into the speech ([thunder crashes], [gunshot]). SSML is not supported.",
+    name: "eleven_v4",
+    label: "Eleven v4",
+    provider: PROVIDERS.ELEVENLABS,
+    year: 2026,
+    modelType: MODEL_TYPES.AUDIO,
+    default: true,
+    // List price, ElevenLabs API pricing page (2026-10-01): $0.08 / 1K chars.
+    pricing: { perCharacter: 0.00008 },
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
+    streaming: true,
+  },
   ELEVEN_TURBO_V2: {
     description:
       "ElevenLabs' high-speed voice synthesis model, providing natural and expressive vocal output.",
@@ -1914,11 +1929,26 @@ const MODELS = {
     provider: PROVIDERS.ELEVENLABS,
     year: 2023,
     modelType: MODEL_TYPES.AUDIO,
-    default: true,
     pricing: { perCharacter: 0.00005 },
     inputTypes: [MODALITY_TYPES.TEXT],
     outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
+  },
+  ELEVEN_TEXT_TO_SOUND_V2: {
+    description:
+      "ElevenLabs' text-to-sound-effects model: foley, ambience and one-shot effects from a description, up to 30 seconds, optionally as a seamless loop. Served by POST /text-to-sound-effect, not text-to-speech.",
+    name: "eleven_text_to_sound_v2",
+    label: "Eleven Sound Effects v2",
+    provider: PROVIDERS.ELEVENLABS,
+    year: 2025,
+    modelType: MODEL_TYPES.AUDIO,
+    // Not a voice: kept out of the text-to-speech model pickers.
+    listed: false,
+    // ElevenLabs API pricing page (2026-10-01): $0.12 per generated minute.
+    pricing: { perMinute: 0.12 },
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
+    streaming: false,
   },
   INWORLD_TTS_2: {
     description:

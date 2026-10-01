@@ -1,9 +1,13 @@
 import SettingsService from "#src/services/SettingsService";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
+import { ELEVENLABS_API_KEY } from "#config";
 import {
   TOOL_NAMES,
   DOMAINS,
 } from "@rodrigo-barraza/utilities-library/taxonomy";
+
+/** tools-service's sound-effect tool (not yet in the shared TOOL_NAMES). */
+const GENERATE_SOUND_EFFECT = "generate_sound_effect";
 
 /**
  * Resolves tool names that should be excluded from the system prompt
@@ -17,6 +21,7 @@ import {
  *   - Memory models (extraction, consolidation, embedding)
  *   - Image/vision models
  *   - TTS/STT models
+ *   - The ElevenLabs key (sound effects)
  *   - Workspace agent connectivity (mirrors client isAgentServed check)
  */
 export async function resolveLockedOffToolNames(): Promise<Set<string>> {
@@ -60,6 +65,8 @@ export async function resolveLockedOffToolNames(): Promise<Set<string>> {
   if (!hasVisionModel) lockedOff.add(TOOL_NAMES.DESCRIBE_IMAGE);
   if (!hasTextToSpeech) lockedOff.add(TOOL_NAMES.SYNTHESIZE_SPEECH);
   if (!hasSpeechToText) lockedOff.add(TOOL_NAMES.TRANSCRIBE_AUDIO);
+  // Sound effects have one provider, ElevenLabs (POST /text-to-sound-effect).
+  if (!ELEVENLABS_API_KEY) lockedOff.add(GENERATE_SOUND_EFFECT);
 
   // Workspace agent connectivity — mirrors the client's isAgentServed check.
   // If no workspace agent is connected, lock off all workspace-domain tools
