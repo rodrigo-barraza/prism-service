@@ -395,6 +395,24 @@ describe("resolveBoundaryAnchorId — the message a boundary names", () => {
     ).toBe("a-1");
   });
 
+  it("names an image-only reply — persisted and shown like any reply", () => {
+    expect(
+      resolveBoundaryAnchorId([
+        { role: "user", content: "draw a robot", id: "u-1" },
+        { role: "assistant", content: "", images: ["minio://generations/robot.jpg"], id: "a-1" },
+      ]),
+    ).toBe("a-1");
+  });
+
+  it("never names a refused turn's empty message — a client need not send it back", () => {
+    expect(
+      resolveBoundaryAnchorId([
+        { role: "user", content: "go", id: "u-1" },
+        { role: "assistant", content: "", refusal: { category: "cyber" }, id: "a-1" },
+      ]),
+    ).toBe("u-1");
+  });
+
   it("an earlier summary stands for the message its boundary named", () => {
     expect(
       resolveBoundaryAnchorId([buildCompactionSummaryMessage("older summary", "a-7")]),
