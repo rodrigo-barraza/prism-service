@@ -199,7 +199,7 @@ export function routeStreamChunk(
     return { action: "continue" };
   }
 
-  // ── Refusal (Anthropic safety classifiers) ───────────
+  // ── Refusal (Anthropic safety classifiers, Gemini blocks) ─
   if (streamChunk?.type === "refusal") {
     pass.refusal = {
       category: (streamChunk.category as string | null) ?? null,

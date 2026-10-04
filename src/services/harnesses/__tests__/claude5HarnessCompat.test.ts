@@ -11,11 +11,16 @@
  *      refusal event.
  *   3. Thinking blocks reach the stored assistant message verbatim and in
  *      order, through the real stream-chunk router.
+ *   4. A pass that only reasoned is answered by a turn-scoped harness
+ *      message, never a user turn, on the empty-output budget — and a
+ *      Gemini block after streamed thoughts is a refusal, not such a pass
+ *      (conversation 9cf6ebdd, 2026-10-04).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ReActHarness from "../ReActHarness.ts";
 import AgenticLoopState from "#src/services/AgenticLoopState";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
+import { HARNESS } from "#src/constants";
 import { runPlanningPhase } from "../strategies/branchingCommon.ts";
 import type {
   AgenticContext,
@@ -451,5 +456,79 @@ describe("Claude 5 compat — thinking blocks reach the stored message verbatim"
     const stored = seenMessages[1].find((message) => message.role === "assistant" && (message.toolCalls?.length ?? 0) > 0);
     expect(stored).toBeDefined();
     expect(stored!.thinkingBlocks).toStrictEqual([blockA, blockB]);
+  });
+});
+
+describe("Thinking-only passes and provider blocks", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    TurnInputMailbox._clearAll();
+  });
+
+  const thinkingOnlyPass: ScriptedPass = (pass) => {
+    pass.streamedText = "";
+    pass.finalStreamedText = "";
+    pass.pendingToolCalls = [];
+    pass.streamedThinking = "Weighing whether to answer.";
+  };
+  const isNudge = (message: ConversationMessage) =>
+    message.role === "system" && String(message.content ?? "").includes("<empty-output-recovery>");
+
+  it("a Gemini block after streamed thoughts ends the turn as a refusal, without a nudge", async () => {
+    // What google.ts yields for conversation 9cf6ebdd: thoughts, the first
+    // words of an answer, then `promptFeedback.blockReason: OTHER`.
+    const { harness, emit, seenMessages, finalizeSnapshots } = buildHarness({
+      chunks: [
+        [
+          { type: "thinking", content: "**Analyzing Circumvention Potential**" },
+          "Sorry, I cannot fulfill",
+          { type: "refusal", category: "OTHER", explanation: null },
+          { type: "usage", usage: { inputTokens: 100, outputTokens: 10 } },
+        ],
+      ],
+    });
+
+    const { messages } = await harness.run();
+
+    expect(seenMessages).toHaveLength(1);
+    const events = emit.mock.calls.map((call) => call[0]);
+    expect(events.find((event) => event.type === "refusal")).toMatchObject({ type: "refusal", category: "OTHER" });
+    expect(finalizeSnapshots).toHaveLength(1);
+    expect(finalizeSnapshots[0]).toMatchObject({ finalStreamedText: "", refusal: { category: "OTHER" } });
+    expect(messages.some(isNudge)).toBe(false);
+    expect(messages.filter((message) => message.role === "user")).toHaveLength(1);
+  });
+
+  it("a thinking-only pass is answered by a turn-scoped harness message, never a user turn", async () => {
+    const { harness, seenMessages } = buildHarness({
+      script: [thinkingOnlyPass, textPass("The answer.")],
+    });
+
+    await harness.run();
+
+    expect(seenMessages).toHaveLength(2);
+    const second = seenMessages[1];
+    const nudge = second[second.length - 1];
+    expect(isNudge(nudge)).toBe(true);
+    expect(nudge.turnScoped).toBe(true);
+    expect(String(nudge.content)).toContain("harness.emptyOutput.thinkingOnly");
+    expect(second[second.length - 2]).toMatchObject({
+      role: "assistant",
+      content: "",
+      thinking: "Weighing whether to answer.",
+    });
+    expect(second.filter((message) => message.role === "user")).toHaveLength(1);
+  });
+
+  it("thinking-only passes stop at the empty-output budget", async () => {
+    const { harness, seenMessages } = buildHarness({
+      maxIterations: 20,
+      script: Array.from({ length: 20 }, () => thinkingOnlyPass),
+    });
+
+    const { messages } = await harness.run();
+
+    expect(seenMessages).toHaveLength(HARNESS.MAX_EMPTY_OUTPUT_RETRIES + 1);
+    expect(messages.filter(isNudge)).toHaveLength(HARNESS.MAX_EMPTY_OUTPUT_RETRIES);
   });
 });

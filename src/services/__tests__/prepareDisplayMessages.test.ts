@@ -153,6 +153,18 @@ describe("prepareDisplayMessages", () => {
     expect(result).toHaveLength(1);
   });
 
+  it("preserves a refused turn's empty message, so the chat can say why", () => {
+    const refusal = { category: "OTHER", explanation: null, model: "gemini-3.8-flash" };
+    const messages: ChatMessage[] = [
+      { role: "user", content: "Can we fix this from that?" },
+      { role: "assistant", content: "", refusal } as ChatMessage,
+    ];
+
+    const result = prepareDisplayMessages(messages);
+    expect(result).toHaveLength(2);
+    expect((result[1] as unknown as { refusal: unknown }).refusal).toEqual(refusal);
+  });
+
   it("passes through system messages unchanged", () => {
     const messages: ChatMessage[] = [
       { role: "system", content: "You are a helpful assistant." },

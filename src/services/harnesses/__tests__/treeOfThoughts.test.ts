@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PROVIDERS } from "#src/constants";
+import { HARNESS, PROVIDERS } from "#src/constants";
 import { runTreeOfThoughts } from "#src/services/harnesses/strategies/TreeOfThoughtsStrategy";
 import { SERVER_SENT_EVENT_TYPES, STATUS_MESSAGES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { runExhaustionRecoveryPass } from "#src/services/harnesses/lifecycle/ExhaustionRecovery";
@@ -97,6 +97,9 @@ vi.mock("#src/services/harnesses/lifecycle/HookInitializer", async () => {
   };
 });
 
+
+const isThinkingOnlyNudge = (msg: any) =>
+  msg.role === "system" && String(msg.content ?? "").includes("<empty-output-recovery>");
 
 describe("TreeOfThoughtsStrategy", () => {
   let mockProvider: any;
@@ -682,6 +685,49 @@ describe("TreeOfThoughtsStrategy", () => {
     const assistantMsg = result.messages.find((msg: any) => msg.role === "assistant");
     expect(assistantMsg).toBeDefined();
     expect(assistantMsg?.thinking).toBe("Internal reasoning details");
+    // The nudge is a turn-scoped harness message — never a user turn.
+    const nudges = result.messages.filter(isThinkingOnlyNudge);
+    expect(nudges.length).toBeGreaterThan(0);
+    expect(nudges.every((msg: any) => msg.turnScoped === true)).toBe(true);
+    expect(result.messages.filter((msg: any) => msg.role === "user")).toHaveLength(1);
+  });
+
+  it("stops nudging a thinking-only model at the empty-output budget", async () => {
+    mockAgenticContext.options.branchCount = 1;
+    mockAgenticContext.options.maxIterations = 20;
+    mockHarnessInstance.consumeStream = vi.fn().mockImplementation(async (_stream: unknown, passState: any) => {
+      passState.streamedText = "";
+      passState.finalStreamedText = "";
+      passState.streamedThinking = "Internal reasoning details";
+    });
+
+    const result = await runTreeOfThoughts(mockHarnessInstance as any);
+
+    expect(result.messages.filter(isThinkingOnlyNudge)).toHaveLength(HARNESS.MAX_EMPTY_OUTPUT_RETRIES);
+    expect(mockAgenticLoopState.iterations).toBe(HARNESS.MAX_EMPTY_OUTPUT_RETRIES + 1);
+  });
+
+  it("ends the run on a provider refusal: no nudge, and the refused words are not the answer", async () => {
+    mockAgenticContext.options.branchCount = 1;
+    mockAgenticContext.options.maxIterations = 3;
+    mockHarnessInstance.consumeStream = vi.fn().mockImplementation(async (_stream: unknown, passState: any) => {
+      passState.streamedText = "Sorry, I cannot fulfill";
+      passState.finalStreamedText = "Sorry, I cannot fulfill";
+      passState.streamedThinking = "Weighing it.";
+      passState.refusal = { category: "OTHER", explanation: null, model: "gemini-3.8-flash" };
+    });
+
+    const result = await runTreeOfThoughts(mockHarnessInstance as any);
+
+    expect(mockAgenticLoopState.iterations).toBe(1);
+    expect(mockAgenticLoopState.refusal).toMatchObject({ category: "OTHER" });
+    expect(mockAgenticLoopState.conversationOutcome).toBe("refused");
+    expect(mockAgenticLoopState.finalStreamedText).toBe("");
+    expect(mockAgenticContext.emit).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "refusal", category: "OTHER" }),
+    );
+    expect(result.messages.some(isThinkingOnlyNudge)).toBe(false);
+    expect(runExhaustionRecoveryPass).not.toHaveBeenCalled();
   });
 
   it("should break when model output is completely empty", async () => {
