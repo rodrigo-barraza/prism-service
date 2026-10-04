@@ -117,6 +117,24 @@ describe('ApprovalRegistry Unit Tests', () => {
       expect(decisions.get('c')).toMatchObject({ decision: 'allow', scope: 'batch' });
     });
 
+    it('a decision names the turn that asked, as its batch recorded it — not whoever decided', async () => {
+      const owner = {
+        project: 'prism-chat',
+        username: 'anonymous',
+        agent: 'OMNI',
+        agentConversationId: 'agent-conv-9',
+        parentConversationId: null,
+        conversationCollection: 'agent_conversations',
+      };
+      const { decisions } = await ApprovalRegistry.open('conv-9', { type: 'tool', batchId: 'batch-9', calls: [writeCall('a')] }, owner);
+      expect(await ApprovalRegistry.decide('conv-9', { toolCallId: 'a', decision: 'allow', scope: 'conversation' })).toMatchObject({
+        status: 'decided',
+        decidedToolCallIds: ['a'],
+        owner,
+      });
+      await decisions;
+    });
+
     it('a widening scope can only allow', async () => {
       await park('conv-6', ['a']);
       expect(await ApprovalRegistry.decide('conv-6', { toolCallId: 'a', decision: 'deny', scope: 'batch' })).toMatchObject({ status: 'invalid' });

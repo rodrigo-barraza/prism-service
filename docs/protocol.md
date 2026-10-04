@@ -142,7 +142,7 @@ taken from recorded streams ([`tests/fixtures/sse-transcripts`](../tests/fixture
 {"type":"approval_decided","toolCallId":"google-toolCall-44c3…","batchId":"c6ce1858-…","decision":"allow","scope":"call","source":"user","seq":1790125249468}
 ```
 
-`approval_required` may also carry `untrustedText: {excerpt, source}` (with `alwaysAsks` and a `reason`): the taint check. The call is a shell, file-write or network-write call whose arguments carry at least 24 characters (Settings → `security.taintMinimumCharacters`) of text the conversation read from untrusted content — a page, an MCP result, mail, a sub-agent, external input. `excerpt` is that text and `source` where it was read; it asks in every mode, and no "Always allow" rule stops it.
+`approval_required` may also carry `untrustedText: {excerpt, source}` (with `alwaysAsks` and a `reason`): the taint check. The call is a shell, file-write or network-write call whose arguments carry at least 24 characters (Settings → `security.taintMinimumCharacters`) of text the conversation read from untrusted content — a page, an MCP result, mail, a sub-agent, external input — that the user did not also write (a URL the user typed, shown back by the page, is the user's). `excerpt` is that text and `source` where it was read; it asks in every mode, and no "Always allow" rule stops it.
 
 ### Turn side channels
 
