@@ -123,6 +123,18 @@ k-gram, which is then extended both ways. Whitespace runs count as one space,
 structured results are compared string by string, and a span of fewer than
 five distinct characters (a rule of dashes) is not evidence.
 
+**The user's own words are not evidence.** A root turn also indexes its
+user's messages (trust `user`: not external input, not a sub-agent's report,
+not a timer or a context note), and a shared span asks only where at least
+the minimum of it in a row is not also text the user wrote. Live on
+2026-10-03 a browser snapshot showed back the URL the user had asked about;
+every script the agent then wrote opened that URL, so all eleven asked as
+"untrusted text" and "auto-approve this conversation" could answer none of
+them. What the page adds to the user's words still asks once it reaches the
+minimum, and the card quotes only that part. A sub-agent never adds its own
+"user" message (its parent's model wrote it, perhaps from a page); it is
+compared against the root's user words.
+
 ## 5. Capability scopes (`permissions/CapabilityScope.ts`)
 
 A run can be started without capabilities — `{ network: false }`,

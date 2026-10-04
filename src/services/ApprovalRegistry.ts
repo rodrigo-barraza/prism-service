@@ -127,6 +127,8 @@ export type ApprovalDecisionOutcome =
        * is re-driven.
        */
       delivered: boolean;
+      /** The turn that asked, as its batch recorded it — where its conversation lives. */
+      owner: DecisionOwner;
     }
   /** No batch is waiting on this loop, and the id was never seen here. */
   | { status: "not_found" }
@@ -252,6 +254,18 @@ function deliver(loopKey: string, batchId: string, toolCallId: string, decision:
     );
   }
   return true;
+}
+
+/** Who asked, from one of its records (a batch's records share one turn). */
+function ownerOf(record: PendingDecisionRecord): DecisionOwner {
+  return {
+    project: record.project ?? null,
+    username: record.username ?? null,
+    agent: record.agent ?? null,
+    agentConversationId: record.agentConversationId ?? null,
+    parentConversationId: record.parentConversationId ?? null,
+    conversationCollection: record.conversationCollection ?? null,
+  };
 }
 
 function recordDecision(record: PendingDecisionRecord): ToolCallDecision | null {
@@ -562,6 +576,7 @@ export const ApprovalRegistry = {
       decidedToolCallIds,
       remaining,
       delivered,
+      owner: ownerOf(batch[0]),
     };
   },
 
