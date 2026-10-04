@@ -101,5 +101,8 @@
     "interruptedTaskSummary": "[ASYNC TASK INTERRUPTED] Tool \"{{toolName}}\" (task {{taskId}}) still run when server restart. Maybe half done; result unknown. Not run again.",
     "interruptedSubAgent": "Sub-agent {{agentId}} (\"{{description}}\") still run when server restart. Stop there; work maybe half. resume_subagent go on from transcript.",
     "interruptedSubAgentsSummary": "[SUB-AGENTS INTERRUPTED] Server restart while {{count}} sub-agent(s) of this chat run or not delivered."
+  },
+  "emptyOutput": {
+    "thinkingOnly": "Last time only think. User see nothing. Think kept. Now answer or call tool."
   }
 }

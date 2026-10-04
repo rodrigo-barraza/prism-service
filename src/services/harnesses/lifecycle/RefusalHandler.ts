@@ -10,8 +10,9 @@ import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
 export const MODEL_REFUSAL_EVENT = PROTOCOL_EVENT_TYPES.REFUSAL;
 
 /**
- * A safety-classifier refusal (Anthropic `stop_reason: "refusal"`) is an
- * outcome, not an empty response: it is never retried with an "empty
+ * A safety-classifier refusal (Anthropic `stop_reason: "refusal"`, or a
+ * Gemini block — `promptFeedback.blockReason` or a content finishReason) is
+ * an outcome, not an empty response: it is never retried with an "empty
  * output" nudge, whatever the refusing pass streamed is discarded by the
  * caller, and the turn ends with a typed event carrying the category.
  */

@@ -318,7 +318,7 @@ function isSafetyBlockError(error: Error | string | number | boolean | null | un
   );
 }
 
-export interface ImageRefusal {
+export interface GeminiRefusal {
   category: string;
   explanation: string | null;
 }
@@ -348,7 +348,7 @@ export function imageRefusalOf({
   blockReason?: string | null;
   finishMessage?: string | null;
   text?: string | null;
-}): ImageRefusal | null {
+}): GeminiRefusal | null {
   if (!forceImageGeneration || imageCount > 0) return null;
   if (finishReason === "MAX_TOKENS") return null;
   const declined =
@@ -364,8 +364,60 @@ export function imageRefusalOf({
 const SAFETY_CATEGORY_PATTERN =
   /\b(IMAGE_PROHIBITED_CONTENT|PROHIBITED_CONTENT|IMAGE_SAFETY|SAFETY|BLOCKLIST|SPII|JAILBREAK)\b/i;
 
-/** The refusal a thrown safety block amounts to on a forced image generation. */
-function imageRefusalFromError(error: Error): ImageRefusal {
+/**
+ * Gemini finish reasons that mean Google stopped the reply for what it was
+ * saying — not the model finishing, running out of tokens, or fumbling a
+ * tool call (MALFORMED_FUNCTION_CALL, UNEXPECTED_TOOL_CALL: retried).
+ */
+const BLOCKED_FINISH_REASONS: ReadonlySet<string> = new Set([
+  "SAFETY",
+  "RECITATION",
+  "LANGUAGE",
+  "BLOCKLIST",
+  "PROHIBITED_CONTENT",
+  "SPII",
+  "IMAGE_SAFETY",
+  "IMAGE_PROHIBITED_CONTENT",
+  "IMAGE_RECITATION",
+]);
+
+/**
+ * Why Google ended a text reply without letting it answer, in the same
+ * typed refusal shape. It blocks the prompt (`promptFeedback.blockReason`)
+ * or the candidate (a content finishReason above). Gemini 3.x streams its
+ * thoughts first and a prompt block arrives LAST — no candidate, no
+ * finishReason, at most a few words of text before the cut — so the reply
+ * looked like a pass that only reasoned. The agent loop nudged it five
+ * times, then showed the model's last words, "Sorry, I cannot fulfill your
+ * request.", as the answer (conversation 9cf6ebdd, 2026-10-04: a userscript
+ * that rips Sketchfab models; nine replays, every one `blockReason: OTHER`,
+ * with or without Prism's system prompt). Asking again meets the same
+ * block, so it is a refusal: the turn ends and says why.
+ */
+export function textRefusalOf({
+  finishReason,
+  blockReason,
+  blockReasonMessage,
+  finishMessage,
+}: {
+  finishReason?: string | null;
+  blockReason?: string | null;
+  blockReasonMessage?: string | null;
+  finishMessage?: string | null;
+}): GeminiRefusal | null {
+  const promptBlock =
+    blockReason && blockReason !== "BLOCKED_REASON_UNSPECIFIED" ? blockReason : null;
+  const category =
+    promptBlock ?? (finishReason && BLOCKED_FINISH_REASONS.has(finishReason) ? finishReason : null);
+  if (!category) return null;
+  return {
+    category,
+    explanation: blockReasonMessage?.trim() || finishMessage?.trim() || null,
+  };
+}
+
+/** The refusal a thrown safety block amounts to. */
+function refusalFromSafetyError(error: Error): GeminiRefusal {
   const message = getErrorMessage(error);
   const category = message.match(SAFETY_CATEGORY_PATTERN)?.[1]?.toUpperCase() || "SAFETY";
   return { category, explanation: message || null };
@@ -1020,23 +1072,31 @@ const googleProvider = {
         }
       }
 
-      const refusal = imageRefusalOf({
-        forceImageGeneration: options.forceImageGeneration,
-        imageCount: images.length,
-        finishReason: response.candidates?.[0]?.finishReason,
-        blockReason: response.promptFeedback?.blockReason,
-        finishMessage: response.candidates?.[0]?.finishMessage,
-        text: textParts.join(""),
-      });
+      const refusal = options.forceImageGeneration
+        ? imageRefusalOf({
+            forceImageGeneration: options.forceImageGeneration,
+            imageCount: images.length,
+            finishReason: response.candidates?.[0]?.finishReason,
+            blockReason: response.promptFeedback?.blockReason,
+            finishMessage: response.candidates?.[0]?.finishMessage,
+            text: textParts.join(""),
+          })
+        : textRefusalOf({
+            finishReason: response.candidates?.[0]?.finishReason,
+            blockReason: response.promptFeedback?.blockReason,
+            blockReasonMessage: response.promptFeedback?.blockReasonMessage,
+            finishMessage: response.candidates?.[0]?.finishMessage,
+          });
       if (refusal) {
         logger.warn(
-          `[Google] ${model} declined the image (${refusal.category})${refusal.explanation ? `: ${refusal.explanation.slice(0, 200)}` : ""}`,
+          `[Google] ${model} ${options.forceImageGeneration ? "declined the image" : "blocked the reply"} (${refusal.category})${refusal.explanation ? `: ${refusal.explanation.slice(0, 200)}` : ""}`,
         );
       }
 
       const result: GenerateTextResult = {
         // `response.text` (the SDK getter) also skips thought parts. A
-        // declined image's text is its explanation, not an answer.
+        // refusal's text is not an answer: a declined image's is its
+        // explanation, a blocked reply's the words before the cut.
         text: refusal ? "" : textParts.join("") || response.text || "",
         usage: normalizeGoogleUsage(response.usageMetadata),
         ...(refusal && { refusal }),
@@ -1061,9 +1121,7 @@ const googleProvider = {
           text: "",
           usage: { inputTokens: 0, outputTokens: 0 },
           safetyBlock: true,
-          ...(options.forceImageGeneration && {
-            refusal: imageRefusalFromError(error as Error),
-          }),
+          refusal: refusalFromSafetyError(error as Error),
         };
       }
       throw new ProviderError("google", getErrorMessage(error), 500, error as Error);
@@ -1158,8 +1216,9 @@ const googleProvider = {
       const maxImages = options.imageCount || 1;
       let imageCount = 0;
       let lastFinishReason: string | null = null;
-      // What a declined forced image generation says about itself.
+      // What a declined image generation or a blocked reply says about itself.
       let promptBlockReason: string | null = null;
+      let promptBlockMessage: string | null = null;
       let lastFinishMessage: string | null = null;
       let streamedText = "";
       // The response's parts in order (signatures) and its search grounding,
@@ -1177,6 +1236,7 @@ const googleProvider = {
         if (candidateFinishReason) lastFinishReason = candidateFinishReason;
         if (chunk.promptFeedback?.blockReason) {
           promptBlockReason = chunk.promptFeedback.blockReason;
+          promptBlockMessage = chunk.promptFeedback.blockReasonMessage ?? promptBlockMessage;
         }
         if (chunk.candidates?.[0]?.finishMessage) {
           lastFinishMessage = chunk.candidates[0].finishMessage;
@@ -1240,17 +1300,24 @@ const googleProvider = {
       if (citations) yield citations;
       const refusal = options.signal?.aborted
         ? null
-        : imageRefusalOf({
-            forceImageGeneration: options.forceImageGeneration,
-            imageCount,
-            finishReason: lastFinishReason,
-            blockReason: promptBlockReason,
-            finishMessage: lastFinishMessage,
-            text: streamedText,
-          });
+        : options.forceImageGeneration
+          ? imageRefusalOf({
+              forceImageGeneration: options.forceImageGeneration,
+              imageCount,
+              finishReason: lastFinishReason,
+              blockReason: promptBlockReason,
+              finishMessage: lastFinishMessage,
+              text: streamedText,
+            })
+          : textRefusalOf({
+              finishReason: lastFinishReason,
+              blockReason: promptBlockReason,
+              blockReasonMessage: promptBlockMessage,
+              finishMessage: lastFinishMessage,
+            });
       if (refusal) {
         logger.warn(
-          `[Google] ${model} declined the image (${refusal.category})${refusal.explanation ? `: ${refusal.explanation.slice(0, 200)}` : ""}`,
+          `[Google] ${model} ${options.forceImageGeneration ? "declined the image" : "blocked the reply"} (${refusal.category})${refusal.explanation ? `: ${refusal.explanation.slice(0, 200)}` : ""}`,
         );
         yield { type: "refusal", ...refusal };
       }
@@ -1274,9 +1341,7 @@ const googleProvider = {
         logger.error(
           `[Google] Content safety block (stream): ${getErrorMessage(error)}`,
         );
-        if (options.forceImageGeneration) {
-          yield { type: "refusal", ...imageRefusalFromError(error as Error) };
-        }
+        yield { type: "refusal", ...refusalFromSafetyError(error as Error) };
         yield {
           type: "usage",
           usage: { inputTokens: 0, outputTokens: 0 },
