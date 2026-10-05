@@ -43,6 +43,17 @@ import type { Capability } from "./types.ts";
 // string (its JSON escaping would break a quoted command apart); and a span
 // of fewer than MINIMUM_DISTINCT_CHARACTERS different characters — a rule
 // of dashes, a table border — is no evidence of copying and never asks.
+//
+// The user's own words are not the attacker's. A page that shows back the
+// URL the user typed (its address, in a browser snapshot) shares that URL
+// with every script the agent then writes for it — seen live 2026-10-03:
+// eleven browser scripts in one turn each asked, and "auto-approve this
+// conversation" could answer none of them. So the root turn also keeps the
+// user's own messages (`addTrusted`), and a shared span is evidence only
+// where at least `minimumCharacters` of it in a row are NOT also the
+// user's (a span of that length shared with the user's words covers them).
+// What the user wrote never made a call ask on its own; it does not start
+// to because a page repeats it.
 // ────────────────────────────────────────────────────────────
 
 /** The shared span that makes a call ask, by default (Settings → security.taintMinimumCharacters). */
@@ -51,6 +62,8 @@ export const DEFAULT_TAINT_MINIMUM_CHARACTERS = 24;
 export const MINIMUM_TAINT_SPAN = 12;
 /** Untrusted text one turn indexes before it stops adding more (normalized characters). */
 export const MAXIMUM_INDEXED_CHARACTERS = 8_000_000;
+/** The user's own words one turn indexes (normalized characters) — messages, not documents. */
+export const MAXIMUM_TRUSTED_CHARACTERS = 1_000_000;
 /** How much of a matched span a denial or a card quotes. */
 export const MAXIMUM_EXCERPT_CHARACTERS = 160;
 /** A shared span with fewer different characters than this ("-----…") is not evidence of copying. */
@@ -128,6 +141,38 @@ function hasDistinctCharacters(text: string, start: number, end: number): boolea
   return false;
 }
 
+/**
+ * The first run of at least `minimum` characters of [start, end) that the
+ * user's words do not cover (and that is not a rule of dashes) — the part of
+ * a shared span only the untrusted text can have supplied. Null when no such
+ * run is left.
+ */
+function uncoveredRun(
+  covered: Uint8Array,
+  text: string,
+  start: number,
+  end: number,
+  minimum: number,
+): [number, number] | null {
+  let runStart = -1;
+  for (let index = start; index <= end; index++) {
+    if (index < end && covered[index] === 0) {
+      if (runStart < 0) runStart = index;
+      continue;
+    }
+    if (runStart >= 0 && index - runStart >= minimum && hasDistinctCharacters(text, runStart, index)) {
+      return [runStart, index];
+    }
+    runStart = -1;
+  }
+  return null;
+}
+
+/** A string that is an inline file, not words (an image a message carries). */
+function isDataUrl(value: string): boolean {
+  return value.startsWith("data:") && value.slice(0, 256).includes(";base64,");
+}
+
 function collectStrings(
   value: unknown,
   depth: number,
@@ -164,6 +209,11 @@ export class UntrustedSpans {
   private readonly fingerprints = new Set<string>();
   private indexedCharacters = 0;
   private warnedFull = false;
+  /** The user's own words (a root registry only) — indexed the same way. */
+  private readonly trustedTexts: string[] = [];
+  private readonly trustedIndex = new Map<string, number[]>();
+  private readonly trustedFingerprints = new Set<string>();
+  private trustedCharacters = 0;
 
   constructor({
     minimumCharacters = DEFAULT_TAINT_MINIMUM_CHARACTERS,
@@ -217,38 +267,145 @@ export class UntrustedSpans {
   }
 
   /**
+   * Remember the user's own words: a span untrusted text shares with an
+   * argument is evidence of copying only where the user did not write it
+   * too. Kept by a ROOT turn only — a sub-agent's "user" message is its
+   * parent's model writing, which may carry a page's words, and a sub-agent
+   * compares against the root's (`trustedRegistry`).
+   */
+  addTrusted(value: unknown): void {
+    if (this.parent) return;
+    const strings: string[] = [];
+    collectStrings(value, 0, strings, { left: MAXIMUM_TRUSTED_CHARACTERS });
+    for (const raw of strings) {
+      if (raw.length < this.minimumCharacters || isDataUrl(raw)) continue;
+      const text = normalizeText(raw);
+      if (text.length < this.minimumCharacters) continue;
+      if (this.trustedCharacters + text.length > MAXIMUM_TRUSTED_CHARACTERS) return;
+      const fingerprint = crypto.createHash("sha1").update(text).digest("base64");
+      if (this.trustedFingerprints.has(fingerprint)) continue;
+      this.trustedFingerprints.add(fingerprint);
+      const textIndex = this.trustedTexts.length;
+      this.trustedTexts.push(text);
+      this.trustedCharacters += text.length;
+      for (let position = 0; position + this.gramLength <= text.length; position += this.stride) {
+        const gram = text.slice(position, position + this.gramLength);
+        const postings = this.trustedIndex.get(gram);
+        if (postings) postings.push(textIndex, position);
+        else this.trustedIndex.set(gram, [textIndex, position]);
+      }
+    }
+  }
+
+  /** The registry that holds the user's words: the root of the delegation tree. */
+  private trustedRegistry(): UntrustedSpans {
+    return this.parent ? this.parent.trustedRegistry() : this;
+  }
+
+  /**
+   * Which characters of a normalized argument are the user's own words —
+   * inside a span of at least `minimumCharacters` it shares with them.
+   * Exact for the same reason `match` is; each maximal shared span is
+   * walked once (per alignment), not once per k-gram in it. Null when the
+   * user wrote nothing long enough to share one.
+   */
+  private trustedCoverage(text: string): Uint8Array | null {
+    if (this.trustedTexts.length === 0) return null;
+    const covered = new Uint8Array(text.length);
+    const gramLength = this.gramLength;
+    // `${trusted text}:${offset}` → where the span along it last ended.
+    const extendedTo = new Map<string, number>();
+    for (let start = 0; start + gramLength <= text.length; start++) {
+      const postings = this.trustedIndex.get(text.slice(start, start + gramLength));
+      if (!postings) continue;
+      for (let entry = 0; entry < postings.length; entry += 2) {
+        const trusted = this.trustedTexts[postings[entry]];
+        const position = postings[entry + 1];
+        const alignment = `${postings[entry]}:${position - start}`;
+        if ((extendedTo.get(alignment) ?? -1) > start) continue;
+        let before = 0;
+        while (
+          before < start &&
+          before < position &&
+          text[start - before - 1] === trusted[position - before - 1]
+        ) {
+          before++;
+        }
+        let after = 0;
+        while (
+          start + gramLength + after < text.length &&
+          position + gramLength + after < trusted.length &&
+          text[start + gramLength + after] === trusted[position + gramLength + after]
+        ) {
+          after++;
+        }
+        const end = start + gramLength + after;
+        extendedTo.set(alignment, end);
+        if (end - (start - before) >= this.minimumCharacters) covered.fill(1, start - before, end);
+      }
+    }
+    return covered;
+  }
+
+  /**
    * The first argument string that shares a span of at least
    * `minimumCharacters` with untrusted text this turn (or an ancestor turn)
-   * has seen; null when none does.
+   * has seen — not counting what the user wrote too; null when none does.
    */
   find(args: unknown): UntrustedSpanHit | null {
     const strings: string[] = [];
     collectStrings(args, 0, strings, { left: MAXIMUM_ARGUMENT_CHARACTERS });
+    const trusted = this.trustedRegistry();
     for (const value of strings) {
       if (value.length < this.minimumCharacters) continue;
       const argument = normalizeWithOrigin(value);
       if (argument.text.length < this.minimumCharacters) continue;
-      const hit = this.matchWithAncestors(argument, value, this.minimumCharacters);
+      // Worked out once per argument, and only when a span is shared at all.
+      let coverage: Uint8Array | null | undefined;
+      const coverageOf = () => {
+        if (coverage === undefined) coverage = trusted.trustedCoverage(argument.text);
+        return coverage;
+      };
+      const hit = this.matchWithAncestors(argument, value, this.minimumCharacters, coverageOf);
       if (hit) return hit;
     }
     return null;
   }
 
   /** This turn's text, then its parent's, up the delegation tree. */
-  private matchWithAncestors(argument: Normalized, original: string, minimum: number): UntrustedSpanHit | null {
-    return this.match(argument, original, minimum) ?? this.parent?.matchWithAncestors(argument, original, minimum) ?? null;
+  private matchWithAncestors(
+    argument: Normalized,
+    original: string,
+    minimum: number,
+    coverageOf: () => Uint8Array | null,
+  ): UntrustedSpanHit | null {
+    return (
+      this.match(argument, original, minimum, coverageOf) ??
+      this.parent?.matchWithAncestors(argument, original, minimum, coverageOf) ??
+      null
+    );
   }
 
-  private match(argument: Normalized, original: string, minimum: number): UntrustedSpanHit | null {
+  private match(
+    argument: Normalized,
+    original: string,
+    minimum: number,
+    coverageOf: () => Uint8Array | null,
+  ): UntrustedSpanHit | null {
     if (this.texts.length === 0) return null;
     const text = argument.text;
     const gramLength = this.gramLength;
+    // A span turned down (too short, a rule of dashes, the user's own words)
+    // is turned down from every k-gram inside it: `${text}:${offset}` → its end.
+    const declinedTo = new Map<string, number>();
     for (let start = 0; start + gramLength <= text.length; start++) {
       const postings = this.index.get(text.slice(start, start + gramLength));
       if (!postings) continue;
       for (let entry = 0; entry < postings.length; entry += 2) {
         const untrusted = this.texts[postings[entry]];
         const position = postings[entry + 1];
+        const alignment = `${postings[entry]}:${position - start}`;
+        if ((declinedTo.get(alignment) ?? -1) > start) continue;
         let before = 0;
         while (
           before < start &&
@@ -265,18 +422,31 @@ export class UntrustedSpans {
         ) {
           after++;
         }
-        const length = before + gramLength + after;
-        if (length < minimum) continue;
-        if (!hasDistinctCharacters(text, start - before, start + gramLength + after)) continue;
-        const first = argument.origin[start - before];
-        const last = argument.origin[start + gramLength + after - 1];
+        let spanStart = start - before;
+        let spanEnd = start + gramLength + after;
+        if (spanEnd - spanStart < minimum || !hasDistinctCharacters(text, spanStart, spanEnd)) {
+          declinedTo.set(alignment, spanEnd);
+          continue;
+        }
+        // What the user wrote too is theirs: the evidence is what is left.
+        const covered = coverageOf();
+        if (covered) {
+          const run = uncoveredRun(covered, text, spanStart, spanEnd, minimum);
+          if (!run) {
+            declinedTo.set(alignment, spanEnd);
+            continue;
+          }
+          [spanStart, spanEnd] = run;
+        }
+        const first = argument.origin[spanStart];
+        const last = argument.origin[spanEnd - 1];
         const excerpt = original.slice(first, last + 1).trim();
         return {
           excerpt:
             excerpt.length > MAXIMUM_EXCERPT_CHARACTERS
               ? `${excerpt.slice(0, MAXIMUM_EXCERPT_CHARACTERS - 1)}…`
               : excerpt,
-          length,
+          length: spanEnd - spanStart,
           source: untrusted.source,
         };
       }
@@ -315,12 +485,17 @@ function toolLabel(name: string, args: unknown): string {
   return typeof url === "string" && url ? `${name} ${url}` : name;
 }
 
-/** Why an untrusted user-role message is untrusted, as a label; null for the user's own words. */
-function untrustedMessageSource(message: ProvenanceMessage): string | null {
+/**
+ * Whose words a user-role message holds: someone else's (why it is
+ * untrusted, as a label), the user's own ("user"), or neither — the harness
+ * speaking (a timer, a context note) or a compaction summary.
+ */
+function userMessageOrigin(message: ProvenanceMessage): { untrusted: string } | "user" | null {
   const external = externalOriginOfMessage(message);
-  if (external) return describeExternalOrigin(external);
+  if (external) return { untrusted: describeExternalOrigin(external) };
   const [provenance] = annotateMessageProvenance([message]);
-  return provenance?.trust === "untrusted" ? provenance.source : null;
+  if (provenance?.trust === "untrusted") return { untrusted: provenance.source };
+  return provenance?.trust === "user" ? "user" : null;
 }
 
 function messageText(message: ProvenanceMessage): unknown {
@@ -362,8 +537,9 @@ export function addUntrustedToolResult(
  * Add everything untrusted a transcript holds: results of tools that return
  * third-party text (inside assistant `toolCalls`, or as `tool` messages —
  * paired with their call, which names the source), external inputs and
- * other untrusted notices. Works on the loop's messages, on the history a
- * client sends and on a stored transcript alike.
+ * other untrusted notices — and the user's own words, which a shared span
+ * is weighed against (`addTrusted`). Works on the loop's messages, on the
+ * history a client sends and on a stored transcript alike.
  */
 export function addUntrustedMessages(spans: UntrustedSpans, messages: readonly ProvenanceMessage[]): void {
   const callArgs = new Map<string, unknown>();
@@ -383,8 +559,9 @@ export function addUntrustedMessages(spans: UntrustedSpans, messages: readonly P
       const args = typeof message.tool_call_id === "string" ? callArgs.get(message.tool_call_id) : null;
       addUntrustedToolResult(spans, typeof message.name === "string" ? message.name : null, args, message.content);
     } else if (message.role === "user") {
-      const source = untrustedMessageSource(message);
-      if (source) spans.add(messageText(message), source);
+      const origin = userMessageOrigin(message);
+      if (origin === "user") spans.addTrusted(messageText(message));
+      else if (origin) spans.add(messageText(message), origin.untrusted);
     }
   }
 }
@@ -407,7 +584,7 @@ export function untrustedSpansOf(context: {
   return spans instanceof UntrustedSpans ? spans : null;
 }
 
-/** A message that just joined the turn (a drained mailbox entry): keep its text if it is untrusted. */
+/** A message that just joined the turn (a drained mailbox entry): keep its text — untrusted, or the user's own. */
 export function recordUntrustedInput(
   context: { options?: { _untrustedSpans?: unknown } | null } | null | undefined,
   message: ProvenanceMessage,

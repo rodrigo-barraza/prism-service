@@ -131,7 +131,12 @@ describe("the taint check in a real loop", () => {
   let provider: any;
   let emitted: any[];
 
-  const run = (options: Record<string, unknown>, messages?: any[]) =>
+  const run = (
+    options: Record<string, unknown>,
+    messages?: any[],
+    // The person's answer to each card; a denial lets the loop finish.
+    answer: () => Record<string, unknown> = () => ({ decision: "deny" }),
+  ) =>
     AgenticLoopService.runAgenticLoop({
       provider,
       providerName: "test-provider",
@@ -151,13 +156,13 @@ describe("the taint check in a real loop", () => {
       requestStart: performance.now(),
       emit: vi.fn((event) => {
         emitted.push(event);
-        // A person denies whatever the turn asks, so the loop can finish.
+        // A person answers whatever the turn asks, so the loop can finish.
         if (event.type === "approval_required") {
           setTimeout(() => {
             void AgenticLoopService.decideApproval(CONVERSATION, {
               toolCallId: event.toolCallId,
-              decision: "deny",
-            });
+              ...answer(),
+            } as any);
           }, 0);
         }
       }),
@@ -208,6 +213,49 @@ describe("the taint check in a real loop", () => {
     expect(String(cards[0].reason)).toContain(INJECTED_COMMAND.slice(0, 30));
     // The person said no: the page's command never ran.
     expect(executedToolNames()).toEqual(["read_web_page"]);
+  });
+
+  // Seen live (2026-10-03): the page showed back the URL the user asked
+  // about, every script the agent then wrote opened that URL, and each one
+  // asked as "untrusted text" — so "auto-approve this conversation" answered
+  // none of them (eleven cards in one turn).
+  it("the URL the user asked about is theirs: a call carrying it asks as any call does, and auto-approve answers the next", async () => {
+    const userUrl = "https://models.example.test/3d-models/knight-rider-kitt-supercar-e6c147a0d2c54bdbb101b56fa61646fe";
+    vi.mocked(ToolOrchestratorService.executeTool).mockImplementation(async (name: string) =>
+      name === "read_web_page"
+        ? { url: userUrl, content: `Canonical: ${userUrl}. ${PAGE_TEXT}` }
+        : { success: true, stdout: "ok" },
+    );
+    provider.generateTextStream
+      .mockImplementationOnce(async function* () {
+        yield { type: "toolCall", name: "read_web_page", args: { url: userUrl }, id: "call-read" };
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      })
+      .mockImplementationOnce(async function* () {
+        yield { type: "toolCall", name: "execute_shell", args: { command: `curl -s '${userUrl}' | head -c 2000` }, id: "call-first" };
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      })
+      .mockImplementationOnce(async function* () {
+        yield { type: "toolCall", name: "execute_shell", args: { command: `curl -sI '${userUrl}'` }, id: "call-second" };
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      })
+      .mockImplementationOnce(async function* () {
+        yield "Here is how the page is laid out.";
+        yield { type: "usage", usage: { inputTokens: 5, outputTokens: 2 } };
+      });
+
+    await run(
+      { maxIterations: 5 },
+      [{ role: MESSAGE_ROLES.USER, content: `How are the elements in this page arranged? ${userUrl}` }],
+      () => ({ decision: "allow", scope: "conversation" }),
+    );
+
+    const cards = emitted.filter((event) => event.type === "approval_required");
+    expect(cards).toHaveLength(1);
+    expect(cards[0].toolCallId).toBe("call-first");
+    expect(cards[0].untrustedText).toBeUndefined();
+    expect(cards[0].alwaysAsks).toBeUndefined();
+    expect(executedToolNames()).toEqual(["read_web_page", "execute_shell", "execute_shell"]);
   });
 
   it("where nobody can answer (an unattended run), the call is refused and the model is told why", async () => {
