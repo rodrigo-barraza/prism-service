@@ -682,9 +682,11 @@ export const HARNESS = {
   /** Max additional stalled iterations after the first warning before hard-breaking. */
   MAX_POST_WARNING_STALL_ITERATIONS: 2,
 
-  /** Max retries when the model produces genuinely empty output (no text, no thinking, no tools).
-   *  Local models (12B-class like Gemma) frequently emit EOS after processing tool results;
-   *  4 attempts with escalating temperature bumps gives them enough headroom to recover. */
+  /** Max retries when a pass gives the user nothing — no text, no tool call. An empty
+   *  pass is retried with escalating temperature bumps: local models (12B-class like
+   *  Gemma) frequently emit EOS after processing tool results, and 4 attempts give them
+   *  enough headroom to recover. A pass that only reasoned keeps its reasoning and is
+   *  asked for the answer, on the same budget. */
   MAX_EMPTY_OUTPUT_RETRIES: 4,
 
   /** Temperature bump applied on each empty output retry attempt. */
