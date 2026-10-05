@@ -17,6 +17,7 @@ import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import { resolveToolEntriesToSet } from "#src/utils/resolveToolEntriesToSet";
 import ToolContext from "#src/services/ToolContext";
 import { appendAndFinalize } from "#src/utils/ConversationUtilities";
+import { carriesGeneratedMedia } from "#src/services/conversation/generatedMedia";
 import { getRequestContext } from "#src/utils/RequestContext";
 import { DEFAULT_PROFILE_ID } from "#src/utils/ProfileScope";
 import { promptCacheWindow } from "#src/providers/ModelProfiles";
@@ -716,11 +717,15 @@ export function expandToolCallsForPersistence(
     } else if (
       message.role === "assistant" &&
       !message.content?.toString().trim() &&
-      (!message.toolCalls || message.toolCalls.length === 0)
+      (!message.toolCalls || message.toolCalls.length === 0) &&
+      !carriesGeneratedMedia(message) &&
+      !message.refusal
     ) {
-      // Strip empty assistant stubs — no content and no tool calls.
-      // These are artifacts from intermediate loop iterations that
-      // produced no output.
+      // Strip empty assistant stubs — no content, no tool calls, no
+      // generated media and no refusal. These are artifacts from
+      // intermediate loop iterations that produced no output. An
+      // image-only reply (Gemini image models) and a refused turn's
+      // message are not stubs.
       continue;
     } else {
       expanded.push(message);

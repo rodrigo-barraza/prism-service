@@ -5,6 +5,7 @@ import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { pristineOf } from "./MessageLineage.ts";
 import { isStoredMessageId, newMessageId } from "#src/services/conversation/messageIds";
+import { carriesGeneratedMedia } from "#src/services/conversation/generatedMedia";
 import type { ProvenanceLabel } from "#src/services/memory/MemoryProvenance";
 
 // ────────────────────────────────────────────────────────────
@@ -106,7 +107,10 @@ export function followMintedAnchor<T>(
 /**
  * A message the Finalizer persists and the client sends back — the only
  * kind a boundary can name. Mirrors the persistence filters
- * (sanitizeMessagesForPersistence, expandToolCallsForPersistence).
+ * (sanitizeMessagesForPersistence, expandToolCallsForPersistence) and the
+ * display one (prepareDisplayMessages): an image- or audio-only reply is
+ * both persisted and shown. A refused turn's empty message is persisted,
+ * but a client need not send it back, so it is never named.
  */
 function isAddressable(message: BoundaryMessage): boolean {
   if (message.role !== "user" && message.role !== "assistant") return false;
@@ -121,7 +125,14 @@ function isAddressable(message: BoundaryMessage): boolean {
     return false;
   }
   const hasToolCalls = Array.isArray(message.toolCalls) && message.toolCalls.length > 0;
-  if (message.role === "assistant" && !content.trim() && !hasToolCalls) return false;
+  if (
+    message.role === "assistant" &&
+    !content.trim() &&
+    !hasToolCalls &&
+    !carriesGeneratedMedia(message)
+  ) {
+    return false;
+  }
   return true;
 }
 
