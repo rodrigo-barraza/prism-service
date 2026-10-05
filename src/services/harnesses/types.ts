@@ -149,7 +149,7 @@ export type DisplaySegment =
 
 // ── Conversation Messages ───────────────────────────────────
 
-/** A provider safety refusal (Anthropic `stop_reason: "refusal"`). */
+/** A provider safety refusal (Anthropic `stop_reason: "refusal"`, a Gemini block). */
 export interface ModelRefusal {
   category: string | null;
   explanation: string | null;
@@ -472,7 +472,7 @@ export interface PassState {
   thinkingSignature: string;
   /** Anthropic: this pass's thinking blocks, verbatim and in order. */
   thinkingBlocks?: AnthropicThinkingBlock[];
-  /** Set when the provider declined the pass (Anthropic `stop_reason: "refusal"`). */
+  /** Set when the provider declined the pass (Anthropic `stop_reason: "refusal"`, a Gemini block). */
   refusal?: ModelRefusal;
   /** The model that actually served the pass, when a fallback did. */
   servedModel?: string;

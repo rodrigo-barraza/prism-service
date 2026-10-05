@@ -104,12 +104,14 @@ import {
 } from "#src/services/harnesses/lifecycle/ToolSurface";
 import { finalizePassTracker } from "#src/services/harnesses/lifecycle/TrackerFinalizer";
 import { handleCodexPlanningResponse } from "#src/services/harnesses/lifecycle/CodexPlanningDetector";
+import { recordRefusal } from "#src/services/harnesses/lifecycle/RefusalHandler";
+import { buildThinkingOnlyNudge } from "#src/services/harnesses/lifecycle/ThinkingOnlyRecovery";
 import { cleanupReminderCache } from "#src/services/harnesses/lifecycle/SystemReminderInjector";
 import { streamWithRetries } from "#src/utils/ProviderStreamResilience";
 import PlanningModeService from "#src/services/PlanningModeService";
 import { HARNESS } from "#src/constants";
 
-const { MAX_CONSECUTIVE_TOOL_ERRORS } = HARNESS;
+const { MAX_CONSECUTIVE_TOOL_ERRORS, MAX_EMPTY_OUTPUT_RETRIES } = HARNESS;
 
 export interface IterationPassOptions extends AgenticOptions {
   project: string;
@@ -144,6 +146,9 @@ export type StandardHooks = ReturnType<typeof createStandardHooks> & {
  * exit path — the strategies return from half a dozen places.
  */
 const openTurns = new WeakMap<BaseAgenticHarness, StandardHooks>();
+
+/** Thinking-only nudges a run has sent — bounded like the ReAct loop's. */
+const thinkingOnlyNudges = new WeakMap<AgenticLoopState, number>();
 
 /**
  * Run a branching strategy with the turn-level configured hooks closed on
@@ -1049,6 +1054,16 @@ export function handleNoToolCallOutcome(
   const tools = harness["tools"];
   const { options, emit } = context;
 
+  // A provider refusal ends the turn, as in the ReAct loop: never nudged,
+  // and whatever streamed before it is not the answer.
+  if (pass.refusal) {
+    state.finalStreamedText = "";
+    state.streamedThinking = "";
+    recordRefusal(pass.refusal, state, emit, logLabel);
+    harness.logIteration(pass, currentMessages);
+    return { action: "break", truncationRecoveryCount, cleanTextBreak: false };
+  }
+
   // Text present → clean text break. Thinking-only → continuation.
   if (pass.streamedText) {
     const codexResult = handleCodexPlanningResponse(
@@ -1068,11 +1083,17 @@ export function handleNoToolCallOutcome(
     return { action: "break", truncationRecoveryCount, cleanTextBreak: true };
   }
 
-  if (!pass.streamedText && pass.streamedThinking.trim()) {
+  const nudgesSent = thinkingOnlyNudges.get(state) ?? 0;
+  if (
+    !pass.streamedText &&
+    pass.streamedThinking.trim() &&
+    nudgesSent < MAX_EMPTY_OUTPUT_RETRIES
+  ) {
+    thinkingOnlyNudges.set(state, nudgesSent + 1);
     logger.warn(
       `[${logLabel}] Thinking-only response on iteration ${state.iterations} — ` +
         `thinking=${pass.streamedThinking.length}chars, text=0. ` +
-        `Injecting continuation prompt.`,
+        `Injecting continuation prompt (${nudgesSent + 1}/${MAX_EMPTY_OUTPUT_RETRIES}).`,
     );
 
     currentMessages.push({
@@ -1085,14 +1106,7 @@ export function handleNoToolCallOutcome(
     ...providerNativeState(pass),
     });
 
-    currentMessages.push({
-      role: "user",
-      content:
-        "[System: Your previous response contained only internal reasoning " +
-        "without producing any visible output. Your thinking has been preserved. " +
-        "Now respond concisely with your actual answer, analysis, or tool calls. " +
-        "Do not repeat your reasoning — act on it.]",
-    });
+    currentMessages.push(buildThinkingOnlyNudge(options?.locale as string | undefined));
 
     harness.logIteration(pass, currentMessages);
     return { action: "continue", truncationRecoveryCount, cleanTextBreak: false };
@@ -1215,6 +1229,7 @@ export async function finalizeStrategyRun(
   // ── Exhaustion Recovery Pass ─────────────────────────────
   if (
     !hasCleanTextBreak &&
+    !state.refusal &&
     state.streamedToolCalls.length > 0 &&
     !signal?.aborted
   ) {

@@ -84,7 +84,9 @@ export function prepareDisplayMessages(
     // Remove tool-role messages — their content is merged into toolCalls
     if (message.role === "tool") continue;
 
-    // Filter empty assistant stubs (no content, no tools, no media, no errors)
+    // Filter empty assistant stubs (no content, no tools, no media, no
+    // errors). A refused turn's message is empty by design — its refusal
+    // is what the chat shows.
     if (
       message.role === "assistant" &&
       !message.content?.toString().trim() &&
@@ -92,6 +94,7 @@ export function prepareDisplayMessages(
       !message.images?.length &&
       !message.audio &&
       !(message as Record<string, unknown>).error &&
+      !(message as Record<string, unknown>).refusal &&
       !message.thinking
     ) {
       continue;

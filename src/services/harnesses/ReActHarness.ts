@@ -79,6 +79,7 @@ import { injectToolDiscoveryNudge } from "./lifecycle/ToolDiscoveryNudge.ts";
 import { finalizePassTracker } from "./lifecycle/TrackerFinalizer.ts";
 import { handleCodexPlanningResponse } from "./lifecycle/CodexPlanningDetector.ts";
 import { buildPlanSubmissionContinuation } from "./lifecycle/PlanSubmissionContinuation.ts";
+import { buildThinkingOnlyNudge } from "./lifecycle/ThinkingOnlyRecovery.ts";
 import { recordRefusal } from "./lifecycle/RefusalHandler.ts";
 import {
   drainTurnInput,
@@ -1352,8 +1353,20 @@ export default class ReActHarness extends BaseAgenticHarness {
           }
         }
 
-        if (!pass.streamedText && pass.streamedThinking.trim()) {
-          logger.warn(`[AgenticLoop] Thinking-only response.`);
+        // ── Empty output recovery ──────────────────────────────
+        // Nothing reached the user. A pass that only reasoned keeps its
+        // reasoning and is asked for the answer; an empty one is retried
+        // warmer — both on one budget, so a model that keeps answering
+        // with thought alone cannot hold the turn open.
+        emptyOutputRetryCount++;
+        if (
+          emptyOutputRetryCount <= MAX_EMPTY_OUTPUT_RETRIES &&
+          !pass.streamedText &&
+          pass.streamedThinking.trim()
+        ) {
+          logger.warn(
+            `[AgenticLoop] Thinking-only response (${emptyOutputRetryCount}/${MAX_EMPTY_OUTPUT_RETRIES}).`,
+          );
           currentMessages.push({
             role: "assistant",
             content: "",
@@ -1362,16 +1375,12 @@ export default class ReActHarness extends BaseAgenticHarness {
             ...computePassPhaseDurations(pass),
             ...providerNativeState(pass),
           });
-          currentMessages.push({
-            role: "user",
-            content: "[System: Reasoning preserved. Please provide actual output now.]",
-          });
+          currentMessages.push(
+            buildThinkingOnlyNudge(this.context.options?.locale as string | undefined),
+          );
           this.logIteration(pass, currentMessages);
           continue;
         }
-
-        // ── Empty output recovery ──────────────────────────────
-        emptyOutputRetryCount++;
         if (emptyOutputRetryCount <= MAX_EMPTY_OUTPUT_RETRIES) {
           const curTemp = context.options.temperature ?? 0.7;
           context.options.temperature = Math.min(curTemp + EMPTY_OUTPUT_TEMPERATURE_BUMP, 1.5);

@@ -101,5 +101,8 @@
     "interruptedTaskSummary": "[ASYNC TASK INTERRUPTED] Tool \"{{toolName}}\" (task {{taskId}}) was still running when the server restarted. It may have partly run; its result is unknown. It was not run again.",
     "interruptedSubAgent": "Sub-agent {{agentId}} (\"{{description}}\") was still running when the server restarted. It stopped there; its work may be partial. resume_subagent continues it from its transcript.",
     "interruptedSubAgentsSummary": "[SUB-AGENTS INTERRUPTED] The server restarted while {{count}} sub-agent(s) of this conversation were running or undelivered."
+  },
+  "emptyOutput": {
+    "thinkingOnly": "Your last response was reasoning only — nothing reached the user. Your reasoning is kept: now give your answer, or make your tool calls."
   }
 }
