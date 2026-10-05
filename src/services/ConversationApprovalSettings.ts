@@ -19,7 +19,9 @@ import {
  * from the request (ConversationService.appendMessages), which erased a flag
  * set mid-turn before the next turn could read it (seen live). `approvals`
  * is written by nothing else. Looked up with the same
- * `{ id, project, username }` scope as goals, agent conversations first.
+ * `{ id, project, username }` scope as goals, agent conversations first —
+ * the identity the conversation is stored under, which the approval route
+ * takes from the decided turn, not from the request (ApprovalDecisionRoute).
  *
  * The conversation's permission mode (`approvals.permissionMode`, see
  * permissions/PermissionModes.ts) lives beside it for the same reason.
@@ -32,12 +34,53 @@ const SEARCHED_COLLECTIONS = [
   COLLECTIONS.MODEL_CONVERSATIONS,
 ];
 
+/** Delegation is capped far below this (SpawnCaps); a longer chain is a cycle. */
+const MAXIMUM_DELEGATION_HOPS = 32;
+
 function getDatabase() {
   try {
     return MongoWrapper.getDb(MONGO_DB_NAME);
   } catch {
     return null;
   }
+}
+
+/**
+ * The conversation its user is in, from any conversation of its delegation
+ * tree: a sub-agent's own conversation (`isSubAgent`) names the one that
+ * spawned it (`parentConversationId`, SubAgentPersistenceService), followed
+ * up to a conversation that is no sub-agent's. Null when none is stored.
+ */
+async function findUsersConversation(
+  database: NonNullable<ReturnType<typeof getDatabase>>,
+  conversationId: string,
+  project: string,
+  username: string,
+): Promise<{ id: string; collection: string } | null> {
+  const visited = new Set<string>();
+  let id = conversationId;
+  while (!visited.has(id) && visited.size < MAXIMUM_DELEGATION_HOPS) {
+    visited.add(id);
+    let found: { collection: string; parent: unknown; isSubAgent: unknown } | null = null;
+    for (const collection of SEARCHED_COLLECTIONS) {
+      const document = (await database
+        .collection(collection)
+        .findOne(
+          { id, project, username },
+          { projection: { isSubAgent: 1, parentConversationId: 1 } },
+        )) as { isSubAgent?: unknown; parentConversationId?: unknown } | null;
+      if (document) {
+        found = { collection, parent: document.parentConversationId, isSubAgent: document.isSubAgent };
+        break;
+      }
+    }
+    if (!found) return null;
+    if (found.isSubAgent !== true || typeof found.parent !== "string" || !found.parent) {
+      return { id, collection: found.collection };
+    }
+    id = found.parent;
+  }
+  return null;
 }
 
 const ConversationApprovalSettings = {
@@ -66,7 +109,13 @@ const ConversationApprovalSettings = {
     return false;
   },
 
-  /** Turn the flag on. Resolves false when no such conversation exists. */
+  /**
+   * Turn the flag on for the conversation its user is in: this one, or —
+   * for a sub-agent's own conversation (a card a sub-agent raised) — the
+   * root of its delegation tree, whose later turns read the flag; a
+   * sub-agent inherits its parent's approval mode and never reads it.
+   * Resolves false when no such conversation exists.
+   */
   async enableAutoApprove(
     conversationId: string,
     project: string,
@@ -74,19 +123,18 @@ const ConversationApprovalSettings = {
   ): Promise<boolean> {
     const database = getDatabase();
     if (!database || !conversationId || !project || !username) return false;
-    for (const collection of SEARCHED_COLLECTIONS) {
-      const result = await database.collection(collection).updateOne(
-        { id: conversationId, project, username },
-        {
-          $set: {
-            [`${CONVERSATION_APPROVALS_FIELD}.autoApprove`]: true,
-            [`${CONVERSATION_APPROVALS_FIELD}.autoApproveSetAt`]: new Date().toISOString(),
-          },
+    const target = await findUsersConversation(database, conversationId, project, username);
+    if (!target) return false;
+    const result = await database.collection(target.collection).updateOne(
+      { id: target.id, project, username },
+      {
+        $set: {
+          [`${CONVERSATION_APPROVALS_FIELD}.autoApprove`]: true,
+          [`${CONVERSATION_APPROVALS_FIELD}.autoApproveSetAt`]: new Date().toISOString(),
         },
-      );
-      if (result.matchedCount > 0) return true;
-    }
-    return false;
+      },
+    );
+    return result.matchedCount > 0;
   },
 
   /** The conversation's stored permission mode, or `null` when it names none. */

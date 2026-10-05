@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import ConversationApprovalSettings from "#src/services/ConversationApprovalSettings";
 import ConversationAttentionRegistry from "#src/services/ConversationAttentionRegistry";
-import PendingDecisionStore from "#src/services/PendingDecisionStore";
+import PendingDecisionStore, { type DecisionOwner } from "#src/services/PendingDecisionStore";
 import type {
   ApprovalDecisionInput,
   ApprovalDecisionKind,
@@ -116,6 +116,42 @@ function parseBody(body: unknown): ParsedBody {
   };
 }
 
+/**
+ * Store "auto-approve this conversation" on the conversation whose turn
+ * asked, found by the identity its decision recorded — not the request's:
+ * the Prism client sends its own project (`prism-client`) while an agent's
+ * conversation lives under the agent's (`prism-chat`, `coding`), so the
+ * request's identity matched no document and every agent conversation
+ * answered `persisted: false` (seen live 2026-10-03). The username is still
+ * the request's to match: a turn's calls are its user's to wave through.
+ */
+async function persistAutoApprove(
+  conversationId: string,
+  owner: DecisionOwner,
+  request: Request,
+  logPrefix: string,
+): Promise<boolean> {
+  const username = (owner.username || request.username) as string;
+  if (owner.username && request.username && owner.username !== request.username) {
+    logger.warn(
+      `${logPrefix} Not persisting auto-approve for ${conversationId}: its turn is ${owner.username}'s, the decision came from ${request.username}`,
+    );
+    return false;
+  }
+  try {
+    return await ConversationApprovalSettings.enableAutoApprove(
+      conversationId,
+      (owner.project || request.project) as string,
+      username,
+    );
+  } catch (error: unknown) {
+    logger.error(
+      `${logPrefix} Could not persist auto-approve for ${conversationId}: ${getErrorMessage(error)}`,
+    );
+    return false;
+  }
+}
+
 export async function handleApprovalDecision(
   request: Request,
   response: Response,
@@ -153,21 +189,10 @@ export async function handleApprovalDecision(
   }
 
   const scope = input.scope ?? "call";
-  let persisted: boolean | undefined;
-  if (scope === "conversation") {
-    try {
-      persisted = await ConversationApprovalSettings.enableAutoApprove(
-        conversationId,
-        request.project as string,
-        request.username as string,
-      );
-    } catch (error: unknown) {
-      persisted = false;
-      logger.error(
-        `${logPrefix} Could not persist auto-approve for ${conversationId}: ${getErrorMessage(error)}`,
-      );
-    }
-  }
+  const persisted =
+    scope === "conversation"
+      ? await persistAutoApprove(conversationId, outcome.owner, request, logPrefix)
+      : undefined;
 
   if (!outcome.delivered && outcome.decidedToolCallIds.length > 0) {
     // No running turn emitted `approval_decided` for these: close their
