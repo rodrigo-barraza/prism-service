@@ -13,6 +13,7 @@ import type {
   HookEventName,
 } from "#src/services/hooks/types";
 import { extractFirstJsonObject } from "#src/services/hooks/handlers/PromptHookHandler";
+import { isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
 import { pickHookDecision } from "#src/services/hooks/HookRunner";
 import type { HookHandlerResult } from "#src/services/hooks/HookRunner";
 
@@ -79,19 +80,6 @@ export interface CommandOutcome {
   stdout: string;
   stderr: string;
   timedOut: boolean;
-}
-
-/** The usernames allowed to own a command hook. Read per call, like the egress allowlist. */
-export function getCommandHookOwners(): string[] {
-  return (process.env[HOOKS.COMMAND_OWNERS_ENV_VAR] ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-}
-
-export function isCommandHookOwner(username: string | null | undefined): boolean {
-  if (!username) return false;
-  return getCommandHookOwners().includes(username);
 }
 
 /** A block, in the vocabulary of the event it lands on. */

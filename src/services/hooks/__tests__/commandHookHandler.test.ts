@@ -11,8 +11,8 @@ vi.mock("#config", async (importOriginal) => ({
 
 import runCommandHook, {
   interpretCommandOutcome,
-  isCommandHookOwner,
 } from "#src/services/hooks/handlers/CommandHookHandler";
+import { isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
 import { runConfiguredHook, normalizeDecision } from "#src/services/hooks/HookRunner";
 import { HOOK_EVENTS } from "#src/services/hooks/types";
 import type {
