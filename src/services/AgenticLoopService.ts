@@ -73,6 +73,15 @@ export function resolveBudgetAction(options: AgenticContext["options"]): BudgetA
   return options.autoApprove === true || options.unattended === true ? "stop" : "pause";
 }
 
+/** Stop the monitors of a sub-agent run that just ended (background-tasks/BackgroundTaskWatcher). */
+function stopMonitorsOfEndedRun(loopKey: string): void {
+  void import("./background-tasks/BackgroundTaskWatcher.ts")
+    .then(({ default: BackgroundTaskWatcher }) => BackgroundTaskWatcher.stopMonitorsOf(loopKey))
+    .catch((error: unknown) => {
+      logger.warn(`[AgenticLoop] Could not stop the monitors of ${loopKey}: ${String(error)}`);
+    });
+}
+
 export default class AgenticLoopService {
   /**
    * Run an agentic loop using the specified (or default) harness, as one
@@ -422,6 +431,9 @@ export default class AgenticLoopService {
         await BudgetPauseRegistry.cancel(loopKey);
       }
       TurnInputMailbox.close(conversationId);
+      // A sub-agent's run is its whole turn: the monitors it armed end with
+      // it (a background command's late exit is dropped on arrival).
+      if (options.isSubAgent) stopMonitorsOfEndedRun(loopKey);
 
       // Always clean up per-session tracker entries to prevent memory leaks —
       // sub-agent sessions have their own agentConversationId that must be released.

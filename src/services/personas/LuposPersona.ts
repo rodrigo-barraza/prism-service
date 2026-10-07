@@ -5,6 +5,7 @@ import {
   TOOL_NAMES,
 } from "#src/services/ToolTaxonomyConstants";
 import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
+import { BACKGROUND_TASK_TOOL_NAMES } from "#src/constants/BackgroundTasks";
 import { allow, deny, type PolicyRule } from "#src/services/PolicyEngine";
 import { type Persona, type ToolPolicySection } from "./types.ts";
 import { buildToolPolicy } from "./utils.ts";
@@ -356,6 +357,7 @@ const LUPOS_UNUSED_CORE_HARNESS_TOOLS = [
   ASYNC_TASK_TOOL_NAMES.LIST_ASYNC_TASKS,
   ASYNC_TASK_TOOL_NAMES.CANCEL_ASYNC_TASK,
   ASYNC_TASK_TOOL_NAMES.WAIT_FOR_TASKS,
+  BACKGROUND_TASK_TOOL_NAMES.TASK_STOP,
   LOCAL_TOOL_NAMES.READ_PROJECT_INSTRUCTIONS,
   LOCAL_TOOL_NAMES.UPDATE_PROJECT_INSTRUCTIONS,
   LOCAL_TOOL_NAMES.EDIT_PROJECT_INSTRUCTIONS,
@@ -386,6 +388,7 @@ const LUPOS_DENIED_TOOLS = [
   // Shell and command execution — the python/js sandboxes are his.
   TOOL_NAMES.EXECUTE_SHELL,
   TOOL_NAMES.EXECUTE_COMMAND,
+  BACKGROUND_TASK_TOOL_NAMES.MONITOR,
   // Dispatchers that run other tools out of sight.
   ASYNC_TASK_TOOL_NAMES.RUN_ASYNC_TASK,
   LOCAL_TOOL_NAMES.RUN_TOOL_PROGRAM,

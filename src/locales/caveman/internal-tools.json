@@ -265,6 +265,22 @@
       "timeoutSeconds": "Optional: max wait (default 60, max 300)."
     }
   },
+  "monitor": {
+    "description": "Start background monitor. Each stdout line of script = one event, arrive in chat while you work. Events not user replies.\n- One notification (server ready, build done) → execute_command run_in_background + until-loop that exit, not monitor.\n- Each occurrence until expiry → unbounded command (tail -f, inotifywait -m, while true). Re-arm after expiry.\n- Each occurrence until known end → command that print lines then exit.\nEvery pipe stage flush per line: grep --line-buffered, awk fflush(). No | head. Filter must match failure too (Traceback|Error|FAILED), not only success. Poll remote 30s+, local 0.5-1s. Stderr go to output file (read_file), not events — merge 2>&1 if needed. Lines within 200ms = one notification. Too many events = stopped, re-arm tighter. timeout_ms default 5 min, max 30 min; expiry = one notice with event count. task_stop cancel early.\nws: {url, protocols} instead of command = each text frame one event; binary = [binary frame, N bytes]; close end watch with close code.",
+    "parameters": {
+      "command": "Shell script. Each stdout line = event; exit end watch.",
+      "ws": "WebSocket to open instead of command. Each text frame = event.",
+      "description": "Short name of what you watch (in every notification).",
+      "timeout_ms": "Deadline ms. Default 300000. Above 1800000 capped to 1800000."
+    }
+  },
+  "task_stop": {
+    "description": "Stop running background task by ID: background command, monitor, async task, or sub-agent. Return success or failure.",
+    "parameters": {
+      "task_id": "ID of task to stop.",
+      "shell_id": "Deprecated: use task_id."
+    }
+  },
   "propose_goal": {
     "description": "Propose goal for conversation: what 'done' mean, as list of checkable criteria, optional budget. User approve or decline card; goal only real after approve. Approved goal keep you working until independent verifier check every criterion from evidence. Refused for sub-agent.",
     "parameters": {

@@ -35,6 +35,7 @@ const MUST_NEVER_RUN = [
   // shell / command execution
   "execute_shell",
   "execute_command",
+  "monitor",
   // background and programmatic dispatch
   "run_async_task",
   "run_tool_program",

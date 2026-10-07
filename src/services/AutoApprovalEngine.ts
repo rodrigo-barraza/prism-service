@@ -112,6 +112,8 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   report_progress: APPROVAL_TIERS.AUTO,
   // Advice from the oracle model: no tools, no workspace, cost-budgeted.
   ask_oracle: APPROVAL_TIERS.AUTO,
+  // Stopping a background task this conversation started (BackgroundTaskTools).
+  task_stop: APPROVAL_TIERS.AUTO,
 
   // Tier 1 — control flow (no side effects)
   [TOOL_NAMES.SLEEP]: APPROVAL_TIERS.AUTO,
@@ -185,6 +187,8 @@ const DEFAULT_TIER_MAP: Record<string, ApprovalTier> = {
   [TOOL_NAMES.EXECUTE_PYTHON]: APPROVAL_TIERS.DANGER,
   [TOOL_NAMES.EXECUTE_JAVASCRIPT]: APPROVAL_TIERS.DANGER,
   [TOOL_NAMES.EXECUTE_COMMAND]: APPROVAL_TIERS.DANGER,
+  // A monitor runs its script in the same shell (BackgroundTaskTools).
+  monitor: APPROVAL_TIERS.DANGER,
 };
 
 const TIER_LABELS: Record<number, string> = {

@@ -50,6 +50,7 @@ const URL_ARGUMENT: CanonicalSpec = { kind: "text", arguments: ["url"] };
 const CANONICAL: Record<string, CanonicalSpec> = {
   execute_shell: SHELL_COMMAND,
   execute_command: SHELL_COMMAND,
+  monitor: SHELL_COMMAND,
   execute_python: CODE,
   execute_javascript: CODE,
   execute_browser_script: CODE,
