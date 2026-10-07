@@ -21,7 +21,7 @@ import type {
   HookPayload,
 } from "#src/services/hooks/types";
 import { runConfiguredHook } from "#src/services/hooks/HookRunner";
-import { isCommandHookOwner } from "#src/services/hooks/handlers/CommandHookHandler";
+import { isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
 import { invalidateHookCache } from "#src/services/hooks/ConfiguredHookRegistry";
 import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
 import { requireUserAuthorityToChange } from "#src/middleware/ExternalAuthority";

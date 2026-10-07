@@ -923,7 +923,7 @@ export async function executeApprovedToolBatch(
 
   emitPostExecutionStatus(pass.pendingToolCalls, emit);
 
-  await runPostToolBatchStage(context, hooks, state, pass.pendingToolCalls, results);
+  await runPostToolBatchStage(context, hooks, state, pass.pendingToolCalls, results, pass.finalStreamedText);
 
   return { results };
 }

@@ -318,6 +318,20 @@ describe("HookRunner", () => {
       const json = serializeHookPayload(payload);
       expect(() => JSON.parse(json)).not.toThrow();
       expect(json).toContain("circular");
+      expect(JSON.parse(json).tool_output).toEqual({ name: "loop", self: "[circular]" });
+    });
+
+    it("writes the same object twice when it is shared, not nested in itself (tool_response is tool_output)", () => {
+      const payload = makePayload();
+      const result = { success: true, files: [{ path: "a.ts" }] };
+      payload.tool_output = result;
+      payload.tool_response = result;
+      payload.tool_input = { first: result.files[0], second: result.files[0] };
+
+      const parsed = JSON.parse(serializeHookPayload(payload));
+      expect(parsed.tool_output).toEqual(result);
+      expect(parsed.tool_response).toEqual(result);
+      expect(parsed.tool_input).toEqual({ first: { path: "a.ts" }, second: { path: "a.ts" } });
     });
 
     it("honours an explicit smaller cap", () => {
