@@ -134,17 +134,23 @@ export interface HookRunOptions {
 
 // ─── Serialization ────────────────────────────────────────────────────────────
 
-/** `JSON.stringify` that survives circular references and throwing getters. */
+/**
+ * `JSON.stringify` that survives circular references and throwing getters.
+ * Only a real cycle — an object inside itself — becomes `"[circular]"`: the
+ * same object twice side by side (`tool_response` is `tool_output`) is
+ * written twice. The replacer's `this` is the object holding the value, so
+ * the ancestors are the chain of holders down to it.
+ */
 function safeStringify(value: unknown): string {
-  const seen = new WeakSet<object>();
+  const ancestors: object[] = [];
   try {
     return (
-      JSON.stringify(value, (_key, nested: unknown) => {
+      JSON.stringify(value, function (this: unknown, _key, nested: unknown) {
         if (typeof nested === "bigint") return nested.toString();
-        if (nested && typeof nested === "object") {
-          if (seen.has(nested as object)) return "[circular]";
-          seen.add(nested as object);
-        }
+        if (!nested || typeof nested !== "object") return nested;
+        while (ancestors.length > 0 && ancestors[ancestors.length - 1] !== this) ancestors.pop();
+        if (ancestors.includes(nested as object)) return "[circular]";
+        ancestors.push(nested as object);
         return nested;
       }) ?? "null"
     );
