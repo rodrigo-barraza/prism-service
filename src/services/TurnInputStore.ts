@@ -51,19 +51,29 @@ export function turnInputIdsIn(messages: ReadonlyArray<Record<string, unknown>>)
 }
 
 const TurnInputStore = {
-  /** A mailbox accepted an entry. Best-effort: a failed write only costs its restart survival. */
+  /**
+   * A mailbox accepted an entry — or a later notification joined it, and
+   * this copy replaces the earlier one. Best-effort: a failed write only
+   * costs its restart survival.
+   */
   async record(loopKey: string, entry: TurnInputEntry, owner: DecisionOwner): Promise<void> {
     const inputs = collection();
     if (!inputs) return;
     try {
-      await inputs.insertOne({
-        ...entry,
-        loopKey,
-        project: owner.project ?? null,
-        username: owner.username ?? null,
-        agent: owner.agent ?? null,
-        conversationCollection: owner.conversationCollection ?? null,
-      });
+      await inputs.updateOne(
+        { id: entry.id },
+        {
+          $set: {
+            ...entry,
+            loopKey,
+            project: owner.project ?? null,
+            username: owner.username ?? null,
+            agent: owner.agent ?? null,
+            conversationCollection: owner.conversationCollection ?? null,
+          },
+        },
+        { upsert: true },
+      );
     } catch (error: unknown) {
       logger.warn(`[TurnInputStore] Could not record ${entry.id} for ${loopKey}: ${getErrorMessage(error)}`);
     }

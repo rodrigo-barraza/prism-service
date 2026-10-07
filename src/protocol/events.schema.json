@@ -1014,7 +1014,8 @@
                 "task_completion",
                 "agent_message",
                 "goal_revision",
-                "external"
+                "external",
+                "task_notification"
               ]
             },
             "content": {
@@ -1032,7 +1033,8 @@
                 "webhook",
                 "discord",
                 "mcp",
-                "subagent"
+                "subagent",
+                "task"
               ]
             },
             "sender": {
@@ -1058,6 +1060,83 @@
             "content",
             "boundary",
             "iteration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "background_task"
+            },
+            "seq": {
+              "type": "number"
+            },
+            "conversationId": {
+              "type": "string"
+            },
+            "taskId": {
+              "type": "string"
+            },
+            "taskType": {
+              "type": "string",
+              "enum": [
+                "shell",
+                "monitor"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "running",
+                "completed",
+                "failed",
+                "killed",
+                "timeout",
+                "too_many_events",
+                "closed",
+                "exited",
+                "lost"
+              ]
+            },
+            "description": {
+              "type": "string"
+            },
+            "command": {
+              "type": "string"
+            },
+            "wsUrl": {
+              "type": "string"
+            },
+            "outputFile": {
+              "type": "string"
+            },
+            "eventCount": {
+              "type": "number"
+            },
+            "exitCode": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "at": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "conversationId",
+            "taskId",
+            "taskType",
+            "status",
+            "description",
+            "at"
           ],
           "additionalProperties": false
         },
@@ -3891,7 +3970,8 @@
                 "task_completion",
                 "agent_message",
                 "goal_revision",
-                "external"
+                "external",
+                "task_notification"
               ]
             }
           },

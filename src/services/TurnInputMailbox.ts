@@ -21,6 +21,12 @@ import { parseExternalOrigin, type ExternalOrigin } from "#src/services/external
  *   - `question_answer`  the answer to a NON-blocking ask_user card
  *   - `task_completion`  an async task / sub-agent finished while the parent
  *                        kept working (instead of waking a new turn later)
+ *   - `task_notification` a background command or a monitor of the agent's
+ *                        own reporting (an event batch, an exit): its own
+ *                        command output, never untrusted. Notifications that
+ *                        arrive before the turn next looks join the one still
+ *                        waiting, so the model reads them as one message
+ *                        (background-tasks/TaskNotificationDelivery)
  *   - `agent_message`    a parent's send_subagent_message to a RUNNING
  *                        sub-agent (previously queued into a field nobody read)
  *   - `hook_context`     the `additionalContext` of an async configured hook
@@ -69,6 +75,7 @@ export type TurnInputKind =
   | "user_update"
   | "question_answer"
   | "task_completion"
+  | "task_notification"
   | "agent_message"
   | "hook_context"
   | "goal_revision"
@@ -111,10 +118,13 @@ interface Mailbox {
   recordedIds: string[];
 }
 
-/** Write an accepted entry through to TurnInputStore (lazily: this module stays light). */
+/**
+ * Write an accepted entry through to TurnInputStore (lazily: this module
+ * stays light) — again when a notification joined it, replacing the copy.
+ */
 function recordDurably(conversationId: string, box: Mailbox, entry: TurnInputEntry): void {
   if (!box.owner) return;
-  box.recordedIds.push(entry.id);
+  if (!box.recordedIds.includes(entry.id)) box.recordedIds.push(entry.id);
   const owner = box.owner;
   void import("./TurnInputStore.ts")
     .then(({ default: TurnInputStore }) => TurnInputStore.record(conversationId, entry, owner))
@@ -194,9 +204,6 @@ const TurnInputMailbox = {
   ): { accepted: boolean; id?: string; position?: number; reason?: string } {
     const box = mailboxes.get(conversationId);
     if (!box || box.sealed) return { accepted: false, reason: "no_active_turn" };
-    if (box.entries.length >= TURN_INPUT_MAXIMUM_PENDING) {
-      return { accepted: false, reason: "mailbox_full" };
-    }
     // An outside source speaks only as `external`, and `external` always
     // says who it is.
     const origin = input.origin ? parseExternalOrigin(input.origin) : null;
@@ -209,6 +216,25 @@ const TurnInputMailbox = {
     const text = typeof input.text === "string" ? input.text : "";
     if (!text.trim() && !(input.images && input.images.length > 0)) {
       return { accepted: false, reason: "empty_input" };
+    }
+    // A background task's notification joins the one still waiting for the
+    // turn's next look: the model reads them as one message.
+    if (input.kind === "task_notification") {
+      const waiting = [...box.entries]
+        .reverse()
+        .find((entry) => entry.kind === "task_notification" && !entry.offeredNatively);
+      if (waiting && waiting.text.length + 1 + text.length <= TURN_INPUT_MAXIMUM_TEXT_LENGTH) {
+        waiting.text = `${waiting.text}\n${text}`;
+        box.acceptedCount++;
+        recordDurably(conversationId, box, waiting);
+        logger.info(
+          `[TurnInputMailbox] task_notification joined ${waiting.id} for ${conversationId} (pending=${box.entries.length})`,
+        );
+        return { accepted: true, id: waiting.id, position: box.entries.indexOf(waiting) + 1 };
+      }
+    }
+    if (box.entries.length >= TURN_INPUT_MAXIMUM_PENDING) {
+      return { accepted: false, reason: "mailbox_full" };
     }
     const entry: TurnInputEntry = {
       id: `input-${crypto.randomUUID().slice(0, 8)}`,

@@ -38,6 +38,8 @@ import {
 } from "#src/constants";
 import FileService from "#src/services/FileService";
 import { redirectArgumentsToWorktree } from "./WorktreePathRewrite.ts";
+import { commandReplyDeadlineMilliseconds, runsInBackground } from "./CommandTimeout.ts";
+import { COMMAND_REPLY_MARGIN_MILLISECONDS } from "#src/constants/BackgroundTasks";
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import { registerToolCapabilities } from "#src/services/permissions/ToolCapabilities";
 import { currentScope, NARROWABLE_CAPABILITIES } from "#src/services/permissions/CapabilityScope";
@@ -403,12 +405,21 @@ async function executeToolGeneric(
     if (context.agent) body.agent = context.agent;
     if (context.username) body.username = context.username;
 
+    // A command is answered within its own timeout (tools-service kills it
+    // there); prism waits that long plus the reply's margin.
+    const signal =
+      name === TOOL_NAMES.RUN_COMMAND
+        ? AbortSignal.any([
+            ...(context.signal ? [context.signal] : []),
+            AbortSignal.timeout(commandReplyDeadlineMilliseconds(resolvedArgs)),
+          ])
+        : context.signal;
     return fetchJsonWithBody(
       url,
       schema.endpoint.method,
       body,
       contextHeaders,
-      context.signal,
+      signal,
     );
   }
 
@@ -2060,6 +2071,15 @@ export default class ToolOrchestratorService {
 
     const result = await executeToolGeneric(name, args, context);
 
+    // A background command: watched, so its exit reaches the agent, and
+    // answered with Claude Code's line (background-tasks/BackgroundCommands).
+    if (name === TOOL_NAMES.RUN_COMMAND) {
+      const { isBackgroundedCommand, watchBackgroundCommand } = await import(
+        "#src/services/background-tasks/BackgroundCommands"
+      );
+      if (isBackgroundedCommand(result)) return watchBackgroundCommand(result, args, context);
+    }
+
     // Post-process: upload generated images to MinIO
     const imageResult = result as GenerateImageToolResult;
     if (
@@ -2613,6 +2633,12 @@ export default class ToolOrchestratorService {
     if (!streamPath) {
       return ToolOrchestratorService.executeTool(name, args, context);
     }
+    // A background command answers at once with its task — nothing to
+    // stream; its exit is watched instead (executeTool).
+    const isCommand = name === TOOL_NAMES.RUN_COMMAND;
+    if (isCommand && runsInBackground(args)) {
+      return ToolOrchestratorService.executeTool(name, args, context);
+    }
 
     const remaps = ARG_REMAPS[name as keyof typeof ARG_REMAPS];
     let resolvedArgs: Record<string, unknown> = args;
@@ -2630,13 +2656,20 @@ export default class ToolOrchestratorService {
     const contextHeaders = buildContextHeaders(context);
     resolvedArgs = withWorktreeRedirect(resolvedArgs, context, contextHeaders);
 
+    // Combine the session's abort signal with a deadline. A command's covers
+    // the whole run — its own timeout plus the reply's margin (tools-service
+    // kills it at its timeout and answers with what it printed); any other
+    // streamed tool's only the wait for its stream to open.
+    const deadline = isCommand
+      ? commandReplyDeadlineMilliseconds(resolvedArgs)
+      : TOOL_PROXY_TIMEOUT_MILLISECONDS;
+    const controller = createAbortController();
+    let deadlinePassed = false;
+    const timeout = setTimeout(() => {
+      deadlinePassed = true;
+      controller.abort();
+    }, deadline);
     try {
-      // Combine session abort signal with a 65s timeout.
-      // If the user cancels the session, the fetch aborts immediately.
-      // If 65s elapses, the fetch aborts via timeout.
-      const controller = createAbortController();
-      const timeout = setTimeout(() => controller.abort(), TOOL_PROXY_TIMEOUT_MILLISECONDS); // generous timeout
-
       // If session signal exists, abort the local controller when session aborts
       if (context.signal && !context.signal.aborted) {
         const onSessionAbort = () => controller.abort();
@@ -2661,7 +2694,7 @@ export default class ToolOrchestratorService {
         body: JSON.stringify(resolvedArgs),
         signal: controller.signal,
       });
-      clearTimeout(timeout);
+      if (!isCommand) clearTimeout(timeout);
 
       if (!response.ok) {
         return {
@@ -2736,7 +2769,14 @@ export default class ToolOrchestratorService {
       }
       return finalResult || { error: "Stream ended without exit event" };
     } catch (error: unknown) {
+      if (deadlinePassed && isCommand) {
+        return {
+          error: `No answer from tools-service within ${deadline} ms (the command's timeout plus ${COMMAND_REPLY_MARGIN_MILLISECONDS} ms)`,
+        };
+      }
       return { error: `Streaming failed: ${getErrorMessage(error)}` };
+    } finally {
+      clearTimeout(timeout);
     }
   }
 

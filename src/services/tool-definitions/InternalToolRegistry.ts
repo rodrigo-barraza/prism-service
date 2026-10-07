@@ -32,6 +32,7 @@ import readUntrustedTool from "./ReadUntrustedTool.ts";
 import compactContextTool from "./CompactContextTool.ts";
 import checkpointTools from "./CheckpointTools.ts";
 import asyncTaskTools from "./AsyncTaskTools.ts";
+import backgroundTaskTools from "./BackgroundTaskTools.ts";
 import artifactTools from "./ArtifactTools.ts";
 import projectInstructionsTools from "./ProjectInstructionsTools.ts";
 import runToolProgramTool from "./RunToolProgramTool.ts";
@@ -144,6 +145,7 @@ function initialize() {
     compactContextTool,
     checkpointTools,
     asyncTaskTools,
+    backgroundTaskTools,
     artifactTools,
     projectInstructionsTools,
     runToolProgramTool,

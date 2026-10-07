@@ -174,6 +174,20 @@ describe("buildJsonResponseFromEvents", () => {
     expect(result.response!.finalText).toBe("Here you go, mortal.");
   });
 
+  it("should expose only the answer after a Stop hook's continuation as finalText", () => {
+    const events: TestEvent[] = [
+      { type: "chunk", content: "All set" },
+      { type: "status", message: "stop_hook_continue" },
+      { type: "chunk", content: "All set ⚠️" },
+      { type: "done", provider: PROVIDERS.ANTHROPIC, model: "claude-sonnet-5-5" },
+    ];
+
+    const result = callBuildJsonResponse(events, { provider: PROVIDERS.ANTHROPIC });
+
+    expect(result.response!.text).toBe("All setAll set ⚠️");
+    expect(result.response!.finalText).toBe("All set ⚠️");
+  });
+
   it("should return null text when no chunk events exist", () => {
     const events: TestEvent[] = [
       { type: "done", provider: PROVIDERS.GOOGLE, model: "gemini-3.5-flash" },

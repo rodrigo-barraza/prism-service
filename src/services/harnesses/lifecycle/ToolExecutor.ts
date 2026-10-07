@@ -23,6 +23,10 @@ import type {
   ResolvedTools,
 } from "#src/services/harnesses/types";
 import { recordUntrustedToolResults } from "#src/services/permissions/UntrustedSpans";
+import {
+  commandReplyDeadlineMilliseconds,
+  runsInBackground,
+} from "#src/services/tool-orchestrator/CommandTimeout";
 
 /**
  * ToolExecutor — parallel and single tool execution extracted from
@@ -47,15 +51,25 @@ const TOOL_TIMEOUT_EXEMPT = new Set<string>([
   TOOL_NAMES.GET_SUBAGENT_OUTPUT,
 ]);
 
-/** Resolve the per-tool timeout for a call. 0 disables the timeout. */
-function resolveToolTimeout(
+/**
+ * Resolve the per-tool timeout for a call. 0 disables the timeout. A
+ * foreground command gets at least its own timeout plus the reply's margin
+ * (tools-service kills it at its timeout and answers with what it printed),
+ * so the loop never abandons a command its own deadline still covers.
+ */
+export function resolveToolTimeout(
   toolName: string,
   context: AgenticContext,
+  args?: Record<string, unknown>,
 ): number {
   if (TOOL_TIMEOUT_EXEMPT.has(toolName)) return 0;
   const configured = context.options?.toolTimeoutMilliseconds;
-  if (typeof configured === "number") return Math.max(0, configured);
-  return HARNESS.DEFAULT_TOOL_TIMEOUT_MILLISECONDS;
+  const timeout =
+    typeof configured === "number" ? Math.max(0, configured) : HARNESS.DEFAULT_TOOL_TIMEOUT_MILLISECONDS;
+  if (timeout > 0 && toolName === TOOL_NAMES.RUN_COMMAND && !runsInBackground(args)) {
+    return Math.max(timeout, commandReplyDeadlineMilliseconds(args));
+  }
+  return timeout;
 }
 
 /**
@@ -212,7 +226,11 @@ export async function executeToolBatch(
         toolCall.args = hookResult.updatedInput as Record<string, unknown>;
       }
 
-      const timeoutMilliseconds = resolveToolTimeout(toolCall.name, context);
+      const timeoutMilliseconds = resolveToolTimeout(
+        toolCall.name,
+        context,
+        toolCall.args as Record<string, unknown> | undefined,
+      );
       const toolSignal = buildToolSignal(context, timeoutMilliseconds);
 
       // On record before it can have any effect: a restart that cuts it off
