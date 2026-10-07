@@ -1071,6 +1071,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             // history as the model's own words, then the hook's reason.
             currentMessages.push({ role: "assistant", content: pass.finalStreamedText });
             currentMessages.push(buildStopContinuationMessage(stopOutcome.continueWith));
+            state.resetDisplayData();
           }
 
           // A rejected (or timed-out) plan ends the turn, but the turn still
@@ -1283,6 +1284,7 @@ export default class ReActHarness extends BaseAgenticHarness {
                 ...providerNativeState(pass),
               });
               currentMessages.push(buildStopContinuationMessage(stopOutcome.continueWith));
+              state.resetDisplayData();
               this.logIteration(pass, currentMessages);
               this.deviationEngine.recordCompletedIteration([]);
               continue;

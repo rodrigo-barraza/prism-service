@@ -1212,6 +1212,7 @@ export async function continueAfterStopHooks(
     ...providerNativeState(pass),
   });
   currentMessages.push(buildStopContinuationMessage(continueWith));
+  state.resetDisplayData();
   return true;
 }
 
