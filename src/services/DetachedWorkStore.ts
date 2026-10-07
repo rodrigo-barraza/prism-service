@@ -4,13 +4,16 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { COLLECTIONS, TURN_RESUME } from "#src/constants";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import type { WorkspaceTaskStatus, WorkspaceTaskType } from "#src/constants/BackgroundTasks";
 
 /**
  * DetachedWorkStore — background work a turn started and has not been told
- * the outcome of: an async task (`run_async_task`) or a sub-agent dispatch
- * (`create_subagent(s)` / `resume_subagent`, DetachedDispatchRegistry).
+ * the outcome of: an async task (`run_async_task`), a sub-agent dispatch
+ * (`create_subagent(s)` / `resume_subagent`, DetachedDispatchRegistry), or
+ * a workspace task (a background `execute_command`, a `monitor`:
+ * BackgroundTaskWatcher).
  *
- * Both registries live in memory; this is their durable shadow, one record
+ * The registries live in memory; this is their durable shadow, one record
  * per task or dispatch in `detached_work`:
  *
  *   running    started, no outcome yet
@@ -24,10 +27,39 @@ import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
  * delivered, so a second boot (or a race) cannot deliver it twice. A running
  * task is reported UNCERTAIN (it may have partly happened) and is never run
  * again on its own. Every write is best-effort.
+ *
+ * A workspace task is the exception: it runs on the workspace, not in this
+ * process, so a restart does not end it. Its record keeps the last event it
+ * handled (`task.lastSeq`) and the watcher picks it up there at boot
+ * (`listUnsettledWorkspaceTasks`); it is delivered once its exit is.
  */
 
-export type DetachedWorkKind = "async_task" | "subagent_dispatch";
+export type DetachedWorkKind = "async_task" | "subagent_dispatch" | "workspace_task";
 export type DetachedWorkStatus = "running" | "settled" | "delivered";
+
+/** A workspace task's own fields (BackgroundTaskWatcher). */
+export interface WorkspaceTaskFields {
+  type: WorkspaceTaskType;
+  description: string;
+  command?: string;
+  wsUrl?: string;
+  outputFile?: string;
+  /** A monitor's deadline (ms). */
+  timeoutMs?: number | null;
+  /** The workspace root (or worktree) it runs in. */
+  workspaceRoot?: string | null;
+  /** Its owner is a sub-agent: never woken; its monitors end with its run. */
+  isSubAgent?: boolean;
+  /** `running`, then how it ended. */
+  status: WorkspaceTaskStatus;
+  /** The last event (or the exit) handled: a re-attach resumes after it. */
+  lastSeq: number;
+  /** A monitor's event lines delivered so far. */
+  eventCount: number;
+  exitCode?: number | null;
+  startedAt: string;
+  endedAt?: string;
+}
 
 export interface DetachedWorkRecord {
   /** Unique: `detachedWorkId(kind, scope, itemId)` — task ids repeat across conversations. */
@@ -46,6 +78,8 @@ export interface DetachedWorkRecord {
   toolArguments?: Record<string, unknown>;
   // ── A sub-agent dispatch ──
   agentIds?: string[];
+  // ── A workspace task ──
+  task?: WorkspaceTaskFields;
   status: DetachedWorkStatus;
   /** completed | failed | cancelled — an async task's outcome. */
   outcome?: string;
@@ -147,20 +181,75 @@ const DetachedWorkStore = {
     }
   },
 
-  /** Work whose parent was never told — at boot. */
+  /**
+   * Work whose parent was never told — at boot. Not a workspace task: a
+   * restart did not end it, and the watcher picks it up where it was.
+   */
   async listUndelivered(): Promise<DetachedWorkRecord[]> {
-    const work = collection();
-    if (!work) return [];
-    try {
-      const documents = await work.find({ status: { $in: UNDELIVERED } }).toArray();
-      return documents
-        .map(({ _id: _ignored, ...record }) => record as unknown as DetachedWorkRecord)
-        .sort((left, right) => (left.createdAt < right.createdAt ? -1 : 1));
-    } catch (error: unknown) {
-      logger.error(`[DetachedWorkStore] Could not list detached work: ${getErrorMessage(error)}`);
-      return [];
-    }
+    return find({ status: { $in: UNDELIVERED }, kind: { $ne: "workspace_task" } }, "detached work");
+  },
+
+  /** A workspace task handled more of its stream (`task.lastSeq`, its count, its status). */
+  async progressed(id: string, fields: Partial<WorkspaceTaskFields>): Promise<void> {
+    const update = Object.fromEntries(
+      Object.entries(fields).map(([field, value]) => [`task.${field}`, value]),
+    );
+    if (Object.keys(update).length === 0) return;
+    await write(`progress ${id}`, (work) => work.updateOne({ id }, { $set: update }));
+  },
+
+  /** A workspace task's exit reached its owner (or was deliberately not sent: `stopped`, `dropped`). */
+  async workspaceTaskEnded(id: string, fields: Partial<WorkspaceTaskFields>, via: string): Promise<void> {
+    const update = Object.fromEntries(
+      Object.entries(fields).map(([field, value]) => [`task.${field}`, value]),
+    );
+    await write(`end ${id}`, (work) =>
+      work.updateOne({ id }, { $set: { ...update, ...deliveredFields(via) } }),
+    );
+  },
+
+  /** Workspace tasks still being watched when the last process stopped — at boot. */
+  async listUnsettledWorkspaceTasks(): Promise<DetachedWorkRecord[]> {
+    return find({ kind: "workspace_task", status: { $in: UNDELIVERED } }, "workspace tasks");
+  },
+
+  /** A conversation's workspace tasks, running and ended (until the TTL removes them). */
+  async listWorkspaceTasks(owner: {
+    conversationId: string;
+    project?: string | null;
+    username?: string | null;
+  }): Promise<DetachedWorkRecord[]> {
+    return find(
+      {
+        kind: "workspace_task",
+        conversationId: owner.conversationId,
+        ...(owner.project ? { project: owner.project } : {}),
+        ...(owner.username ? { username: owner.username } : {}),
+      },
+      "a conversation's workspace tasks",
+    );
+  },
+
+  /** One workspace task's record, by its task id. */
+  async findWorkspaceTask(taskId: string): Promise<DetachedWorkRecord | null> {
+    const [record] = await find({ kind: "workspace_task", itemId: taskId }, `workspace task ${taskId}`);
+    return record ?? null;
   },
 };
+
+/** Records matching `filter`, oldest first; [] when the database is not there. */
+async function find(filter: Document, label: string): Promise<DetachedWorkRecord[]> {
+  const work = collection();
+  if (!work) return [];
+  try {
+    const documents = await work.find(filter).toArray();
+    return documents
+      .map(({ _id: _ignored, ...record }) => record as unknown as DetachedWorkRecord)
+      .sort((left, right) => (left.createdAt < right.createdAt ? -1 : 1));
+  } catch (error: unknown) {
+    logger.error(`[DetachedWorkStore] Could not list ${label}: ${getErrorMessage(error)}`);
+    return [];
+  }
+}
 
 export default DetachedWorkStore;
