@@ -1,6 +1,7 @@
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import { TOOLS_SERVICE_URL } from "#config";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import { traceHeaders } from "#src/services/Tracing";
 import logger from "#src/utils/logger";
 import { HOOK_EVENT_NAMES, HOOK_HANDLER_TYPES } from "#src/services/hooks/types";
@@ -217,7 +218,7 @@ async function requestConfig(
   { project, username, baseUrl = TOOLS_SERVICE_URL, fetchImplementation = fetch }: FetchConfigOptions,
 ): Promise<WorkspaceHooksConfig> {
   if (!baseUrl) throw new Error("TOOLS_SERVICE_URL is not configured");
-  const headers: Record<string, string> = { ...traceHeaders() };
+  const headers: Record<string, string> = { ...traceHeaders(), ...toolsServiceAuthHeaders() };
   if (project) headers[IDENTITY_HEADERS.project] = project;
   if (username) headers[IDENTITY_HEADERS.username] = username;
   const response = await fetchImplementation(

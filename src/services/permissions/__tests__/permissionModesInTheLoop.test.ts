@@ -25,6 +25,8 @@ import { MODALITY_TYPES } from "#src/config";
 import { clearPermissionRuleCache } from "#src/services/permissions/PermissionRuleStore";
 import { PermissionModeRegistry } from "#src/services/permissions/PermissionModeState";
 import { BYPASS_OWNERS_ENV_VAR } from "#src/services/permissions/PermissionModes";
+import type { AuthKind } from "#src/utils/RequestContext";
+import { runAs } from "../../../../tests/helpers/auth.ts";
 
 vi.mock("#src/utils/logger", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), success: vi.fn(), request: vi.fn() },
@@ -165,8 +167,10 @@ describe("permission modes in a real loop", () => {
       });
   }
 
+  // A signed-in user's turn (AuthMiddleware), unless a test says otherwise.
+  let authKind: AuthKind | null = "user";
   const run = (options: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
-    AgenticLoopService.runAgenticLoop({
+    runAs(authKind, USERNAME, () => AgenticLoopService.runAgenticLoop({
       provider,
       providerName: "test-provider",
       resolvedModel: "test-model",
@@ -207,7 +211,7 @@ describe("permission modes in a real loop", () => {
       }),
       signal: new AbortController().signal,
       ...extra,
-    } as any);
+    } as any));
 
   const executed = () => vi.mocked(ToolOrchestratorService.executeTool).mock.calls.map((call) => [call[0], call[1]]);
   /** What ran — minus the approval card's diff preview, which reads the target file. */
@@ -228,6 +232,7 @@ describe("permission modes in a real loop", () => {
   beforeEach(() => {
     mongo.collections.clear();
     emitted = [];
+    authKind = "user";
     cardAnswer = "deny";
     onFirstModelCall = null;
     clearPermissionRuleCache();
@@ -333,6 +338,18 @@ describe("permission modes in a real loop", () => {
     expect(modeEvents()[0]).toMatchObject({ mode: "bypass", source: "request" });
     expect(cards()).toEqual([]);
     expect(executed()).toEqual([["execute_shell", { command: "npm test" }]]);
+  });
+
+  it("a service's turn under the owner's name gets no bypass: the shell call asks", async () => {
+    process.env[BYPASS_OWNERS_ENV_VAR] = USERNAME;
+    authKind = "service";
+    script({ name: "execute_shell", args: { command: "npm test" }, id: "call-shell" });
+
+    await run({ permissionMode: "bypass" });
+
+    expect(modeEvents()[0]).toMatchObject({ mode: "default", refused: "bypass" });
+    expect(cards().map((card) => card.toolCall.name)).toEqual(["execute_shell"]);
+    expect(executed()).toEqual([]);
   });
 
   it("protected paths always ask — acceptEdits, bypass and full auto alike", async () => {

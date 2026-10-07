@@ -7,6 +7,7 @@ import { HOOKS } from '#src/constants';
 import { WORKSPACE_HOOKS } from '#src/services/hooks/WorkspaceHookConstants';
 import { invalidateWorkspaceHooksConfig } from '#src/services/hooks/WorkspaceHookConfig';
 import { createMockCollection } from './mongoMock.ts';
+import { serviceHeaders } from './helpers/auth.ts';
 
 const { default: workspaceHooksRouter } = await import('#src/routes/WorkspaceHooksRoutes');
 const { default: hooksRouter } = await import('#src/routes/HooksRoutes');
@@ -190,6 +191,25 @@ describe('WorkspaceHooksRoutes', () => {
         await agent.post('/hooks/workspace/trust').set(as(OWNER)).send(body).expect(400);
       }
       expect(trust._docs.size).toBe(0);
+    });
+
+    it("a service naming the owner is refused: trusting a file needs the owner signed in", async () => {
+      const response = await agent
+        .post('/hooks/workspace/trust')
+        .set('x-project', PROJECT)
+        .set(serviceHeaders(OWNER))
+        .send({ path: PROJECT_FILE, sha256: SHA_PROJECT })
+        .expect(403);
+      expect(response.body.error).toMatch(/owner powers need a signed-in user and this is a service's request/);
+      expect(trust._docs.size).toBe(0);
+
+      const listed = await agent
+        .get('/hooks/workspace')
+        .query({ root: '/repo' })
+        .set('x-project', PROJECT)
+        .set(serviceHeaders(OWNER))
+        .expect(200);
+      expect(listed.body.ownerAllowed).toBe(false);
     });
 
     it('a relay speaking for someone else cannot trust anything', async () => {

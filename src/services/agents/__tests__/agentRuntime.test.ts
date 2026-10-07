@@ -7,11 +7,13 @@ import { describe, it, expect, afterEach } from "vitest";
 import {
   ACP_AGENT_OWNERS_ENV_VAR,
   ACP_BASE_ENVIRONMENT,
+  acpOwnershipError,
   buildAgentEnvironment,
   isAcpAgentOwner,
   normalizeAgentRuntime,
 } from "../AgentRuntime.ts";
 import { parseAgentDefinitionFile } from "../AgentDefinitionFiles.ts";
+import { runAs } from "../../../../tests/helpers/auth.ts";
 
 describe("normalizeAgentRuntime", () => {
   it("no runtime, or prism, is Prism's own loop", () => {
@@ -54,12 +56,27 @@ describe("owners", () => {
   });
 
   it("nobody, until PRISM_ACP_AGENT_OWNERS names them", () => {
+    runAs("user", "rodrigo", () => {
+      expect(isAcpAgentOwner("rodrigo")).toBe(false);
+      process.env[ACP_AGENT_OWNERS_ENV_VAR] = " rodrigo , alex ";
+      expect(isAcpAgentOwner("rodrigo")).toBe(true);
+      expect(isAcpAgentOwner("alex")).toBe(true);
+      expect(isAcpAgentOwner("mallory")).toBe(false);
+      expect(isAcpAgentOwner(undefined)).toBe(false);
+    });
+  });
+
+  it("an owner only when signed in: a service naming one, or no request at all, is not", () => {
+    process.env[ACP_AGENT_OWNERS_ENV_VAR] = "rodrigo";
+    expect(runAs("service", "rodrigo", () => isAcpAgentOwner("rodrigo"))).toBe(false);
+    expect(runAs(null, "rodrigo", () => isAcpAgentOwner("rodrigo"))).toBe(false);
     expect(isAcpAgentOwner("rodrigo")).toBe(false);
-    process.env[ACP_AGENT_OWNERS_ENV_VAR] = " rodrigo , alex ";
-    expect(isAcpAgentOwner("rodrigo")).toBe(true);
-    expect(isAcpAgentOwner("alex")).toBe(true);
-    expect(isAcpAgentOwner("mallory")).toBe(false);
-    expect(isAcpAgentOwner(undefined)).toBe(false);
+    expect(runAs("service", "rodrigo", () => acpOwnershipError("rodrigo"))).toMatch(
+      /"rodrigo" is in PRISM_ACP_AGENT_OWNERS, but owner powers need a signed-in user and this is a service's request/,
+    );
+    expect(runAs("user", "mallory", () => acpOwnershipError("mallory"))).toMatch(
+      /"mallory" is not in PRISM_ACP_AGENT_OWNERS/,
+    );
   });
 });
 

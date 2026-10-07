@@ -13,6 +13,7 @@ import runCommandHook, {
   interpretCommandOutcome,
 } from "#src/services/hooks/handlers/CommandHookHandler";
 import { isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
+import { runAs } from "../../../../tests/helpers/auth.ts";
 import {
   runConfiguredHook,
   normalizeDecision,
@@ -73,6 +74,11 @@ function runLikeToolsService(_url: string, init: RequestInit) {
 const PAYLOAD = { hook_event_name: "PreToolUse", tool_name: "execute_shell", tool_input: { command: "rm -rf /" } };
 const OWNER = "rodrigo";
 
+/** A hook runs inside its turn: here, a turn the owner signed in to (AuthMiddleware). */
+function asOwner<T>(fn: () => T): T {
+  return runAs("user", OWNER, fn);
+}
+
 function commandHook(
   command: string,
   overrides: Partial<ConfiguredHookDocument> = {},
@@ -126,7 +132,7 @@ if printf '%s' "$payload" | grep -q 'rm -rf'; then
 fi
 exit 0`,
     );
-    const result = await runConfiguredHook(commandHook(path), PAYLOAD as never);
+    const result = await asOwner(() => runConfiguredHook(commandHook(path), PAYLOAD as never));
     expect(normalizeDecision(result, HOOK_EVENTS.PRE_TOOL_USE)).toMatchObject({
       permissionDecision: "deny",
       reason: "rm -rf is not allowed",
@@ -135,7 +141,7 @@ exit 0`,
 
   it("exit 2 blocks, with stderr as the reason, whatever stdout says", async () => {
     const path = script("block.sh", `echo '{"permissionDecision":"allow"}'; echo "protected path" >&2; exit 2`);
-    const result = await runConfiguredHook(commandHook(path), PAYLOAD as never);
+    const result = await asOwner(() => runConfiguredHook(commandHook(path), PAYLOAD as never));
     expect(normalizeDecision(result, HOOK_EVENTS.PRE_TOOL_USE)).toMatchObject({
       isApproved: false,
       permissionDecision: "deny",
@@ -145,10 +151,10 @@ exit 0`,
 
   it("exit 2 on Stop keeps the agent going", async () => {
     const path = script("stop.sh", `echo "tests still failing" >&2; exit 2`);
-    const result = await runConfiguredHook(
+    const result = await asOwner(() => runConfiguredHook(
       commandHook(path, { event: HOOK_EVENTS.STOP }),
       { hook_event_name: "Stop" } as never,
-    );
+    ));
     expect(normalizeDecision(result, HOOK_EVENTS.STOP)).toMatchObject({
       permissionDecision: "deny",
       reason: "tests still failing",
@@ -157,17 +163,17 @@ exit 0`,
 
   it("any other exit status without JSON is a non-blocking failure", async () => {
     const path = script("crash.sh", `echo "boom" >&2; exit 1`);
-    const result = await runConfiguredHook(commandHook(path), PAYLOAD as never);
+    const result = await asOwner(() => runConfiguredHook(commandHook(path), PAYLOAD as never));
     expect(result).toMatchObject({ _handlerFailed: true, _reason: "command_exit_1" });
     expect(normalizeDecision(result, HOOK_EVENTS.PRE_TOOL_USE)).toEqual({});
   });
 
   it("plain stdout on UserPromptSubmit becomes context the model sees", async () => {
     const path = script("context.sh", `echo "Sprint ends Friday."`);
-    const result = await runConfiguredHook(
+    const result = await asOwner(() => runConfiguredHook(
       commandHook(path, { event: HOOK_EVENTS.USER_PROMPT_SUBMIT }),
       { hook_event_name: "UserPromptSubmit" } as never,
-    );
+    ));
     expect(result).toMatchObject({ additionalContext: "Sprint ends Friday." });
   });
 
@@ -176,7 +182,7 @@ exit 0`,
       "env.sh",
       `printf '{"additionalContext":"%s %s"}' "$PRISM_HOOK_EVENT" "$PRISM_HOOK_NAME"`,
     );
-    const result = await runConfiguredHook(commandHook(path), PAYLOAD as never);
+    const result = await asOwner(() => runConfiguredHook(commandHook(path), PAYLOAD as never));
     expect(result).toMatchObject({ additionalContext: "PreToolUse shell gate" });
   });
 
@@ -184,19 +190,19 @@ exit 0`,
     const slow = () => script("slow.sh", `sleep 5; echo '{}'`);
 
     it("fail_open: a timeout is no decision, the action proceeds", async () => {
-      const result = await runConfiguredHook(
+      const result = await asOwner(() => runConfiguredHook(
         commandHook(slow(), { timeoutMilliseconds: 800 }),
         PAYLOAD as never,
-      );
+      ));
       expect(result._handlerFailed).toBe(true);
       expect(normalizeDecision(result, HOOK_EVENTS.PRE_TOOL_USE)).toEqual({});
     });
 
     it("fail_closed: a timeout on a blocking event blocks", async () => {
-      const result = await runConfiguredHook(
+      const result = await asOwner(() => runConfiguredHook(
         commandHook(slow(), { timeoutMilliseconds: 800 }, { timeoutBehavior: "fail_closed" }),
         PAYLOAD as never,
-      );
+      ));
       expect(normalizeDecision(result, HOOK_EVENTS.PRE_TOOL_USE)).toMatchObject({
         isApproved: false,
         permissionDecision: "deny",
@@ -220,10 +226,10 @@ exit 0`,
             init.signal?.addEventListener("abort", () => reject(init.signal?.reason));
           }),
       );
-      const result = await runConfiguredHook(
+      const result = await asOwner(() => runConfiguredHook(
         commandHook("sleep 10", { timeoutMilliseconds: 300 }, { timeoutBehavior: "fail_closed" }),
         PAYLOAD as never,
-      );
+      ));
       expect(normalizeDecision(result, HOOK_EVENTS.PRE_TOOL_USE)).toMatchObject({
         permissionDecision: "deny",
       });
@@ -233,18 +239,33 @@ exit 0`,
   describe("ownership", () => {
     it("reads the owner list per call, comma-separated", () => {
       process.env[HOOKS.COMMAND_OWNERS_ENV_VAR] = " alice , rodrigo ";
-      expect(isCommandHookOwner("rodrigo")).toBe(true);
-      expect(isCommandHookOwner("mallory")).toBe(false);
-      delete process.env[HOOKS.COMMAND_OWNERS_ENV_VAR];
-      expect(isCommandHookOwner("rodrigo")).toBe(false);
+      asOwner(() => {
+        expect(isCommandHookOwner("rodrigo")).toBe(true);
+        expect(isCommandHookOwner("mallory")).toBe(false);
+        delete process.env[HOOKS.COMMAND_OWNERS_ENV_VAR];
+        expect(isCommandHookOwner("rodrigo")).toBe(false);
+      });
+    });
+
+    it("an owner only in a signed-in user's turn: a service under the owner's name, or no request, is not", () => {
+      expect(runAs("service", OWNER, () => isCommandHookOwner(OWNER))).toBe(false);
+      expect(runAs(null, OWNER, () => isCommandHookOwner(OWNER))).toBe(false);
+      expect(isCommandHookOwner(OWNER)).toBe(false);
+    });
+
+    it("never runs the owner's command hook in a service's turn named after the owner", async () => {
+      const path = script("service.sh", `echo '{"permissionDecision":"allow"}'`);
+      const result = await runAs("service", OWNER, () => runConfiguredHook(commandHook(path), PAYLOAD as never));
+      expect(result).toMatchObject({ _handlerFailed: true, _reason: "command_owner_required" });
+      expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("never runs a command hook whose document belongs to a non-owner", async () => {
       const path = script("never.sh", `echo '{"permissionDecision":"allow"}'`);
-      const result = await runConfiguredHook(
+      const result = await asOwner(() => runConfiguredHook(
         commandHook(path, { username: "mallory" }),
         PAYLOAD as never,
-      );
+      ));
       expect(result).toMatchObject({ _handlerFailed: true, _reason: "command_owner_required" });
       expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -256,15 +277,15 @@ exit 0`,
       status: 400,
       json: async () => ({ error: "bad request" }),
     });
-    const result = await runCommandHook(
+    const result = await asOwner(() => runCommandHook(
       { type: "command", command: "true" },
       { payloadJson: "{}", event: HOOK_EVENTS.PRE_TOOL_USE, timeoutMilliseconds: 1_000, owner: OWNER },
-    );
+    ));
     expect(result).toMatchObject({ _handlerFailed: true, _reason: "command_service_400" });
   });
 
   it("sends tools-service the command, the payload as stdin, and a deadline inside the runner's", async () => {
-    await runCommandHook(
+    await asOwner(() => runCommandHook(
       { type: "command", command: "true" },
       {
         payloadJson: '{"hook_event_name":"PreToolUse"}',
@@ -274,7 +295,7 @@ exit 0`,
         project: "prism",
         hookName: "gate",
       },
-    );
+    ));
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(`http://tools.test${HOOKS.COMMAND_RUN_PATH}`);
     const body = JSON.parse(String(init.body));
@@ -304,10 +325,10 @@ exit 0`,
         status: 200,
         json: async () => ({ exitCode: 0, stdout: "", stderr: "", timedOut: false }),
       });
-      await runCommandHook(
+      await asOwner(() => runCommandHook(
         { type: "command", command: ".claude/hooks/prism-hook.sh", workspace },
         { payloadJson: "{}", event: HOOK_EVENTS.PRE_TOOL_USE, timeoutMilliseconds: 15_000, owner: OWNER },
-      );
+      ));
       const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       const body = JSON.parse(String(init.body));
       expect(body).toMatchObject({
@@ -325,14 +346,14 @@ exit 0`,
         status: 200,
         json: async () => ({ exitCode: 0, stdout: "", stderr: "", timedOut: false }),
       });
-      await runCommandHook(
+      await asOwner(() => runCommandHook(
         {
           type: "command",
           command: "true",
           workspace: { ...workspace, cwd: "/worktrees/agent-1", worktreePath: "/worktrees/agent-1" },
         },
         { payloadJson: "{}", event: HOOK_EVENTS.STOP, timeoutMilliseconds: 5_000, owner: OWNER },
-      );
+      ));
       const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(JSON.parse(String(init.body)).cwd).toBe("/worktrees/agent-1");
       expect((init.headers as Record<string, string>)["x-workspace-override"]).toBe("/worktrees/agent-1");
@@ -349,10 +370,10 @@ exit 0`,
     });
 
     it("is still refused for a user outside the owner list", async () => {
-      const result = await runCommandHook(
+      const result = await asOwner(() => runCommandHook(
         { type: "command", command: "true", workspace },
         { payloadJson: "{}", event: HOOK_EVENTS.PRE_TOOL_USE, timeoutMilliseconds: 1_000, owner: "mallory" },
-      );
+      ));
       expect(result).toMatchObject({ _handlerFailed: true, _reason: "command_owner_required" });
       expect(fetchMock).not.toHaveBeenCalled();
     });

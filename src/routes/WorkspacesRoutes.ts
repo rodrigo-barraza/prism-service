@@ -6,6 +6,7 @@ import {
 import express, { type Request, type Response } from "express";
 import { basename } from "node:path";
 import { TOOLS_SERVICE_URL } from "#config";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import logger from "#src/utils/logger";
 import {
@@ -18,8 +19,9 @@ import { TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS } from "#src/constants";
 const router = express.Router();
 
 // String() matches the previous template-literal coercion of the
-// (possibly undefined) env-derived base URL.
-const toolsClient = createApiClient(String(TOOLS_SERVICE_URL), {});
+// (possibly undefined) env-derived base URL. Every call carries
+// tools-service's credential (its routes here are gated).
+const toolsClient = createApiClient(String(TOOLS_SERVICE_URL), { headers: toolsServiceAuthHeaders });
 
 interface MappedWorkspace {
   id: string;

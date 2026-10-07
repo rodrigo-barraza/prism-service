@@ -3,6 +3,7 @@ import supertest from 'supertest';
 import { app } from './setup.ts';
 import MongoWrapper from '#src/wrappers/MongoWrapper';
 import { COLLECTIONS, HOOKS } from '#src/constants';
+import { serviceHeaders } from './helpers/auth.ts';
 
 // The runner and the registry are owned by a sibling module; the route only
 // cares that it calls them, with what, and what it does with the answer.
@@ -728,6 +729,20 @@ describe('HooksRoutes', () => {
         .set('x-username', USERNAME)
         .send({ enabled: true })
         .expect(403);
+    });
+
+    it("refuses a service that names the owner: command hooks need the owner signed in", async () => {
+      process.env[HOOKS.COMMAND_OWNERS_ENV_VAR] = USERNAME;
+      const refused = await agent
+        .post('/hooks')
+        .set('x-project', PROJECT)
+        .set(serviceHeaders(USERNAME))
+        .send({ name: 'gate', event: 'PreToolUse', handler: COMMAND_HANDLER })
+        .expect(403);
+      expect(refused.body.error).toMatch(
+        new RegExp(`"${USERNAME}" is in PRISM_HOOK_COMMAND_OWNERS, but owner powers need a signed-in user and this is a service's request`),
+      );
+      expect(hooks).toHaveLength(0);
     });
 
     it('rejects an unknown timeout behavior', async () => {

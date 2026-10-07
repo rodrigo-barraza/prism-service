@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { PROVIDERS } from "#src/constants";
 import request from 'supertest';
 import { app } from './setup.ts';
+import { userHeaders } from './helpers/auth.ts';
 import { getParameterDescriptors, getAgentDefaults } from '#src/services/ParameterRegistry';
 
 describe('ParameterRegistry', () => {
@@ -62,7 +63,7 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
 
     await request(app)
       .post('/chat')
-      .set('Authorization', 'Bearer test-secret')
+      .set(userHeaders('test-user'))
       .send({
         provider: PROVIDERS.OPENAI,
         model: 'gpt-5.5',
@@ -91,7 +92,7 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
 
     await request(app)
       .post('/chat')
-      .set('Authorization', 'Bearer test-secret')
+      .set(userHeaders('test-user'))
       .send({
         provider: PROVIDERS.ANTHROPIC,
         model: 'claude-sonnet-4-5-20250929',
@@ -117,7 +118,7 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
 
     await request(app)
       .post('/chat')
-      .set('Authorization', 'Bearer test-secret')
+      .set(userHeaders('test-user'))
       .send({
         provider: PROVIDERS.GOOGLE,
         model: 'gemini-3.5-flash',
@@ -143,7 +144,7 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
 
     await request(app)
       .post('/chat')
-      .set('Authorization', 'Bearer test-secret')
+      .set(userHeaders('test-user'))
       .send({
         provider: PROVIDERS.OPENAI,
         model: 'gpt-5.5',
@@ -170,7 +171,7 @@ describe('Chat Pipeline - Agent defaults resolution', () => {
 
     await request(app)
       .post('/chat')
-      .set('Authorization', 'Bearer test-secret')
+      .set(userHeaders('test-user'))
       .send({
         provider: PROVIDERS.OPENAI,
         model: 'gpt-5.5',

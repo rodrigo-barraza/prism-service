@@ -1079,6 +1079,7 @@ async function triggerAsyncTaskAutoResponse(
       project: context.project || taskState.project,
       username: context.username || taskState.username,
       isSubAgent: false,
+      authKind: taskState.authKind ?? null,
       kind: "task_completion",
       text: notification.content,
       timestamp: notification.timestamp,

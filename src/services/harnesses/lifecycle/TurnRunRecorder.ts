@@ -10,6 +10,7 @@ import { resolveLoopKey } from "#src/services/LoopKey";
 import { conversationCollectionFor } from "#src/services/conversation/ConversationRunState";
 import { TURN_RESUME } from "#src/constants";
 import type AgenticLoopState from "#src/services/AgenticLoopState";
+import { currentAuthKind } from "#src/utils/RequestContext";
 import type { AgenticContext, PassState, ToolCall } from "#src/services/harnesses/types";
 
 /**
@@ -126,6 +127,8 @@ export async function recordTurnCheckpoint(
       profileId: context.profileId ?? null,
       agent: context.agent ?? null,
       request: context.request as Record<string, unknown>,
+      // Who started it — a resume re-applies it (TurnResumeService.drive).
+      authKind: currentAuthKind(),
       systemPrompt: typeof options.systemPrompt === "string" ? options.systemPrompt : null,
       skillsText: typeof options._skillsText === "string" ? options._skillsText : null,
       conversationMeta: context.conversationMeta ?? null,

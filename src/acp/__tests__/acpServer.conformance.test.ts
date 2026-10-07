@@ -19,6 +19,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { TurnEvent } from "#src/protocol/events";
 import { SERVICE_ROOT } from "../../protocol/__tests__/siblingCheckout.ts";
 import { MockPrism, type ScriptedTurn } from "./mockPrism.ts";
+import { verifyUserToken } from "#src/utils/UserToken";
+import { TEST_USER_TOKEN_SECRET } from "../../../tests/helpers/authSecrets.ts";
 
 type Json = Record<string, unknown>;
 interface Message {
@@ -257,7 +259,7 @@ describe("ACP server — malformed JSON-RPC is answered, not fatal", () => {
 
   beforeAll(async () => {
     await mock.start();
-    client = new StdioClient({ PRISM_URL: mock.url });
+    client = new StdioClient({ PRISM_URL: mock.url, PRISM_USERNAME: "acp-test" });
   });
   afterAll(async () => {
     client.close();
@@ -341,7 +343,11 @@ describe("ACP server — a session, end to end", () => {
       ],
     });
     const [modeRequest] = mock.requestsTo("/permissions/mode");
-    expect(modeRequest?.headers).toMatchObject({ "x-project": "prism-test", "x-username": "acp-test" });
+    expect(modeRequest?.headers).toMatchObject({ "x-project": "prism-test" });
+    // Signed in as PRISM_USERNAME with a token it minted; the token names the user.
+    expect(modeRequest?.headers).not.toHaveProperty("x-username");
+    const token = String(modeRequest?.headers.authorization).replace(/^Bearer /, "");
+    expect(verifyUserToken(token, TEST_USER_TOKEN_SECRET)).toMatchObject({ ok: true, token: { username: "acp-test" } });
   });
 
   it("session/prompt streams the turn, asks permission for the tool, and relays the answer", async () => {
@@ -628,7 +634,7 @@ describe("ACP server — a client that renders forms", () => {
 
   beforeAll(async () => {
     await mock.start();
-    client = new StdioClient({ PRISM_URL: mock.url, PRISM_WORKSPACE_ROOT: "none" });
+    client = new StdioClient({ PRISM_URL: mock.url, PRISM_USERNAME: "acp-test", PRISM_WORKSPACE_ROOT: "none" });
   });
   afterAll(async () => {
     client.close();
@@ -712,7 +718,9 @@ describe("ACP server — a turn that hands work to the background", () => {
 
     const subscription = await within(mock.nextSubscription(), 10_000, "the /ws/chat subscription");
     expect(subscription.subscribe).toEqual({ type: "subscribe", conversationId: sessionId, afterSeq: 103 });
-    expect(Object.fromEntries(subscription.query)).toEqual({ project: "prism-test", username: "acp-test" });
+    const { access_token: accessToken, ...query } = Object.fromEntries(subscription.query);
+    expect(query).toEqual({ project: "prism-test" });
+    expect(verifyUserToken(accessToken, TEST_USER_TOKEN_SECRET)).toMatchObject({ ok: true, token: { username: "acp-test" } });
     let answered = false;
     void prompt.then(() => (answered = true));
 

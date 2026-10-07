@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { runAs } from "../../../../tests/helpers/auth.ts";
 import type { Db } from "mongodb";
 
 vi.mock("#config", async (importOriginal) => ({
@@ -49,6 +50,11 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
 
 const OWNER = "rodrigo";
 const PROJECT_FILE = "/repo/.prism/hooks.json";
+
+/** A turn's hooks are attached inside the turn: here, one a user signed in to (AuthMiddleware). */
+function asOwner<T>(fn: () => T): T {
+  return runAs("user", OWNER, fn);
+}
 const USER_FILE = "/home/rodrigo/.prism/hooks.json";
 const SHA_V1 = "1".repeat(64);
 const SHA_V2 = "2".repeat(64);
@@ -167,7 +173,7 @@ describe("attachWorkspaceHooks", () => {
       { username: OWNER, path: USER_FILE, sha256: SHA_V2 },
     ]);
     const hooks = new AgentHooks();
-    const registered = await attachWorkspaceHooks(hooks, context(), WORKSPACE, { database: db });
+    const registered = await asOwner(() => attachWorkspaceHooks(hooks, context(), WORKSPACE, { database: db }));
 
     expect(registered).toBe(4);
     expect(hooks.hasHooks("preToolUse")).toBe(true);
@@ -208,9 +214,9 @@ describe("attachWorkspaceHooks", () => {
     const { db } = trustDb([{ username: "mallory", path: PROJECT_FILE, sha256: SHA_V1 }]);
     const hooks = new AgentHooks();
     const emit = vi.fn();
-    const registered = await attachWorkspaceHooks(hooks, context({ username: "mallory", emit }), WORKSPACE, {
+    const registered = await asOwner(() => attachWorkspaceHooks(hooks, context({ username: "mallory", emit }), WORKSPACE, {
       database: db,
-    });
+    }));
     expect(registered).toBe(0);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
@@ -220,7 +226,7 @@ describe("attachWorkspaceHooks", () => {
     const { db } = trustDb([{ username: OWNER, path: USER_FILE, sha256: SHA_V2 }]);
     const hooks = new AgentHooks();
     const emit = vi.fn();
-    const registered = await attachWorkspaceHooks(hooks, context({ emit }), WORKSPACE, { database: db });
+    const registered = await asOwner(() => attachWorkspaceHooks(hooks, context({ emit }), WORKSPACE, { database: db }));
 
     expect(registered).toBe(1); // the trusted user file's PostToolUse only
     expect(hooks.hasHooks("preToolUse")).toBe(false);
@@ -240,7 +246,7 @@ describe("attachWorkspaceHooks", () => {
     (files.project as { sha256: string }).sha256 = "3".repeat(64);
     const emit = vi.fn();
     const hooks = new AgentHooks();
-    await attachWorkspaceHooks(hooks, context({ emit }), WORKSPACE, { database: db });
+    await asOwner(() => attachWorkspaceHooks(hooks, context({ emit }), WORKSPACE, { database: db }));
     expect(hooks.hasHooks("preToolUse")).toBe(false);
     expect(emit).toHaveBeenCalledWith(
       expect.objectContaining({ message: expect.stringContaining(PROJECT_FILE) }),
@@ -251,9 +257,9 @@ describe("attachWorkspaceHooks", () => {
     files.user = null;
     files.project = { path: PROJECT_FILE, dir: "/repo", exists: true, content: '{"hooks":{"Nope":[]}}', sha256: "4".repeat(64) };
     const emit = vi.fn();
-    const registered = await attachWorkspaceHooks(new AgentHooks(), context({ emit }), WORKSPACE, {
+    const registered = await asOwner(() => attachWorkspaceHooks(new AgentHooks(), context({ emit }), WORKSPACE, {
       database: trustDb().db,
-    });
+    }));
     expect(registered).toBe(0);
     expect(emit).not.toHaveBeenCalled();
   });
@@ -265,12 +271,12 @@ describe("attachWorkspaceHooks", () => {
     files.user = null;
     const { db } = trustDb([{ username: OWNER, path: PROJECT_FILE, sha256: SHA_V1 }]);
     const hooks = new AgentHooks();
-    const registered = await attachWorkspaceHooks(
+    const registered = await asOwner(() => attachWorkspaceHooks(
       hooks,
       context({ agentConversationId: "agent-1", parentAgentConversationId: "conv-1" }),
       { root: worktree.worktreePath, worktree },
       { database: db },
-    );
+    ));
     expect(registered).toBe(3);
     expect(fetchMock.mock.calls[0][0]).toBe("http://tools.test/agentic/hooks/config?root=%2Frepo");
     expect((fetchMock.mock.calls[0][1] as RequestInit).headers).not.toHaveProperty("x-workspace-override");
@@ -318,31 +324,31 @@ describe("attachWorkspaceHooks", () => {
       register: (event: string, _handler: unknown, _name: string, category: string) =>
         registrations.push({ event, category }),
     } as unknown as AgentHooks;
-    await attachWorkspaceHooks(hooks, context(), WORKSPACE, {
+    await asOwner(() => attachWorkspaceHooks(hooks, context(), WORKSPACE, {
       database: trustDb([{ username: OWNER, path: PROJECT_FILE, sha256: "5".repeat(64) }]).db,
-    });
+    }));
     expect(registrations).toEqual([{ event: "stop", category: "inspect" }]);
   });
 
   it("runs none for a benchmark sample, a turn without a workspace, or when tools-service fails", async () => {
     const { db } = trustDb([{ username: OWNER, path: PROJECT_FILE, sha256: SHA_V1 }]);
     expect(
-      await attachWorkspaceHooks(new AgentHooks(), context({ options: { evaluation: true } } as never), WORKSPACE, {
+      await asOwner(() => attachWorkspaceHooks(new AgentHooks(), context({ options: { evaluation: true } } as never), WORKSPACE, {
         database: db,
-      }),
+      })),
     ).toBe(0);
-    expect(await attachWorkspaceHooks(new AgentHooks(), context(), { root: null, worktree: null }, { database: db })).toBe(0);
+    expect(await asOwner(() => attachWorkspaceHooks(new AgentHooks(), context(), { root: null, worktree: null }, { database: db }))).toBe(0);
     expect(fetchMock).not.toHaveBeenCalled();
 
     fetchMock.mockRejectedValueOnce(new Error("ECONNREFUSED"));
     await expect(
-      attachWorkspaceHooks(new AgentHooks(), context(), WORKSPACE, { database: db }),
+      asOwner(() => attachWorkspaceHooks(new AgentHooks(), context(), WORKSPACE, { database: db })),
     ).resolves.toBe(0);
   });
 
   it("without a database to check trust in, runs nothing", async () => {
     const emit = vi.fn();
-    expect(await attachWorkspaceHooks(new AgentHooks(), context({ emit }), WORKSPACE, { database: null })).toBe(0);
+    expect(await asOwner(() => attachWorkspaceHooks(new AgentHooks(), context({ emit }), WORKSPACE, { database: null }))).toBe(0);
     expect(emit).not.toHaveBeenCalled();
   });
 });

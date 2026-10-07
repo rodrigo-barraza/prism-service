@@ -17,6 +17,9 @@ export default defineConfig({
       "**/dist/**",
       ".claude/**",
     ],
+    // prism-service's credentials, configured for every test (AuthMiddleware
+    // fails closed without them).
+    setupFiles: ["./tests/helpers/authSecrets.ts"],
     testTimeout: 30000,
     hookTimeout: 30000,
   },

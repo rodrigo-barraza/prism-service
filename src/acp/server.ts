@@ -12,6 +12,7 @@ import { Readable, Writable } from "node:stream";
 import * as acp from "@agentclientprotocol/sdk";
 import { AcpConfigError, readAcpConfig } from "./AcpConfig.ts";
 import { PrismAcpAgent } from "./PrismAcpAgent.ts";
+import { PrismCredential } from "./PrismCredential.ts";
 import { PrismHttpClient } from "./PrismHttpClient.ts";
 
 function log(message: string): void {
@@ -44,7 +45,7 @@ function main(): void {
   const prism = new PrismHttpClient(
     config.prismUrl,
     { project: config.project, username: config.username, profileId: config.profileId },
-    { log },
+    { log, credential: new PrismCredential(config.credential) },
   );
   const agent = new PrismAcpAgent({ config, prism, log, version: serviceVersion() });
   const stream = acp.ndJsonStream(
@@ -53,7 +54,10 @@ function main(): void {
   );
   const connection = agent.app().connect(stream);
   log(
-    `[acp] Prism ACP server ready — prism-service ${config.prismUrl}, project ${config.project}, provider ${config.provider}${config.model ? `/${config.model}` : ""}`,
+    `[acp] Prism ACP server ready — prism-service ${config.prismUrl}, project ${config.project}, provider ${config.provider}${config.model ? `/${config.model}` : ""}, ` +
+      (config.credential.kind === "token"
+        ? "signed in with PRISM_ACCESS_TOKEN"
+        : `signed in as ${config.credential.username} (minted tokens)`),
   );
   void connection.closed.then(() => {
     log("[acp] client disconnected");

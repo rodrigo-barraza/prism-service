@@ -17,6 +17,7 @@ import DetachedWorkStore, { type DetachedWorkRecord } from "#src/services/Detach
 import PendingDecisionStore from "#src/services/PendingDecisionStore";
 import type { TurnInputEntry, TurnInputPost } from "#src/services/TurnInputMailbox";
 import type { TurnResumeState } from "#src/services/harnesses/types";
+import { authOfRecord, requestContext } from "#src/utils/RequestContext";
 
 /**
  * TurnResumeService — what a starting process does about the turns the
@@ -44,7 +45,8 @@ import type { TurnResumeState } from "#src/services/harnesses/types";
  * `start` (once the process is up) then, for each re-driven turn: merges
  * its checkpoint into the transcript (so a reloading client sees the turn
  * so far), and runs it again through handleAgent with the stored request
- * and a resume payload — the harness replays the interrupted pass
+ * and a resume payload, as whoever started it (owner powers hold only if a
+ * signed-in user did) — the harness replays the interrupted pass
  * (ResumedPass) and the gate picks up its decisions. Mailbox entries no
  * turn took go into the re-driven turn, or into the transcript; background
  * work nobody was told about is reported once, the same two ways. A task
@@ -294,7 +296,18 @@ async function drive(run: TurnRunRecord, params: Record<string, unknown>): Promi
   const emit = withDirectViewerBroadcast(conversationId, (event: { type?: string }) => {
     logger.debug(`[TurnResume][${conversationId}] ${event.type}`);
   });
-  void handleAgent(params, emit, { signal: stopController.signal })
+  // No request carries it: the turn runs as whoever started it, with the
+  // auth its record kept (none for a record from before authentication).
+  const store = {
+    project: run.project,
+    username: run.username,
+    ...(run.profileId ? { profileId: run.profileId } : {}),
+    clientIp: typeof run.request.clientIp === "string" ? run.request.clientIp : null,
+    agent: run.agent ?? null,
+    auth: authOfRecord(run.authKind, run.username),
+  };
+  void requestContext
+    .run(store, () => handleAgent(params, emit, { signal: stopController.signal }))
     .catch((error: unknown) => {
       logger.error(`[TurnResume] Re-driven turn of ${conversationId} failed: ${getErrorMessage(error)}`);
     })
