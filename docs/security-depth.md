@@ -135,6 +135,14 @@ minimum, and the card quotes only that part. A sub-agent never adds its own
 "user" message (its parent's model wrote it, perhaps from a page); it is
 compared against the root's user words.
 
+**A background task's notification is the agent's own output.** A `monitor`'s
+events and a background `execute_command`'s exit reach the model as
+`<task-notification>` blocks (`_notificationSource: "workspace_task"`, mailbox
+kind `task_notification`): like `execute_command`'s own result they are
+derived, never untrusted text and never the user's words — the owner's
+decision, as in Claude Code. A script that prints a page's command does not
+launder the page: the page itself is still untrusted wherever the turn read it.
+
 ## 5. Capability scopes (`permissions/CapabilityScope.ts`)
 
 A run can be started without capabilities — `{ network: false }`,

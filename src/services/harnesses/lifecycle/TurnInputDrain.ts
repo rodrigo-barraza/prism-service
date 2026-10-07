@@ -54,6 +54,12 @@ import type {
  * the source and gives it tool-level authority, the message carries its
  * origin (`_external`, and on the `_turnInput` marker for viewers), and its
  * text joins the turn's untrusted spans (permissions/UntrustedSpans).
+ *
+ * `task_notification` (a background command's exit, a monitor's events) is
+ * the agent's own command output: a user-role message holding the
+ * <task-notification> blocks, never an <external-input> envelope, and never
+ * untrusted text (its `workspace_task` source is the harness speaking, not
+ * a third party). Its `turn_input` event says `source: "task"`.
  */
 
 /** Status acknowledging an async hook's context reached the model. */
@@ -127,10 +133,12 @@ export function buildTurnInputMessage(entry: TurnInputEntry): ConversationMessag
         _notificationId: `${NOTIFICATION_SOURCES.GOAL_VERIFIER}:${entry.id}:${entry.receivedAt}`,
       };
     case "task_completion":
+    case "task_notification":
     case "agent_message":
     default:
       // Producers format these (AgentNotificationService for completions,
-      // the orchestrator for follow-ups) and set their own source markers
+      // the orchestrator for follow-ups, TaskNotificationFormatter for a
+      // background task's notifications) and set their own source markers
       // through `meta`; keep the text verbatim.
       return { ...base, content: entry.text };
   }
@@ -213,6 +221,8 @@ function acknowledgeTurnInput(
     ...(entry.images && entry.images.length > 0 ? { images: entry.images } : {}),
     // An external input names its source, so a viewer never shows it as the user.
     ...(entry.kind === "external" && entry.origin ? entry.origin : {}),
+    // …and so does a background task's notification.
+    ...(entry.kind === "task_notification" ? { source: "task" } : {}),
     boundary,
     iteration: state.iterations,
   });
