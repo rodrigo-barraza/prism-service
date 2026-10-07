@@ -33,12 +33,13 @@ interface MintedToken {
   secret: string;
 }
 
-/** By user (username, email, roles): a user's calls share one token until it nears its end. */
+/** By user (username, email): a user's calls share one token until it nears its end. */
 const onBehalfTokens = new Map<string, MintedToken>();
 
 /**
  * The on-behalf token of the current turn's signed-in user (its username,
- * and its email and roles when the request carried them). None for a
+ * and its email when the request carried one). Never its roles: a callback
+ * speaks for the user, not as an admin, so it cannot open /admin. None for a
  * service's turn, outside any request or turn, or without
  * PRISM_USER_TOKEN_SECRET.
  */
@@ -46,9 +47,8 @@ function onBehalfToken(auth: RequestAuth | null | undefined): string | null {
   if (auth?.kind !== "user" || !auth.username) return null;
   const secret = process.env[USER_TOKEN_SECRET_ENV_VAR];
   if (!secret) return null;
-  const roles = [...auth.roles].sort();
   const email = auth.email ?? null;
-  const key = JSON.stringify([auth.username, email, roles]);
+  const key = JSON.stringify([auth.username, email]);
   const now = Math.floor(Date.now() / 1000);
   const cached = onBehalfTokens.get(key);
   if (cached && cached.secret === secret && cached.expiresAt - now > ON_BEHALF_TOKEN_RENEW_SECONDS) {
@@ -58,7 +58,7 @@ function onBehalfToken(auth: RequestAuth | null | undefined): string | null {
     secret,
     username: auth.username,
     email,
-    roles,
+    roles: [],
     lifetimeSeconds: ON_BEHALF_TOKEN_LIFETIME_SECONDS,
     issuer: ON_BEHALF_TOKEN_ISSUER,
     now,
