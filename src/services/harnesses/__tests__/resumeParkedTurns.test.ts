@@ -31,6 +31,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import express from "express";
 import supertest from "supertest";
 import { createMockCollection } from "../../../../tests/mongoMock.ts";
+import { signInAsHeaderUser } from "../../../../tests/helpers/auth.ts";
 
 // ── State that outlives a "process" ───────────────────────────────────
 
@@ -342,8 +343,12 @@ async function bootProcess() {
   const { default: TurnInputMailbox } = await import("#src/services/TurnInputMailbox");
   const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
   const { PermissionModeRegistry } = await import("#src/services/permissions/PermissionModeState");
+  const { authMiddleware } = await import("#src/middleware/AuthMiddleware");
   const app = express();
   app.use(express.json());
+  // Signed in as the client is: only a signed-in user decides.
+  app.use(signInAsHeaderUser);
+  app.use(authMiddleware);
   app.use("/agent", agentRouter);
   return { TurnResumeService, http: supertest(app), handleAgent, TurnInputMailbox, AsyncTaskRegistry, PermissionModeRegistry };
 }

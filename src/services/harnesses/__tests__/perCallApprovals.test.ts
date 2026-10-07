@@ -25,6 +25,8 @@ import AgenticLoopService from "#src/services/AgenticLoopService";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
 import agentRouter from "#src/routes/AgentRoutes";
+import { authMiddleware } from "#src/middleware/AuthMiddleware";
+import { signInAsHeaderUser } from "../../../../tests/helpers/auth.ts";
 import type {
   AgenticContext,
   ResolvedTools,
@@ -323,6 +325,9 @@ function executedIds(): string[] {
 
 const app = express();
 app.use(express.json());
+// Signed in as the client is: only a signed-in user approves a call.
+app.use(signInAsHeaderUser);
+app.use(authMiddleware);
 app.use("/agent", agentRouter);
 const http = supertest(app);
 

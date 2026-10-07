@@ -14,6 +14,18 @@ else. Owner powers — command hooks, trusting a repository's hooks, `bypass`,
 ACP agents — need a signed-in user, and turns that run without a request
 carry the auth of whoever started them. A service's turns never get a
 workspace root, workspace tools or full auto (`utils/ServiceTurnLimits.ts`).
+No service's request may answer or approve a pending decision (a tool call,
+a plan, a question, a budget pause, a proposed goal), add, change or start
+an MCP server that runs a command, approve an MCP server's tools, change the
+workspaces or run the importers: a 403 (`requireSignedInUser`) — a relay is
+told `external_input` first, as before.
+
+When a signed-in user's turn calls tools-service, prism-service sends a
+15-minute on-behalf token for that user beside its secret
+(`x-prism-user-token`, `iss: "prism-service"`, `utils/ToolsServiceAuth.ts`);
+tools-service's callbacks hand it back as their bearer, so a task the agent
+schedules through tools-service stays the user's. It never goes to LM
+Studio, whose MCP integration headers a third-party process holds.
 
 ## 1. Memory provenance (`memory/MemoryProvenance.ts`)
 
@@ -175,7 +187,10 @@ Inner checks — `run_async_task`, `run_tool_program`, `read_untrusted`'s fetch
 - Authentication: `tests/authMiddleware.test.ts` (tokens, the service secret,
   public paths, `/admin`, CORS, the request log), `tests/authWiring.test.ts`
   (mount order, `/files/gc`), `src/websocket/__tests__/websocketAuth.test.ts`
-  (upgrades), `tests/serviceTurnLimits.test.ts`, `tests/toolsServiceAuth.test.ts`;
+  (upgrades), `tests/serviceTurnLimits.test.ts`, `tests/toolsServiceAuth.test.ts`
+  (the secret and the on-behalf token), `tests/onBehalfToken.test.ts` (the
+  callback round trip), `tests/userOnlyPowers.test.ts` and
+  `tests/mcpServersRoutes.test.ts` (powers no service has);
   owner powers denied to a service: `hooksRoutes`, `workspaceHooksRoutes`,
   `permissionsRoutes`, `customAgentsAcpRuntimeRoutes`, `commandHookHandler`,
   `workspaceHookSemantics`, `permissionModes(InTheLoop)`, `acpClientRuntime`;

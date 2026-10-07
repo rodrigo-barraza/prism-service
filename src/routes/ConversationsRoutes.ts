@@ -40,6 +40,7 @@ import {
   snapshotRootsOf,
 } from "#src/services/conversation/workspaceSnapshots";
 import { requireUserAuthority } from "#src/middleware/ExternalAuthority";
+import { requireSignedInUser } from "#src/middleware/AuthMiddleware";
 
 /**
  * Raw messages → what the client is served: every message carries its id
@@ -1101,8 +1102,10 @@ router.post(
 // (ConversationBudgetRoute).
 router.patch(
   "/:id/budget",
-  // Raising a cap is the user's decision, like an approval (ExternalAuthority).
+  // Raising a cap is the user's decision, like an approval (ExternalAuthority)
+  // — a signed-in user's, never a service's (AuthMiddleware).
   requireUserAuthority("raise a budget"),
+  requireSignedInUser("raise a budget"),
   asyncHandler(handleConversationBudgetPatch),
 );
 
@@ -1213,6 +1216,9 @@ router.put(
 router.patch(
   "/:id/goal",
   requireUserAuthority("change a goal"),
+  // A budget change resumes a turn paused at its cost cap: that decision is
+  // a signed-in user's, like PATCH /:id/budget.
+  requireSignedInUser("change a goal's budget", (req) => req.body?.budget !== undefined),
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { conversationId, project, username } = resolveGoalRouteScope(req);
@@ -1345,6 +1351,7 @@ router.delete(
 router.post(
   "/:id/goal/proposal/approve",
   requireUserAuthority("approve a goal"),
+  requireSignedInUser("approve a goal"),
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { conversationId, project, username } = resolveGoalRouteScope(req);
@@ -1374,6 +1381,7 @@ router.post(
 router.post(
   "/:id/goal/proposal/decline",
   requireUserAuthority("decline a goal"),
+  requireSignedInUser("decline a goal"),
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { conversationId, project, username } = resolveGoalRouteScope(req);

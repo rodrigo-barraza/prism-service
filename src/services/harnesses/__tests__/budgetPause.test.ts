@@ -32,6 +32,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import express from "express";
 import supertest from "supertest";
 import { createMockCollection } from "../../../../tests/mongoMock.ts";
+import { signInAsHeaderUser } from "../../../../tests/helpers/auth.ts";
 
 // ── State that outlives a "process" ───────────────────────────────────
 
@@ -367,13 +368,13 @@ async function bootProcess() {
   const { default: TurnResumeService } = await import("#src/services/TurnResumeService");
   const { default: conversationsRouter } = await import("#src/routes/ConversationsRoutes");
   const { handleAgent } = await import("#src/routes/ChatRoutes");
+  const { authMiddleware } = await import("#src/middleware/AuthMiddleware");
   const app = express();
   app.use(express.json());
-  app.use((request, _response, next) => {
-    (request as unknown as Record<string, unknown>).project = request.headers["x-project"];
-    (request as unknown as Record<string, unknown>).username = request.headers["x-username"];
-    next();
-  });
+  // Signed in as the client is, as its x-username (project from x-project):
+  // only a signed-in user raises a budget.
+  app.use(signInAsHeaderUser);
+  app.use(authMiddleware);
   app.use("/conversations", conversationsRouter);
   return { TurnResumeService, http: supertest(app), handleAgent };
 }

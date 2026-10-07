@@ -17,14 +17,13 @@ import {
   ADMIN_ROLE,
   CORS_ALLOWED_REQUEST_HEADERS,
   SERVICE_API_SECRET_ENV_VAR,
-  USER_TOKEN_SECRET_ENV_VAR,
   authMiddleware,
   isPublicRequest,
   requireAdmin,
 } from "#src/middleware/AuthMiddleware";
 import { requestLoggerMiddleware } from "#src/middleware/RequestLoggerMiddleware";
 import logger from "#src/utils/logger";
-import { signUserToken } from "#src/utils/UserToken";
+import { ON_BEHALF_TOKEN_ISSUER, USER_TOKEN_SECRET_ENV_VAR, signUserToken } from "#src/utils/UserToken";
 import {
   TEST_SERVICE_API_SECRET,
   TEST_USER_TOKEN_SECRET,
@@ -144,6 +143,17 @@ describe("AuthMiddleware — a signed-in user's token", () => {
     await http.get("/conversations").set("authorization", `Bearer ${token}`).expect(200);
   });
 
+  it("prism-service's own on-behalf token (iss prism-service) signs its user in too", async () => {
+    const { token } = signUserToken({
+      secret: TEST_USER_TOKEN_SECRET,
+      username: "rodrigo",
+      lifetimeSeconds: 900,
+      issuer: ON_BEHALF_TOKEN_ISSUER,
+    });
+    const response = await http.get("/conversations").set("authorization", `Bearer ${token}`).expect(200);
+    expect(response.body.auth).toMatchObject({ kind: "user", username: "rodrigo" });
+  });
+
   const refusals: Array<[string, () => string, RegExp]> = [
     ["an expired token", () => craftToken(HS256, claims({ iat: now() - 7200, exp: now() - 60 })), /expired/],
     ["the alg none", () => `${craftToken({ alg: "none", typ: "JWT" }, claims()).split(".").slice(0, 2).join(".")}.`, /malformed/],
@@ -155,8 +165,8 @@ describe("AuthMiddleware — a signed-in user's token", () => {
     ["another algorithm (HS512)", () => craftToken({ alg: "HS512", typ: "JWT" }, claims(), { digest: "sha512" }), /must be signed with HS256/],
     ["another algorithm (RS256)", () => craftToken({ alg: "RS256", typ: "JWT" }, claims()), /must be signed with HS256/],
     ["another secret", () => craftToken(HS256, claims(), { secret: "not-the-secret" }), /signature is not valid/],
-    ["another audience", () => craftToken(HS256, claims({ aud: "tools-service" })), /not issued by prism-client for prism-service/],
-    ["another issuer", () => craftToken(HS256, claims({ iss: "someone-else" })), /not issued by prism-client for prism-service/],
+    ["another audience", () => craftToken(HS256, claims({ aud: "tools-service" })), /not issued by prism-client or prism-service for prism-service/],
+    ["another issuer", () => craftToken(HS256, claims({ iss: "someone-else" })), /not issued by prism-client or prism-service for prism-service/],
     ["a lifetime over 12 hours", () => craftToken(HS256, claims({ exp: now() + 13 * 3600 })), /longer than 12 hours/],
     ["no expiry", () => craftToken(HS256, claims({ exp: undefined })), /no issue or expiry time/],
     ["no subject", () => craftToken(HS256, claims({ sub: "" })), /names no user/],

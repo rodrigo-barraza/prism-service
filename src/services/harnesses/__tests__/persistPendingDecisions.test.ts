@@ -29,7 +29,9 @@ import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import AutoApprovalEngine from "#src/services/AutoApprovalEngine";
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import agentRouter from "#src/routes/AgentRoutes";
+import { authMiddleware } from "#src/middleware/AuthMiddleware";
 import { createMockCollection } from "../../../../tests/mongoMock.ts";
+import { signInAsHeaderUser } from "../../../../tests/helpers/auth.ts";
 import type {
   AgenticContext,
   ResolvedTools,
@@ -359,9 +361,15 @@ function conversationDocument(conversationId: string): Record<string, any> | und
   return mockCollection("agent_conversations")._docs.get(conversationId);
 }
 
-function buildApp(router: express.Router) {
+/**
+ * The /agent routes, signed in as the client is (only a signed-in user
+ * decides). `signIn`: a restarted process's own AuthMiddleware.
+ */
+function buildApp(router: express.Router, signIn: express.RequestHandler = authMiddleware) {
   const app = express();
   app.use(express.json());
+  app.use(signInAsHeaderUser);
+  app.use(signIn);
   app.use("/agent", router);
   return supertest(app);
 }
@@ -547,7 +555,8 @@ describe("a pending approval survives a restart", () => {
     vi.resetModules();
     const { default: restartedRouter } = await import("#src/routes/AgentRoutes");
     const { default: RestartedLoopService } = await import("#src/services/AgenticLoopService");
-    const restarted = buildApp(restartedRouter);
+    const { authMiddleware: restartedAuth } = await import("#src/middleware/AuthMiddleware");
+    const restarted = buildApp(restartedRouter, restartedAuth);
 
     // Still visible as pending to a reloading client.
     const before = await RestartedLoopService.getPendingApproval(conversationId);
@@ -598,7 +607,8 @@ describe("a pending approval survives a restart", () => {
 
     vi.resetModules();
     const { default: restartedRouter } = await import("#src/routes/AgentRoutes");
-    const answered = await buildApp(restartedRouter)
+    const { authMiddleware: restartedAuth } = await import("#src/middleware/AuthMiddleware");
+    const answered = await buildApp(restartedRouter, restartedAuth)
       .post("/agent/answer")
       .send({ conversationId, questionId: parked.itemId, answer: "5173" });
     expect(answered.status, JSON.stringify(answered.body)).toBe(200);

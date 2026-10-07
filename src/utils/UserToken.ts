@@ -7,18 +7,28 @@ import crypto from "node:crypto";
 // (`GET /api/prism-token`) with PRISM_USER_TOKEN_SECRET; the browser sends it
 // as `Authorization: Bearer …` (or `access_token` on a WebSocket) and
 // AuthMiddleware verifies it here. The ACP server mints its own for the
-// owner when it holds the secret (docs/acp.md).
+// owner when it holds the secret (docs/acp.md). prism-service itself mints a
+// short on-behalf one for the user a tools-service call is made for, which
+// tools-service hands back on its callbacks (ToolsServiceAuth).
 //
 // Claims: `sub` (the Prism username), `email`, `roles` (string[]), `iat`,
-// `exp`, `iss` = "prism-client", `aud` = "prism-service". HS256 only — a
-// token naming any other `alg`, `none` included, is refused before its
-// signature is looked at — and never valid for more than 12 hours.
+// `exp`, `iss` = "prism-client" (or "prism-service", the on-behalf token),
+// `aud` = "prism-service". HS256 only — a token naming any other `alg`,
+// `none` included, is refused before its signature is looked at — and never
+// valid for more than 12 hours.
 //
 // No dependency: node:crypto signs and checks it. Free of prism-service
 // imports so the ACP server (a separate process) can use it.
 // ────────────────────────────────────────────────────────────
 
+/** The HS256 key of every user token (prism-client and prism-service sign with it). */
+export const USER_TOKEN_SECRET_ENV_VAR = "PRISM_USER_TOKEN_SECRET";
+/** prism-client's sign-in tokens. */
 export const USER_TOKEN_ISSUER = "prism-client";
+/** prism-service's on-behalf tokens (ToolsServiceAuth). */
+export const ON_BEHALF_TOKEN_ISSUER = "prism-service";
+/** The issuers whose tokens prism-service accepts. */
+export const USER_TOKEN_ISSUERS: readonly string[] = [USER_TOKEN_ISSUER, ON_BEHALF_TOKEN_ISSUER];
 export const USER_TOKEN_AUDIENCE = "prism-service";
 export const USER_TOKEN_ALGORITHM = "HS256";
 /** The longest a token may live (`exp - iat`). */
@@ -76,6 +86,8 @@ export interface SignUserTokenOptions {
   roles?: string[];
   /** Seconds; at most USER_TOKEN_MAXIMUM_LIFETIME_SECONDS. */
   lifetimeSeconds: number;
+  /** `iss`: prism-client's by default; prism-service's for an on-behalf token. */
+  issuer?: string;
   /** Seconds since the epoch; now by default (tests pin it). */
   now?: number;
 }
@@ -87,6 +99,7 @@ export function signUserToken({
   email = null,
   roles = [],
   lifetimeSeconds,
+  issuer = USER_TOKEN_ISSUER,
   now = Math.floor(Date.now() / 1000),
 }: SignUserTokenOptions): { token: string; expiresAt: number } {
   if (!secret) throw new Error("Cannot sign a user token without a secret");
@@ -100,7 +113,7 @@ export function signUserToken({
     roles,
     iat: now,
     exp: expiresAt,
-    iss: USER_TOKEN_ISSUER,
+    iss: issuer,
     aud: USER_TOKEN_AUDIENCE,
   });
   const signingInput = `${header}.${payload}`;
@@ -150,10 +163,10 @@ export function verifyUserToken(
   const audienceMatches = Array.isArray(audience)
     ? audience.includes(USER_TOKEN_AUDIENCE)
     : audience === USER_TOKEN_AUDIENCE;
-  if (claims.iss !== USER_TOKEN_ISSUER || !audienceMatches) {
+  if (typeof claims.iss !== "string" || !USER_TOKEN_ISSUERS.includes(claims.iss) || !audienceMatches) {
     return {
       ok: false,
-      reason: `The sign-in token was not issued by ${USER_TOKEN_ISSUER} for ${USER_TOKEN_AUDIENCE}.`,
+      reason: `The sign-in token was not issued by ${USER_TOKEN_ISSUERS.join(" or ")} for ${USER_TOKEN_AUDIENCE}.`,
     };
   }
   if (typeof claims.sub !== "string" || !claims.sub.trim()) {

@@ -95,7 +95,7 @@ Prism reads the model list and context window from `/v1/models`, and the parsers
 
 Every request proves who is calling (`src/middleware/AuthMiddleware.ts`). Prism trusts a credential, never a header that merely names someone. In order:
 
-1. **A signed-in user's token** — `Authorization: Bearer <jwt>`. prism-client's server mints it for its signed-in, allowlisted user (`GET /api/prism-token`). HS256 only (any other `alg`, `none` included, is refused), signed with `PRISM_USER_TOKEN_SECRET`; claims `sub` (the Prism username), `email`, `roles`, `iat`, `exp` (at most 12 h after `iat`), `iss: "prism-client"`, `aud: "prism-service"`. The username is the token's `sub`; `x-username` is ignored. `x-project` and `x-profile-id` are still read from headers. A bad or expired token is `401 {error, code: "INVALID_TOKEN"}` and never falls through to another credential.
+1. **A signed-in user's token** — `Authorization: Bearer <jwt>`. prism-client's server mints it for its signed-in, allowlisted user (`GET /api/prism-token`). HS256 only (any other `alg`, `none` included, is refused), signed with `PRISM_USER_TOKEN_SECRET`; claims `sub` (the Prism username), `email`, `roles`, `iat`, `exp` (at most 12 h after `iat`), `iss: "prism-client"` (or `"prism-service"`, the on-behalf token below), `aud: "prism-service"`. The username is the token's `sub`; `x-username` is ignored. `x-project` and `x-profile-id` are still read from headers. A bad or expired token is `401 {error, code: "INVALID_TOKEN"}` and never falls through to another credential.
 2. **A service's secret** — `x-api-secret` equal to `PRISM_SERVICE_API_SECRET` (lupos-bot, messages-service, clock-crew-service, tools-service, the Next.js servers of public sites). A service speaks for its own end users: the username is its `x-username`, else `anonymous`. Relays keep their lane (`ExternalAuthority`).
 3. **Nothing** — `401 {"error": "Sign in to use Prism.", "code": "UNAUTHENTICATED"}`. A wrong `x-api-secret` is the same 401 with its own message.
 
@@ -107,13 +107,17 @@ Every request proves who is calling (`src/middleware/AuthMiddleware.ts`). Prism 
 
 **Machine access is a user's alone.** On `/agent`, `/chat`, `/conversation` and `/ws/chat`, a service's `workspaceRoot` (body or `x-workspace-root`) and `autoApprove` are dropped (one debug line) and its turn gets no workspace tools; every agentic loop a service's request starts gets the same limits (`src/utils/ServiceTurnLimits.ts`).
 
+**User-only powers.** No server needs these, so a service's request gets `403 {error, code: "FORBIDDEN"}` (`requireSignedInUser`): approving or answering a pending decision (`/agent/approve`, `/agent/answer` and their `/conversation/*` aliases, `PATCH /conversations/:id/budget`, a goal change that touches its budget, a proposed goal's approve and decline), adding, changing or starting an MCP server that runs a command on this host (stdio — the default transport — or any config with a `command`), approving an MCP server's quarantined tools, every write under `/workspaces`, and the plugin and Claude Code configuration importers (their MCP servers run commands). Reads stay open.
+
 **Admin:** `/admin/*` and `POST /files/gc` need a signed-in user whose token carries the `admin` role (from accounts-service, via prism-client); anyone else gets `403 {error, code: "FORBIDDEN"}`.
 
 **Outbound:** every request to tools-service carries `x-api-secret: TOOLS_SERVICE_API_SECRET` (`src/utils/ToolsServiceAuth.ts`), LM Studio's MCP integration included.
 
+**On the user's behalf.** In a signed-in user's turn, every request to tools-service also carries `x-prism-user-token`: a token prism-service mints for that user with `PRISM_USER_TOKEN_SECRET` (`iss: "prism-service"`, the turn's username, and its email and roles when the request carried them). It lives 15 minutes and is minted afresh once less than 5 are left. tools-service hands it back as `Authorization: Bearer` on its callbacks (scheduling a task, saving a memory, writing a custom agent), so what the agent creates through tools-service is the user's — a scheduled task stamped `user`, not `service`. It is never sent for a service's turn, outside a turn, without `PRISM_USER_TOKEN_SECRET`, or to LM Studio (whose MCP integration headers a third-party process holds).
+
 | Variable | Meaning |
 |---|---|
-| `PRISM_USER_TOKEN_SECRET` | HS256 key of user tokens (prism-client signs, prism-service verifies) |
+| `PRISM_USER_TOKEN_SECRET` | HS256 key of user tokens (prism-client signs, prism-service verifies; prism-service also signs its on-behalf tokens) |
 | `PRISM_SERVICE_API_SECRET` | Servers' credential, sent as `x-api-secret` |
 | `TOOLS_SERVICE_API_SECRET` | tools-service's credential, sent on every call to it |
 | `PRISM_HOOK_COMMAND_OWNERS`, `PRISM_PERMISSION_BYPASS_OWNERS`, `PRISM_ACP_AGENT_OWNERS` | The owners lists (comma-separated; empty = nobody) |
