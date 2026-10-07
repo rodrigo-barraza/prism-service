@@ -116,6 +116,8 @@ import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
 import { AGENT_DIRECTIVES, NOTIFICATION_SOURCES } from "#src/constants";
+import { getRequestContext } from "#src/utils/RequestContext";
+import { runAs } from "../../../tests/helpers/auth.ts";
 
 // Extract individual tools
 const [runAsyncTask, listAsyncTasks, cancelAsyncTask, waitForTasksTool] = asyncTaskTools;
@@ -709,6 +711,32 @@ describe("AsyncTaskTools", () => {
         -1,
         expect.objectContaining({ collection: expect.any(String) }),
       );
+    });
+
+    it("the woken turn runs with the auth of the turn that dispatched the task — a service's never gains owner powers", async () => {
+      const findOne = vi.fn().mockResolvedValue({
+        id: "test-session-123",
+        project: "test-project",
+        username: "test-user",
+        isGenerating: false,
+        messages: [{ role: "user", content: "go" }],
+        settings: { provider: "google", model: "gemini" },
+      });
+      vi.mocked(MongoWrapper.getDb).mockReturnValue({} as any);
+      vi.mocked(MongoWrapper.getCollection).mockReturnValue({ findOne } as any);
+      const seen: Array<string | null> = [];
+      mockHandleAgent.mockImplementationOnce(async () => {
+        seen.push(getRequestContext().auth?.kind ?? null);
+      });
+
+      const { resolve } = deferExecution();
+      await runAs("service", "test-user", () =>
+        runAsyncTask.execute({ toolName: "execute_command", toolArguments: {}, continueWorking: true }, createContext()),
+      );
+      resolve({ output: "late result" });
+      await vi.waitFor(() => expect(seen).toEqual(["service"]));
+      // The wake has finished paying the dispatching turn's counter back.
+      await vi.waitFor(() => expect(mockAdjustPendingBackgroundTasks).toHaveBeenCalledTimes(1));
     });
 
     it("should pay back the counter even when the auto-response turn throws", async () => {

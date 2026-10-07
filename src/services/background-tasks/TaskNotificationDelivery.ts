@@ -7,7 +7,7 @@ import {
 import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
-import { requestContext } from "#src/utils/RequestContext";
+import { authOfRecord, requestContext, type AuthKind } from "#src/utils/RequestContext";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { SseEvent } from "#src/types/SseTypes";
@@ -25,7 +25,9 @@ import type { SseEvent } from "#src/types/SseTypes";
 //      a message and a new turn runs through handleAgent — with the
 //      conversation's own permission mode and approval settings, as a Claude
 //      Code session re-invoked by a notification runs (an ask nobody is
-//      there for parks as a durable pending decision). One wake at a time
+//      there for parks as a durable pending decision), and with the auth of
+//      the turn that started the work: a signed-in user's work wakes a turn
+//      with the owner's powers, a service's never does. One wake at a time
 //      per conversation: notifications that arrive while it is starting
 //      join it; once its turn has opened its mailbox they go there. A turn
 //      that holds the conversation first (a user's: the wake's request
@@ -56,6 +58,12 @@ export interface TaskNotice {
   username: string | null;
   /** A sub-agent is never woken: a notice after its run is dropped. */
   isSubAgent: boolean;
+  /**
+   * How the turn that started the work authenticated (null: unknown — a
+   * record from before authentication). A wake runs with the weakest of its
+   * notices' (wakeAuthKind): owner powers only when all are a user's.
+   */
+  authKind?: AuthKind | null;
   /** How it rides a mailbox. */
   kind: "task_notification" | "task_completion";
   /** The formatted <task-notification> block. */
@@ -260,11 +268,23 @@ async function wakeRequest(
   };
 }
 
+/**
+ * The auth a wake runs with: a signed-in user's only when every notice it
+ * carries came from a signed-in user's work — a service's notice (or one of
+ * unknown origin) never lends a turn the owner's powers.
+ */
+export function wakeAuthKind(notices: TaskNotice[]): AuthKind | null {
+  if (notices.length === 0) return null;
+  if (notices.every((notice) => notice.authKind === "user")) return "user";
+  return notices.some((notice) => notice.authKind === "service") ? "service" : null;
+}
+
 /** Run the woken turn the way a request's turn runs: admitted, stoppable, watched. */
 async function runWokenTurn(
   conversationId: string,
   request: Record<string, unknown>,
   stopController: AbortController,
+  authKind: AuthKind | null,
 ): Promise<void> {
   const { handleAgent } = await import("#src/routes/ChatRoutes");
   const { withDirectViewerBroadcast } = await import("#src/utils/DirectViewerBroadcast");
@@ -274,7 +294,8 @@ async function runWokenTurn(
   const emit = withDirectViewerBroadcast(conversationId, (event: SseEvent) => {
     logger.debug(`[TaskNotificationDelivery][${conversationId}] ${event.type}`);
   });
-  // The turn runs as the conversation's owner, wherever the notice came from.
+  // The turn runs as the conversation's owner, wherever the notice came
+  // from — with the auth of the work that sent it (wakeAuthKind).
   await requestContext.run(
     {
       project: String(request.project),
@@ -282,6 +303,7 @@ async function runWokenTurn(
       clientIp: TASK_NOTIFICATION_CLIENT_IP,
       agent: (request.agent as string | null) ?? null,
       ...(typeof request.profileId === "string" ? { profileId: request.profileId } : {}),
+      auth: authOfRecord(authKind, String(request.username)),
     },
     () => handleAgent(request, emit, { signal: stopController.signal }),
   );
@@ -356,7 +378,8 @@ async function runWake(wake: PendingWake): Promise<void> {
     if (!request) return;
     logger.info(`[TaskNotificationDelivery] Waking ${conversationId} for ${woken.length} notification(s)`);
     ran = true;
-    const turn = runWokenTurn(conversationId, request, stopController).catch((error: unknown) => {
+    const authKind = wakeAuthKind(woken.map((queued) => queued.notice));
+    const turn = runWokenTurn(conversationId, request, stopController, authKind).catch((error: unknown) => {
       logger.error(`[TaskNotificationDelivery] Woken turn of ${conversationId} failed: ${getErrorMessage(error)}`);
     });
     await Promise.all([turn, handOverWhenOpen(wake, conversationId, turn)]);

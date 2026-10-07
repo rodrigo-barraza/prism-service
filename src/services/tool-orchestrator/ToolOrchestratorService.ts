@@ -1,4 +1,5 @@
 import { TOOLS_SERVICE_URL } from "#config";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import MCPClientService, { type MCPCallOptions } from "#src/services/MCPClientService";
 import { createLoopElicitHandler } from "#src/services/mcp/McpElicitation";
@@ -140,6 +141,7 @@ async function fetchSchemas() {
     );
 
     const response = await fetch(`${TOOLS_SERVICE_URL}/admin/tool-schemas`, {
+      headers: toolsServiceAuthHeaders(),
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -195,6 +197,7 @@ async function fetchSchemas() {
     // Fetch workspace config from tools-api (single source of truth)
     try {
       const configResponse = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
+        headers: toolsServiceAuthHeaders(),
         signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS),
       });
       if (configResponse.ok) {
@@ -234,7 +237,10 @@ async function fetchSchemasForLocale(locale: string) {
     const localeParam = `?locale=${encodeURIComponent(locale)}`;
     const response = await fetch(
       `${TOOLS_SERVICE_URL}/admin/tool-schemas${localeParam}`,
-      { signal: AbortSignal.timeout(TOOL_SCHEMA_FETCH_TIMEOUT_MILLISECONDS) },
+      {
+        headers: toolsServiceAuthHeaders(),
+        signal: AbortSignal.timeout(TOOL_SCHEMA_FETCH_TIMEOUT_MILLISECONDS),
+      },
     );
     if (!response.ok) {
       logger.warn(
@@ -448,12 +454,13 @@ function withWorktreeRedirect(
 /**
  * Build X-context headers from the caller context object.
  * These are consumed by tools-api's ToolCallLoggerMiddleware — and, on a
- * Discord turn, by its Discord scope enforcement (x-discord-*).
+ * Discord turn, by its Discord scope enforcement (x-discord-*). Every tool
+ * call carries tools-service's credential (ToolsServiceAuth).
  */
 function buildContextHeaders(
   context: ToolExecutionContext = {},
 ): Record<string, string> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...toolsServiceAuthHeaders() };
   if (context.project) headers[IDENTITY_HEADERS.project] = context.project;
   if (context.username) headers[IDENTITY_HEADERS.username] = context.username;
   if (context.agent) headers[IDENTITY_HEADERS.agent] = context.agent;
@@ -1251,6 +1258,7 @@ export default class ToolOrchestratorService {
   static async isWorkspaceAgentConnected(): Promise<boolean> {
     try {
       const configResponse = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
+        headers: toolsServiceAuthHeaders(),
         signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS),
       });
       if (!configResponse.ok) return false;
@@ -1271,6 +1279,7 @@ export default class ToolOrchestratorService {
   static async refreshWorkspaceRoots() {
     try {
       const configResponse = await fetch(`${TOOLS_SERVICE_URL}/admin/config`, {
+        headers: toolsServiceAuthHeaders(),
         signal: AbortSignal.timeout(TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS),
       });
       if (configResponse.ok) {
@@ -1290,7 +1299,7 @@ export default class ToolOrchestratorService {
       `${TOOLS_SERVICE_URL}/admin/config/workspaces`,
       {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...toolsServiceAuthHeaders() },
         body: JSON.stringify({ roots }),
         signal: AbortSignal.timeout(TOOL_WORKSPACE_UPDATE_TIMEOUT_MILLISECONDS),
       },
@@ -1313,7 +1322,7 @@ export default class ToolOrchestratorService {
       `${TOOLS_SERVICE_URL}/admin/config/workspaces/validate`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...toolsServiceAuthHeaders() },
         body: JSON.stringify({ path }),
         signal: AbortSignal.timeout(TOOL_WORKSPACE_VALIDATE_TIMEOUT_MILLISECONDS),
       },
@@ -1408,6 +1417,7 @@ export default class ToolOrchestratorService {
         TOOL_API_HEALTH_TIMEOUT_MILLISECONDS,
       );
       const response = await fetch(`${TOOLS_SERVICE_URL}/health`, {
+        headers: toolsServiceAuthHeaders(),
         signal: controller.signal,
       });
       clearTimeout(timeout);

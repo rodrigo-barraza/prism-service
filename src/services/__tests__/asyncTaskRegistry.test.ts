@@ -28,6 +28,7 @@ vi.mock("#src/utils/CleanupRegistry", () => ({
 
 import AsyncTaskRegistry from "#src/services/AsyncTaskRegistry";
 import type { AsyncTaskState } from "#src/services/AsyncTaskRegistry";
+import { runAs } from "../../../tests/helpers/auth.ts";
 
 describe("AsyncTaskRegistry", () => {
   beforeEach(() => {
@@ -70,6 +71,16 @@ describe("AsyncTaskRegistry", () => {
       { command: "ls -la" },
       expect.any(Object), // AbortSignal
     );
+  });
+
+  it("keeps the auth of the turn that dispatched it — what the wake its completion causes runs with", () => {
+    const dispatch = () =>
+      AsyncTaskRegistry.dispatch("execute_command", { command: "ls" }, { agentConversationId: "session-auth" }, () =>
+        new Promise<unknown>(() => {}),
+      ) as AsyncTaskState;
+    expect(runAs("user", "rod", dispatch).authKind).toBe("user");
+    expect(runAs("service", "rod", dispatch).authKind).toBe("service");
+    expect(dispatch().authKind).toBeNull();
   });
 
   // ── Task Completion ─────────────────────────────────────

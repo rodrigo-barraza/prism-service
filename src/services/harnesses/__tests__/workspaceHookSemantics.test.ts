@@ -39,6 +39,12 @@ import { _clearTurnHookFacts } from "#src/services/hooks/TurnHookFacts";
 import { PermissionModeHandle } from "#src/services/permissions/PermissionModeState";
 import { HOOKS } from "#src/constants";
 import type { AgenticContext, ResolvedTools, ConversationMessage, PassState } from "../types.ts";
+import { runAs } from "../../../../tests/helpers/auth.ts";
+
+/** The turn runs as a user who signed in (AuthMiddleware) — what repository hooks need. */
+function asOwner<T>(fn: () => T): T {
+  return runAs("user", "rodrigo", fn);
+}
 
 const HOOKS_FILE = "/repo/.prism/hooks.json";
 const sha256Of = (text: string) => createHash("sha256").update(text).digest("hex");
@@ -467,7 +473,7 @@ describe("repository hooks — Claude Code's semantics through a real ReActHarne
       ],
       "conv-deny",
     );
-    await harness.run();
+    await asOwner(() => harness.run());
 
     expect(world.executed).toHaveLength(0);
     expect(emit.mock.calls.some(([event]) => (event as { type: string }).type === "approval_required")).toBe(false);
@@ -486,7 +492,7 @@ describe("repository hooks — Claude Code's semantics through a real ReActHarne
       ],
       "conv-exit2",
     );
-    await harness.run();
+    await asOwner(() => harness.run());
 
     expect(world.executed).toHaveLength(0);
     const result = toolMessageOf(seenMessages[1])!.toolCalls![0].result as { message: string };
@@ -501,7 +507,7 @@ describe("repository hooks — Claude Code's semantics through a real ReActHarne
       ],
       "conv-payload",
     );
-    await harness.run();
+    await asOwner(() => harness.run());
 
     expect(world.executed.map((call) => call.name)).toEqual(["execute_command"]);
     const [pre] = runsFor("PreToolUse");
@@ -556,7 +562,7 @@ describe("repository hooks — Claude Code's semantics through a real ReActHarne
       ],
       "conv-context",
     );
-    await harness.run();
+    await asOwner(() => harness.run());
 
     const secondRequest = seenMessages[1];
     const toolIndex = secondRequest.findIndex((message) => (message.toolCalls?.length ?? 0) > 0);
@@ -583,7 +589,7 @@ describe("repository hooks — Claude Code's semantics through a real ReActHarne
       ],
       "conv-stop",
     );
-    await harness.run();
+    await asOwner(() => harness.run());
 
     expect(iterations()).toBe(2);
     const stopRuns = runsFor("Stop");
@@ -603,7 +609,7 @@ describe("repository hooks — Claude Code's semantics through a real ReActHarne
       ],
       "conv-transcript",
     );
-    await harness.run();
+    await asOwner(() => harness.run());
 
     const lines = toolsService.appends.flatMap((append) => append.lines);
     expect(toolsService.appends.every((append) => append.root === "/repo" && append.conversationId === "conv-transcript")).toBe(true);
@@ -637,7 +643,7 @@ describe("repository hooks — Claude Code's semantics through a real ReActHarne
       ],
       "conv-untrusted",
     );
-    await harness.run();
+    await asOwner(() => harness.run());
 
     expect(toolsService.runs).toHaveLength(0);
     expect(world.executed.map((call) => call.name)).toEqual(["execute_command"]);
@@ -661,7 +667,7 @@ describe("repository hooks — Claude Code's semantics through a real ReActHarne
       hooks: { ...REPO_HOOKS.hooks, UserPromptSubmit: [{ hooks: [{ type: "command", command: "exfiltrate" }] }] },
     });
     const { harness, emit } = buildHarness([{ kind: "text", text: "Done." }], "conv-edited");
-    await harness.run();
+    await asOwner(() => harness.run());
     expect(toolsService.runs).toHaveLength(0);
     expect(emit).toHaveBeenCalledWith(
       expect.objectContaining({ type: "status", message: expect.stringContaining("not trusted yet") }),
@@ -677,7 +683,20 @@ describe("repository hooks — Claude Code's semantics through a real ReActHarne
       ],
       "conv-not-owner",
     );
-    await harness.run();
+    await asOwner(() => harness.run());
+    expect(toolsService.log.filter((entry) => !entry.startsWith("model:"))).toEqual([]);
+    expect(world.executed).toHaveLength(1);
+  });
+
+  it("a service's turn under the owner's name runs no repository hooks and costs no discovery", async () => {
+    const { harness } = buildHarness(
+      [
+        { kind: "tool", calls: [{ name: "execute_command", args: { command: "rm -rf build" } }] },
+        { kind: "text", text: "Done." },
+      ],
+      "conv-service",
+    );
+    await runAs("service", "rodrigo", () => harness.run());
     expect(toolsService.log.filter((entry) => !entry.startsWith("model:"))).toEqual([]);
     expect(world.executed).toHaveLength(1);
   });

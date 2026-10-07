@@ -1,6 +1,7 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { type Request, type Response } from "express";
 import requireDb from "#src/middleware/RequireDbMiddleware";
+import { requireSignedInUserToChange } from "#src/middleware/AuthMiddleware";
 import ClaudeConfigImportService from "#src/services/ClaudeConfigImportService";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
@@ -8,6 +9,8 @@ import { PostClaudeConfigImportSchema } from "#src/types/index";
 
 const router = express.Router();
 router.use(requireDb);
+// .mcp.json servers run commands on this host: a signed-in user's to import.
+router.use(requireSignedInUserToChange("import Claude Code configuration (its MCP servers run commands on this host)"));
 
 /**
  * POST /claude-config-import

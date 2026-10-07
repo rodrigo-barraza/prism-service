@@ -33,6 +33,8 @@ import {
   PERMISSION_MODES,
   PERMISSION_MODE_DESCRIPTIONS,
   PERMISSION_MODE_LABELS,
+  bypassOwners,
+  bypassRefusal,
   canUseBypass,
   type PermissionMode,
 } from "#src/services/permissions/PermissionModes";
@@ -224,7 +226,11 @@ function describeModes(username: string) {
     description: PERMISSION_MODE_DESCRIPTIONS[id],
     available: id === "bypass" ? bypassAllowed : true,
     ...(id === "bypass" &&
-      !bypassAllowed && { unavailableReason: `Owner only: add the username to ${BYPASS_OWNERS_ENV_VAR}.` }),
+      !bypassAllowed && {
+        unavailableReason: bypassOwners().has(username)
+          ? `Owner only: ${bypassRefusal(username)}`
+          : `Owner only: add the username to ${BYPASS_OWNERS_ENV_VAR}.`,
+      }),
   }));
 }
 
@@ -265,9 +271,7 @@ router.put(
       const { conversationId, mode } = parsed.data;
       const { project, username } = resolveScope(req);
       if (mode === "bypass" && !canUseBypass(username)) {
-        return res.status(403).json({
-          error: `bypass is owner-only: "${username}" is not in ${BYPASS_OWNERS_ENV_VAR}.`,
-        });
+        return res.status(403).json({ error: `bypass is owner-only: ${bypassRefusal(username)}` });
       }
       const runningTurn = PermissionModeRegistry.get(conversationId);
       if (runningTurn?.pinned) {

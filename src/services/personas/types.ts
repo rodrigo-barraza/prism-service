@@ -4,6 +4,7 @@ import type {
 } from "#src/services/agents/AgentDefinitionFields";
 import type { AcpAgentLaunch, AgentRuntime } from "#src/services/agents/AgentRuntime";
 import type { PolicyRule } from "#src/services/PolicyEngine";
+import type { CapabilityDeclaration } from "#src/services/permissions/CapabilityScope";
 import type { PinnablePermissionMode } from "#src/services/permissions/PermissionModes";
 import type { EmotionPersonality } from "#src/services/somatic/SomaticConstants";
 import type { RoleModelSpec } from "#src/services/routing/AgentModelPins";
@@ -118,6 +119,17 @@ export interface Persona {
    * would ask is refused, never parked on a card nobody in the channel sees.
    */
   pinnedPermissionMode?: PinnablePermissionMode;
+  /**
+   * What a service's turn of this agent keeps (ServiceTurnLimits). A turn a
+   * service's request starts runs without the shell, file writes, outside
+   * actions and MCP tools (SERVICE_TURN_DENIED_CAPABILITIES); `true` keeps
+   * one of them, `false` takes another away. Only for an agent whose own
+   * policies already decide what the people a service speaks for may reach
+   * — LUPOS keeps his python/js sandboxes and Discord actions, with his DENY
+   * list for the rest. A built-in persona's alone: a custom agent never
+   * carries it. Absent: the default.
+   */
+  serviceCapabilities?: CapabilityDeclaration;
   /**
    * Fire-and-forget tools (the StopAtTools pattern): when EVERY call of a
    * model response is one of these and the same response carried reply

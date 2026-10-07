@@ -5,6 +5,7 @@ import { COLLECTIONS, TURN_RESUME } from "#src/constants";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { WorkspaceTaskStatus, WorkspaceTaskType } from "#src/constants/BackgroundTasks";
+import type { AuthKind } from "#src/utils/RequestContext";
 
 /**
  * DetachedWorkStore — background work a turn started and has not been told
@@ -73,6 +74,12 @@ export interface DetachedWorkRecord {
   agentConversationId: string | null;
   project: string | null;
   username: string | null;
+  /**
+   * How the turn that started it authenticated: a wake it causes runs with
+   * the same (TaskNotificationDelivery) — owner powers only for a signed-in
+   * user's work. Absent on a record from before authentication: none.
+   */
+  authKind?: AuthKind | null;
   // ── An async task ──
   toolName?: string;
   toolArguments?: Record<string, unknown>;

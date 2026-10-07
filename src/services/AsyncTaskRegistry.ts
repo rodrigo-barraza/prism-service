@@ -2,6 +2,7 @@ import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { createAbortController } from "#src/utils/AbortController";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
+import { currentAuthKind, type AuthKind } from "#src/utils/RequestContext";
 import {
   MAXIMUM_CONCURRENT_ASYNC_TASKS,
   COMPLETED_TASK_TIME_TO_LIVE_MILLISECONDS,
@@ -49,6 +50,11 @@ export interface AsyncTaskState {
   agentConversationId: string | null;
   project: string | null;
   username: string | null;
+  /**
+   * How the dispatching turn authenticated: the wake its completion causes
+   * runs with the same (owner powers only for a signed-in user's task).
+   */
+  authKind?: AuthKind | null;
   abortController: AbortController | null;
   /**
    * Resolves once the task leaves `running` (completed / failed / cancelled),
@@ -284,6 +290,8 @@ export default class AsyncTaskRegistry {
       agentConversationId: context.agentConversationId || null,
       project: context.project || null,
       username: context.username || null,
+      // Dispatched from inside its turn: that turn's auth.
+      authKind: currentAuthKind(),
       abortController: taskAbortController,
       settled,
     };
@@ -299,6 +307,7 @@ export default class AsyncTaskRegistry {
         agentConversationId: context.agentConversationId || null,
         project: context.project || null,
         username: context.username || null,
+        authKind: taskState.authKind ?? null,
         toolName,
         toolArguments,
       }),

@@ -7,6 +7,39 @@ authority, and a taint check on tool arguments. Built by prompt 22 (branches
 2026-09-22/23). The research behind each is in
 `harness_modernization_2026-09.md` §4.13.
 
+Underneath them all, every request is authenticated (README
+"Authentication", `middleware/AuthMiddleware.ts`, 2026-10-06): a signed-in
+user's token (prism-client) or a service's secret (`x-api-secret`), nothing
+else. Owner powers — command hooks, trusting a repository's hooks, `bypass`,
+ACP agents — need a signed-in user, and turns that run without a request
+carry the auth of whoever started them. A service's turns never get a
+workspace root, workspace tools or full auto (`utils/ServiceTurnLimits.ts`).
+Nor do they get the shell or the code sandboxes, file writes, outside actions
+or MCP tools: every loop a service's request starts runs under a capability
+scope that denies `shell`, `fs_write`, `external_side_effect` and `mcp` (§5's
+narrowing, applied at the loop's start), so its sub-agents, tool programs and
+async tasks inherit the denials, the approval engine refuses a denied call
+and the resolver never offers one. An agent whose own policies already decide
+what a service's people may reach names what it keeps
+(`Persona.serviceCapabilities`) — LUPOS keeps his python/js sandboxes and
+Discord actions, his DENY list covering the rest. `/chat`'s function
+calling and `/ws/live` run calls with no approval engine and no persona
+policy, so a service's turn there gets the default whatever the agent: not
+offered, and refused before it runs.
+No service's request may answer or approve a pending decision (a tool call,
+a plan, a question, a budget pause, a proposed goal), add, change or start
+an MCP server that runs a command, approve an MCP server's tools, change the
+workspaces, run the importers, or change or run benchmarks (their scorers run
+commands): a 403 (`requireSignedInUser`) — a relay is told `external_input`
+first, as before.
+
+When a signed-in user's turn calls tools-service, prism-service sends a
+15-minute on-behalf token for that user (no roles) beside its secret
+(`x-prism-user-token`, `iss: "prism-service"`, `utils/ToolsServiceAuth.ts`);
+tools-service's callbacks hand it back as their bearer, so a task the agent
+schedules through tools-service stays the user's. It never goes to LM
+Studio, whose MCP integration headers a third-party process holds.
+
 ## 1. Memory provenance (`memory/MemoryProvenance.ts`)
 
 Every memory carries `source`, `trust` (`user | derived | untrusted`) and
@@ -84,10 +117,11 @@ pairs, default `lupos=discord`). Such a request:
   bot's conversation is left as it is (its persona already treats every
   message as a Discord user's, and its mode is pinned).
 
-This is a lane for well-behaved relays, not authentication (modernization
-item #1): a caller that lies about its project is not stopped here.
-Self-protection also refuses an agent's own call to `/answer`, `/input`,
-goals, budgets and the taint setting.
+This is a lane for well-behaved relays, not authentication: AuthMiddleware
+has proved who is calling before it runs, and a relay is a service holding
+PRISM_SERVICE_API_SECRET that names its own end users. Self-protection also
+refuses an agent's own call to `/answer`, `/input`, goals, budgets and the
+taint setting.
 
 ## 4. The taint check (`permissions/UntrustedSpans.ts`)
 
@@ -157,12 +191,30 @@ declaration is refused, never ignored.
 | `create_subagent` / `create_subagents` `capabilities` | every agent that call spawns (members, judges, synthesizers) | plus every ancestor's denial; kept on the agent and persisted (`subAgentCapabilityScope`) for a resume |
 | a scheduled task's `capabilities` | every run of the task | a task created from inside a narrowed run (its forwarded `x-conversation-id`) keeps the run's narrowing, and a change from inside one only adds restrictions |
 | a goal's `capabilities` | the agent working on the goal on its own, from the verifier's first send-back | lifted when the user steps back in (a steering update or an answer) |
+| a service's request (`utils/ServiceTurnLimits.ts`) | every loop it starts, whatever the entry point: no `shell`, `fs_write`, `external_side_effect` or `mcp` | minus what the agent's `serviceCapabilities` keeps (LUPOS); the only scope whose tools are also left out of the schema |
 
 Inner checks — `run_async_task`, `run_tool_program`, `read_untrusted`'s fetch
 — judge in the same scope.
 
 ## Tests
 
+- Authentication: `tests/authMiddleware.test.ts` (tokens, the service secret,
+  public paths, `/admin`, CORS, the request log), `tests/authWiring.test.ts`
+  (mount order, `/files/gc`), `src/websocket/__tests__/websocketAuth.test.ts`
+  (upgrades), `tests/serviceTurnLimits.test.ts` and
+  `src/services/permissions/__tests__/serviceTurnScopeInTheLoop.test.ts` (a
+  service's turn and its scope, real loop), `tests/serviceTurnFunctionCalling.test.ts`
+  and `src/websocket/__tests__/websocketHandler.test.ts` (the same on `/chat`'s
+  function calling and `/ws/live`), `tests/toolsServiceAuth.test.ts`
+  (the secret and the on-behalf token), `tests/onBehalfToken.test.ts` (the
+  callback round trip), `tests/userOnlyPowers.test.ts` and
+  `tests/mcpServersRoutes.test.ts` (powers no service has);
+  owner powers denied to a service: `hooksRoutes`, `workspaceHooksRoutes`,
+  `permissionsRoutes`, `customAgentsAcpRuntimeRoutes`, `commandHookHandler`,
+  `workspaceHookSemantics`, `permissionModes(InTheLoop)`, `acpClientRuntime`;
+  internal turns' auth: `scheduledTaskService`, `conversationTimerService`,
+  `taskNotificationDelivery`, `backgroundTaskWatcher`, `asyncTask*`,
+  `resumeParkedTurns`.
 - External input: `tests/externalInputLane.test.ts`, `tests/externalAuthority.test.ts`,
   `tests/nonBlockingSubAgentDispatch.test.ts` (scenario 3, real harness),
   `src/services/__tests__/mcpClientService.test.ts` (server notifications),

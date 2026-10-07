@@ -1,4 +1,5 @@
 import { TOOLS_SERVICE_URL } from "#config";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import {
@@ -89,6 +90,7 @@ export interface StopTaskResult {
 function headersFor(owner: TaskOwnerIdentity, json = false): Record<string, string> {
   return {
     ...(json ? { "Content-Type": "application/json" } : {}),
+    ...toolsServiceAuthHeaders(),
     ...(owner.project ? { [IDENTITY_HEADERS.project]: owner.project } : {}),
     ...(owner.username ? { [IDENTITY_HEADERS.username]: owner.username } : {}),
     [IDENTITY_HEADERS.conversationId]: owner.conversationId,

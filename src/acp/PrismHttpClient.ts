@@ -4,11 +4,17 @@ import {
   validateTurnEvent,
   type TurnEvent,
 } from "#src/protocol/events";
+import type { PrismCredential } from "./PrismCredential.ts";
 
 /**
  * The ACP server's view of one prism-service: the HTTP routes a prism-client
  * uses to run an agent turn and answer what it asks, and the SSE turn stream
  * parsed into `TurnEvent`s (docs/protocol.md).
+ *
+ * It signs in the way prism-client does: every request carries a user token
+ * (`Authorization: Bearer …`, and `access_token` on the `/ws/chat` follow),
+ * so the username is the token's — PrismCredential mints or holds it. A 401
+ * renews a minted token and retries once.
  *
  * Frames are read the way prism-client reads them: an event whose `type` the
  * protocol does not know is dropped (a newer server), a known type is passed
@@ -18,6 +24,7 @@ import {
 
 export interface PrismIdentity {
   project: string;
+  /** Who the credential signs in as (the token decides; this only names it in logs). */
   username: string | null;
   profileId: string | null;
 }
@@ -75,6 +82,7 @@ type FetchLike = typeof fetch;
 export class PrismHttpClient {
   readonly baseUrl: string;
   private readonly identity: PrismIdentity;
+  private readonly credential: PrismCredential | null;
   private readonly fetchImpl: FetchLike;
   private readonly log: PrismLog;
   private readonly reportedUnknownTypes = new Set<string>();
@@ -83,10 +91,15 @@ export class PrismHttpClient {
   constructor(
     baseUrl: string,
     identity: PrismIdentity,
-    { fetchImpl = fetch, log = () => {} }: { fetchImpl?: FetchLike; log?: PrismLog } = {},
+    {
+      fetchImpl = fetch,
+      log = () => {},
+      credential = null,
+    }: { fetchImpl?: FetchLike; log?: PrismLog; credential?: PrismCredential | null } = {},
   ) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.identity = identity;
+    this.credential = credential;
     this.fetchImpl = fetchImpl;
     this.log = log;
   }
@@ -94,10 +107,28 @@ export class PrismHttpClient {
   private headers(json: boolean): Record<string, string> {
     return {
       ...(json ? { "content-type": "application/json" } : {}),
+      ...(this.credential ? { authorization: this.credential.authorization() } : {}),
       "x-project": this.identity.project,
-      ...(this.identity.username ? { "x-username": this.identity.username } : {}),
       ...(this.identity.profileId ? { "x-profile-id": this.identity.profileId } : {}),
     };
+  }
+
+  /**
+   * One request, signed in; a 401 renews a minted token and sends it once
+   * more (a refused request never ran, so a POST is safe to repeat).
+   */
+  private async send(path: string, init: RequestInit & { json: boolean; accept?: string }): Promise<Response> {
+    const { json, accept, ...rest } = init;
+    const attempt = () =>
+      this.fetchImpl(`${this.baseUrl}${path}`, {
+        ...rest,
+        headers: { ...this.headers(json), ...(accept ? { accept } : {}) },
+      });
+    const response = await attempt();
+    if (response.status !== 401 || !this.credential?.renew()) return response;
+    await response.body?.cancel().catch(() => {});
+    this.log(`[auth] ${rest.method ?? "GET"} ${path} → 401: renewing the token and trying once more`);
+    return attempt();
   }
 
   private async requestJson<T>(
@@ -105,9 +136,9 @@ export class PrismHttpClient {
     path: string,
     body?: unknown,
   ): Promise<T> {
-    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+    const response = await this.send(path, {
       method,
-      headers: this.headers(body !== undefined),
+      json: body !== undefined,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
     const text = await response.text();
@@ -139,9 +170,10 @@ export class PrismHttpClient {
    * does, and the body then ends once the turn has finalized.
    */
   async *streamAgentTurn(body: Record<string, unknown>): AsyncGenerator<TurnEvent> {
-    const response = await this.fetchImpl(`${this.baseUrl}/agent`, {
+    const response = await this.send("/agent", {
       method: "POST",
-      headers: { ...this.headers(true), accept: "text/event-stream" },
+      json: true,
+      accept: "text/event-stream",
       body: JSON.stringify(body),
     });
     if (!response.ok || !response.body) {
@@ -216,8 +248,8 @@ export class PrismHttpClient {
   /**
    * The conversation's events after `afterSeq`, live, over `/ws/chat`
    * (`subscribe`: the running turn's missed events are replayed first).
-   * Identity rides the query string, as it does for prism-client. Ends when
-   * the socket closes or `signal` aborts.
+   * Identity rides the query string, as it does for prism-client — the
+   * token as `access_token`. Ends when the socket closes or `signal` aborts.
    */
   async *followConversation(
     conversationId: string,
@@ -227,8 +259,8 @@ export class PrismHttpClient {
     const url = new URL("/ws/chat", this.baseUrl);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.searchParams.set("project", this.identity.project);
-    if (this.identity.username) url.searchParams.set("username", this.identity.username);
     if (this.identity.profileId) url.searchParams.set("profileId", this.identity.profileId);
+    if (this.credential) url.searchParams.set("access_token", this.credential.token());
 
     const socket = new WebSocket(url);
     const queue: TurnEvent[] = [];

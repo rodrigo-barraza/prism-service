@@ -6,6 +6,7 @@ import {
 import express, { type Request, type Response } from "express";
 import { basename } from "node:path";
 import { TOOLS_SERVICE_URL } from "#config";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import logger from "#src/utils/logger";
 import {
@@ -14,12 +15,17 @@ import {
 } from "#src/types/index";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS } from "#src/constants";
+import { requireSignedInUserToChange } from "#src/middleware/AuthMiddleware";
 
 const router = express.Router();
+// The roots, the agents serving them: machine configuration, a signed-in
+// user's to change (reads stay open to every caller).
+router.use(requireSignedInUserToChange("change the workspaces"));
 
 // String() matches the previous template-literal coercion of the
-// (possibly undefined) env-derived base URL.
-const toolsClient = createApiClient(String(TOOLS_SERVICE_URL), {});
+// (possibly undefined) env-derived base URL. Every call carries
+// tools-service's credential (its routes here are gated).
+const toolsClient = createApiClient(String(TOOLS_SERVICE_URL), { headers: toolsServiceAuthHeaders });
 
 interface MappedWorkspace {
   id: string;

@@ -1,6 +1,7 @@
 import { resolve, relative } from "node:path";
 import { existsSync } from "node:fs";
 import { TOOLS_SERVICE_URL } from "#config";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import { traceHeaders } from "#src/services/Tracing";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import type {
@@ -116,7 +117,7 @@ export class GitWorktreeHelper {
     try {
       const response = await fetch(`${TOOLS_SERVICE_URL}${path}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...traceHeaders() },
+        headers: { "Content-Type": "application/json", ...traceHeaders(), ...toolsServiceAuthHeaders() },
         body: JSON.stringify(body),
       });
       if (!response.ok) {

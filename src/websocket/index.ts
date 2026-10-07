@@ -30,10 +30,21 @@ import {
 } from "#src/utils/ProfileScope";
 import {
   requestContext,
+  type RequestAuth,
   type RequestContextStore,
 } from "#src/utils/RequestContext";
+import {
+  ACCESS_TOKEN_QUERY_PARAMETER,
+  authenticate,
+  credentialsOf,
+  wwwAuthenticate,
+  type Authentication,
+} from "#src/middleware/AuthMiddleware";
+import { deniedCapabilityOf, limitServiceTurn, serviceTurnScope } from "#src/utils/ServiceTurnLimits";
+import { capabilityScopeDenialReason } from "#src/services/permissions/CapabilityScope";
 import type { WebSocket } from "ws";
-import type { IncomingMessage } from "http";
+import type { IncomingMessage, Server } from "http";
+import type { Duplex } from "stream";
 import type { WebSocketServer } from "ws";
 import type { GoogleToolConfigEntry } from "#src/providers/google";
 import WebSocketConnectionRegistry from "./WebSocketConnectionRegistry.ts";
@@ -129,10 +140,87 @@ function bindConnectionContext(
   };
 }
 
-export function setupWebSocket(webSocketServer: WebSocketServer) {
+/** An upgrade request, once authenticated (the `upgrade` handler attaches the result). */
+type AuthenticatedUpgrade = IncomingMessage & { prismAuth?: RequestAuth };
+
+function requestUrl(request: IncomingMessage): URL {
+  return new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+}
+
+/**
+ * Authenticate a WebSocket upgrade the way AuthMiddleware authenticates a
+ * request: a user's token from `Authorization` or — browsers cannot set
+ * headers on a WebSocket — the `access_token` query parameter; a service's
+ * secret from `x-api-secret`.
+ */
+export function authenticateUpgrade(request: IncomingMessage): Authentication {
+  const accessToken = requestUrl(request).searchParams.get(ACCESS_TOKEN_QUERY_PARAMETER);
+  return authenticate(credentialsOf(request.headers, accessToken));
+}
+
+/** Refuse an upgrade before switching protocols: a plain HTTP 401 with the usual body. */
+function refuseUpgrade(socket: Duplex, failure: Extract<Authentication, { ok: false }>): void {
+  if (!socket.writable) {
+    socket.destroy();
+    return;
+  }
+  const body = JSON.stringify(failure.body);
+  socket.once("finish", () => socket.destroy());
+  socket.end(
+    `HTTP/1.1 401 Unauthorized\r\n` +
+      `Content-Type: application/json\r\n` +
+      `Content-Length: ${Buffer.byteLength(body)}\r\n` +
+      `WWW-Authenticate: ${wwwAuthenticate(failure.body)}\r\n` +
+      `Connection: close\r\n\r\n` +
+      body,
+  );
+}
+
+/**
+ * The `upgrade` handler of the HTTP server: an unauthenticated upgrade gets
+ * a 401 and never becomes a WebSocket; an authenticated one is handed to the
+ * WebSocket server with its auth attached.
+ */
+export function handleUpgrade(
+  webSocketServer: WebSocketServer,
+  request: IncomingMessage,
+  socket: Duplex,
+  head: Buffer,
+): void {
+  const result = authenticateUpgrade(request);
+  if (!result.ok) {
+    logger.warn(`[WebSocket] Refused an upgrade to ${requestUrl(request).pathname}: ${result.body.code}`);
+    refuseUpgrade(socket, result);
+    return;
+  }
+  (request as AuthenticatedUpgrade).prismAuth = result.auth;
+  webSocketServer.handleUpgrade(request, socket, head, (websocket) => {
+    webSocketServer.emit("connection", websocket, request);
+  });
+}
+
+export function setupWebSocket(webSocketServer: WebSocketServer, httpServer?: Server) {
+  httpServer?.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) =>
+    handleUpgrade(webSocketServer, request, socket, head),
+  );
   webSocketServer.on("connection", (websocket: WebSocket, request: IncomingMessage) => {
-    const url = new URL(request.url || "/", `http://${request.headers.host}`);
+    const url = requestUrl(request);
     const pathname = url.pathname;
+
+    // Authenticated at the upgrade; a server that reached this handler some
+    // other way authenticates here, and an unauthenticated socket closes.
+    let auth = (request as AuthenticatedUpgrade).prismAuth;
+    if (!auth) {
+      const result = authenticateUpgrade(request);
+      if (!result.ok) {
+        websocket.send(
+          JSON.stringify(toErrorEvent(result.body.error, { code: "auth", status: 401 })),
+        );
+        websocket.close(1008, result.body.code);
+        return;
+      }
+      auth = result.auth;
+    }
 
     const project =
       (request.headers[IDENTITY_HEADERS.project] as string) ||
@@ -141,13 +229,17 @@ export function setupWebSocket(webSocketServer: WebSocketServer) {
     const xForwardedFor = request.headers[IDENTITY_HEADERS.forwardedFor];
     const rawIp =
       (Array.isArray(xForwardedFor) ? xForwardedFor[0] : xForwardedFor)?.split(",")[0]?.trim() ||
-      request.socket.remoteAddress;
+      request.socket?.remoteAddress;
     // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1)
     const clientIp = rawIp?.replace(/^::ffff:/, "") || rawIp;
+    // A user is the token's; a service names who it speaks for — its
+    // x-username header, else the `username` query parameter.
     const username =
-      (request.headers[IDENTITY_HEADERS.username] as string) ||
-      url.searchParams.get("username") ||
-      DEFAULT_USERNAME;
+      auth.kind === "user"
+        ? auth.username
+        : (request.headers[IDENTITY_HEADERS.username] as string | undefined)?.trim() ||
+          url.searchParams.get("username")?.trim() ||
+          DEFAULT_USERNAME;
     const agent = (request.headers[IDENTITY_HEADERS.agent] as string) || null;
     // Profile identity — header first (mirrors AuthMiddleware), then a
     // `profileId` query param for browser WebSocket clients that cannot
@@ -161,6 +253,7 @@ export function setupWebSocket(webSocketServer: WebSocketServer) {
       `WebSocket connection on ${pathname} (project: ${project}, user: ${username}, profile: ${profileId})`,
     );
 
+    const connectionAuth: RequestAuth = { ...auth, username };
     if (pathname === "/ws/chat") {
       handleWebsocketChat(
         websocket,
@@ -169,6 +262,7 @@ export function setupWebSocket(webSocketServer: WebSocketServer) {
         clientIp || "unknown",
         agent,
         profileId,
+        connectionAuth,
       );
     } else if (pathname === "/ws/text-to-audio") {
       handleWebsocketVoice(
@@ -178,6 +272,7 @@ export function setupWebSocket(webSocketServer: WebSocketServer) {
         clientIp || "unknown",
         agent,
         profileId,
+        connectionAuth,
       );
     } else if (pathname === "/ws/live") {
       handleWebsocketLive(
@@ -187,6 +282,7 @@ export function setupWebSocket(webSocketServer: WebSocketServer) {
         clientIp || "unknown",
         agent,
         profileId,
+        connectionAuth,
       );
     } else {
       websocket.send(
@@ -208,6 +304,7 @@ function handleWebsocketChat(
   clientIp: string,
   agent: string | null,
   profileId: string = DEFAULT_PROFILE_ID,
+  auth: RequestAuth | null = null,
 ) {
   const emitFunction = (event: Record<string, unknown>) => {
     if (websocket.readyState === websocket.OPEN) {
@@ -223,6 +320,7 @@ function handleWebsocketChat(
     profileId,
     clientIp,
     agent,
+    auth,
   };
   websocket.on("message", bindConnectionContext(connectionStore, async (rawData: Buffer | string) => {
     let data: Record<string, unknown>;
@@ -310,10 +408,11 @@ function handleWebsocketChat(
         })
       : emitFunction;
 
-    await handleConversation(
-      { ...data, project, username, clientIp, agent, profileId },
-      emitWithDirectViewers,
-    );
+    // A message's workspaceRoot and autoApprove are a user's alone
+    // (ServiceTurnLimits), as on POST /chat.
+    const params = { ...data, project, username, clientIp, agent, profileId };
+    limitServiceTurn(auth?.kind, params, "/ws/chat");
+    await handleConversation(params, emitWithDirectViewers);
   }));
 
   websocket.on("close", () => {
@@ -333,6 +432,7 @@ function handleWebsocketVoice(
   clientIp: string,
   _agent: string | null,
   profileId: string = DEFAULT_PROFILE_ID,
+  auth: RequestAuth | null = null,
 ) {
   const connectionStore: RequestContextStore = {
     project,
@@ -340,6 +440,7 @@ function handleWebsocketVoice(
     profileId,
     clientIp,
     agent: _agent,
+    auth,
   };
   websocket.on("message", bindConnectionContext(connectionStore, async (rawData: Buffer | string) => {
     let data: Record<string, unknown>;
@@ -407,8 +508,14 @@ function handleWebsocketLive(
   _clientIp: string,
   agent: string | null,
   profileId: string = DEFAULT_PROFILE_ID,
+  auth: RequestAuth | null = null,
 ) {
   let liveSession: Session | null = null;
+  // Prism runs the session's tool calls with no approval engine: a
+  // service's session is offered nothing a service's turn runs without, and
+  // a call to one is refused (ServiceTurnLimits — the default scope, as on
+  // /chat's function calling).
+  const serviceScope = auth?.kind === "service" ? serviceTurnScope(null) : null;
   /** Accumulated base64 PCM audio chunks for current turn (model output, 24kHz) */
   let turnAudioChunks: string[] = [];
   let audioSampleRate = 24000;
@@ -492,6 +599,7 @@ function handleWebsocketLive(
     profileId,
     clientIp: _clientIp,
     agent,
+    auth,
   };
   websocket.on("message", bindConnectionContext(connectionStore, async (rawData: Buffer | string) => {
     let data: Record<string, unknown>;
@@ -563,8 +671,10 @@ function handleWebsocketLive(
             ...ToolOrchestratorService.getToolSchemas(defaultTopology),
           ];
 
-          const filtered = dynamicTools.filter((dynamicTool) =>
-            enabledSet.has(dynamicTool.name),
+          const filtered = dynamicTools.filter(
+            (dynamicTool) =>
+              enabledSet.has(dynamicTool.name) &&
+              deniedCapabilityOf(dynamicTool.name, serviceScope) === null,
           );
           const googleFormats = convertToolsToGoogle(
             filtered as {
@@ -759,6 +869,19 @@ function handleWebsocketLive(
 
                     const results: ToolResult[] = await Promise.all(
                       functionCalls.map(async (toolCall) => {
+                        const deniedCapability = deniedCapabilityOf(toolCall.name, serviceScope);
+                        if (serviceScope && deniedCapability) {
+                          logger.warn(
+                            `[Live API] Refused "${toolCall.name}" for a service's session: it uses ${deniedCapability} (ServiceTurnLimits)`,
+                          );
+                          const refusal: { [key: string]: ToolResultValue } = {
+                            success: false,
+                            error: "CAPABILITY_SCOPE_DENIED",
+                            capability: deniedCapability,
+                            message: capabilityScopeDenialReason(toolCall.name, deniedCapability, serviceScope),
+                          };
+                          return { id: toolCall.id, name: toolCall.name, result: refusal };
+                        }
                         const result =
                           (await ToolOrchestratorService.executeTool(
                             toolCall.name,

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import request from "supertest";
 import { app } from "./setup.ts";
+import { userHeaders } from "./helpers/auth.ts";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import { setupWebSocket } from "#src/websocket/index";
 import { PROVIDERS } from "#src/constants";
@@ -63,9 +64,8 @@ describe("Telemetry Context Propagation — Integration Tests", () => {
 
     await request(app)
       .post("/chat")
-      .set("Authorization", "Bearer test-secret")
+      .set(userHeaders("test-user"))
       .set("x-project", "my-project")
-      .set("x-username", "test-user")
       .set("x-agent", "OMNI")
       .send({
         provider: PROVIDERS.GOOGLE,
@@ -114,8 +114,8 @@ describe("Telemetry Context Propagation — Integration Tests", () => {
       url: "/ws/live",
       headers: {
         host: "localhost",
+        ...userHeaders("test-user"),
         "x-project": "my-project",
-        "x-username": "test-user",
         "x-agent": "my-agent",
         "x-forwarded-for": "127.0.0.1",
       },

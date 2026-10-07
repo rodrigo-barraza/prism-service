@@ -2,6 +2,7 @@ import logger from "#src/utils/logger";
 import { createAbortController } from "#src/utils/AbortController";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { TOOLS_SERVICE_URL } from "#config";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import {
   DIRECTORY_CACHE_TIME_TO_LIVE_MILLISECONDS,
   DIRECTORY_FETCH_TIMEOUT_MILLISECONDS,
@@ -41,7 +42,10 @@ export class DirectoryTreeFormatter {
       );
 
       const url = `${TOOLS_SERVICE_URL}/filesystem/list?path=${encodeURIComponent(this.workspaceRoot)}&depth=2`;
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch(url, {
+        headers: toolsServiceAuthHeaders(),
+        signal: controller.signal,
+      });
       clearTimeout(timeout);
 
       if (!response.ok) {

@@ -763,6 +763,13 @@ export const LuposPersona: Persona = {
   // Least privilege (see the allow list above): no request widens his turns,
   // and nothing he calls waits on a card nobody in the channel can answer.
   pinnedPermissionMode: "dontAsk",
+  // lupos-bot's requests are a service's, and a service's turn runs without
+  // the shell, file writes, outside actions and MCP (ServiceTurnLimits).
+  // His lists above already decide those for the channel: he keeps the
+  // python/js sandboxes (shell, fs_write) and his Discord actions and gold
+  // (external_side_effect), while execute_shell, execute_command, send_*
+  // and the lights stay denied by name. MCP is blocked for him either way.
+  serviceCapabilities: { shell: true, fs_write: true, external_side_effect: true },
   // A reaction sent with the reply ends the turn: nothing in the reaction's
   // `{ ok: true }` is worth another model call (EndTurnAfterTools). His
   // Emoji Reactions section tells him to write the reply in that response.

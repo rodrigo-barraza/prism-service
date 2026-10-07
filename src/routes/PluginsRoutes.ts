@@ -1,6 +1,7 @@
 import { asyncHandler } from "@rodrigo-barraza/utilities-library/express";
 import express, { type Request, type Response } from "express";
 import requireDb from "#src/middleware/RequireDbMiddleware";
+import { requireSignedInUserToChange } from "#src/middleware/AuthMiddleware";
 import AgentPluginImportService from "#src/services/skills/AgentPluginImportService";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
@@ -8,6 +9,9 @@ import { PostPluginImportSchema } from "#src/types/index";
 
 const router = express.Router();
 router.use(requireDb);
+// A plugin brings MCP servers that run commands on this host: a signed-in
+// user's to import (AuthMiddleware).
+router.use(requireSignedInUserToChange("import a plugin (its MCP servers run commands on this host)"));
 
 /**
  * POST /plugins/import

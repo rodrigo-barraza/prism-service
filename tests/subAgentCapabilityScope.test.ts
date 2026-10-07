@@ -34,6 +34,8 @@ import OrchestratorService from "#src/services/OrchestratorService";
 import ToolOrchestratorService from "#src/services/tool-orchestrator/ToolOrchestratorService";
 import { SubAgentPersistenceService } from "#src/services/orchestrator/SubAgentPersistenceService";
 import { UntrustedSpans } from "#src/services/permissions/UntrustedSpans";
+import { CapabilityScopeHandle } from "#src/services/permissions/CapabilityScope";
+import { serviceTurnScope } from "#src/utils/ServiceTurnLimits";
 import type { OrchestratorContext, SubAgentResult } from "#src/types/orchestrator";
 
 const CONVERSATION = "conv-scope";
@@ -142,6 +144,31 @@ describe("a sub-agent spawned with a capability set", () => {
     );
     expect(childOptions()._capabilityScope).toEqual({ denied: ["network_write"] });
     expect(childOptions()._untrustedSpans).toBe(parentSpans);
+  });
+
+  it("a sub-agent of a service's turn starts inside the service's denials (ServiceTurnLimits)", async () => {
+    await ToolOrchestratorService.executeOrchestratorTool(
+      "create_subagent",
+      { description: "Look it up", prompt: "Look it up.", capabilities: { network: false } },
+      {
+        project: "test-project",
+        username: "visitor",
+        agent: "CODING",
+        _providerName: PROVIDERS.GOOGLE,
+        _resolvedModel: "gemini-3-flash-preview",
+        agentConversationId: "session-scope",
+        conversationId: CONVERSATION,
+        workspaceRoot: "/workspace",
+        _emit: vi.fn(),
+        _recursionDepth: 1,
+        _maxRecursionDepth: 3,
+        // The live handle a service's turn runs with.
+        _capabilityScope: new CapabilityScopeHandle(serviceTurnScope(null)),
+      } as never,
+    );
+    expect(childOptions()._capabilityScope).toEqual({
+      denied: ["fs_write", "shell", "network", "mcp", "external_side_effect"],
+    });
   });
 
   it("the spawn tools declare the parameter, closed to unknown names", () => {

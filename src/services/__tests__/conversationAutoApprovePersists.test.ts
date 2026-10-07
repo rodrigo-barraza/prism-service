@@ -61,6 +61,7 @@ const { handleApprovalDecision } = await import("#src/routes/ApprovalDecisionRou
 const { authMiddleware } = await import("#src/middleware/AuthMiddleware");
 const { default: ConversationApprovalSettings } = await import("#src/services/ConversationApprovalSettings");
 const { COLLECTIONS } = await import("#src/constants");
+const { userHeaders } = await import("../../../tests/helpers/auth.ts");
 
 const app = express();
 app.use(express.json());
@@ -87,12 +88,12 @@ function decidedBy(owner: Row) {
   };
 }
 
-/** What the Prism client sends: its own project, and the username it keeps. */
+/** What the Prism client sends: its own project, and its signed-in user's token. */
 function approveAsTheClient(body: Row, username = "anonymous") {
   return http
     .post("/agent/approve")
     .set("x-project", "prism-client")
-    .set("x-username", username)
+    .set(userHeaders(username))
     .send({ toolCallId: "call-1", decision: "allow", ...body });
 }
 

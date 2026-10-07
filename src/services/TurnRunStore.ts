@@ -9,6 +9,7 @@ import type {
   ResponsesPhase,
   ResponsesReasoningItem,
 } from "#src/types/admin";
+import type { AuthKind } from "#src/utils/RequestContext";
 
 /**
  * TurnRunStore — what a running turn needs to be re-driven after a restart.
@@ -21,7 +22,9 @@ import type {
  *
  *   - the REQUEST the turn was started with (minus its messages), so the
  *     re-driven turn resolves provider, model, options and tools exactly as
- *     the first one did — and the system prompt it assembled;
+ *     the first one did — and the system prompt it assembled — and how that
+ *     request authenticated (`authKind`), so it keeps the owner powers a
+ *     signed-in user's turn had and a service's turn never gains them;
  *   - the loop state a checkpoint does not carry: iteration, plan mode,
  *     a mid-turn "approve all";
  *   - the PASS whose tool batch was in progress: what the model said
@@ -102,6 +105,8 @@ export interface TurnRunRecord {
   agent?: string | null;
   /** The handleAgent params the turn started from, without `messages`. */
   request: Record<string, unknown>;
+  /** How the turn's request authenticated (AuthMiddleware); absent on a record from before that. */
+  authKind?: AuthKind | null;
   systemPrompt?: string | null;
   skillsText?: string | null;
   conversationMeta?: Record<string, unknown> | null;

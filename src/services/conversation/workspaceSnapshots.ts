@@ -5,6 +5,7 @@ import {
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { MONGO_DB_NAME, TOOLS_SERVICE_URL } from "#config";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import { COLLECTIONS, WORKSPACE_SNAPSHOTS } from "#src/constants";
 import logger from "#src/utils/logger";
 import { traceHeaders } from "#src/services/Tracing";
@@ -123,6 +124,7 @@ async function postToTools<T extends object>(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...traceHeaders(),
+    ...toolsServiceAuthHeaders(),
   };
   if (identity.project) headers[IDENTITY_HEADERS.project] = identity.project;
   if (identity.username) headers[IDENTITY_HEADERS.username] = identity.username;

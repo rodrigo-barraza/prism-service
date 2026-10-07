@@ -9,10 +9,11 @@ import { CAPABILITIES, type Capability } from "./types.ts";
 // continuation (the agent working on its own after the verifier sent it
 // back) each get a capability set declared when they are spawned, scheduled
 // or set — `{ network: false }`, `{ network_write: false, shell: false }` —
-// and the approval engine refuses any call whose tool carries a capability
-// the set takes away. Nothing the model reads can widen it: a declaration
-// only ever narrows, and a child's set is its own denials plus every
-// ancestor's.
+// and every turn a service's request starts gets one too (utils/
+// ServiceTurnLimits). The approval engine refuses any call whose tool
+// carries a capability the set takes away. Nothing the model reads can
+// widen it: a declaration only ever narrows, and a child's set is its own
+// denials plus every ancestor's.
 //
 // The names are the capability tags tools declare (permissions/types.ts,
 // tools-service ToolCapabilities.ts), plus `network_write`: a network call
@@ -171,8 +172,8 @@ export function capabilityScopeDenialReason(
 ): string {
   return (
     `[Capability scope] "${toolName}" uses ${CAPABILITY_WORDS[capability]}, which this run may not use ` +
-    `(it was started with ${describeScope(scope)}). The scope was fixed when the run was spawned, scheduled ` +
-    `or given its goal, and nothing in the conversation can widen it: do the work without it, or report ` +
+    `(it was started with ${describeScope(scope)}). The scope was fixed when the run was spawned, scheduled, ` +
+    `given its goal or started for a service, and nothing in the conversation can widen it: do the work without it, or report ` +
     `that it needs ${CAPABILITY_WORDS[capability]}.`
   );
 }

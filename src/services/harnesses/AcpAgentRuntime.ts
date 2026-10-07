@@ -10,10 +10,12 @@ import { resolveLoopKey } from "#src/services/LoopKey";
 import {
   ACP_AGENT_OWNERS_ENV_VAR,
   ACP_RUNTIME,
+  acpAgentOwners,
   buildAgentEnvironment,
   isAcpAgentOwner,
   type AcpAgentLaunch,
 } from "#src/services/agents/AgentRuntime";
+import { ownerRefusal } from "#src/utils/RequestContext";
 import { AgentProcess, type AgentProcessExit } from "#src/acp/client/AgentProcess";
 import { UpdateTranslator } from "#src/acp/client/UpdateTranslator";
 import { PermissionBridge } from "#src/acp/client/PermissionBridge";
@@ -264,7 +266,9 @@ export default class AcpAgentRuntime {
     }
     if (!isAcpAgentOwner(context.username)) {
       throw new AcpAgentError(
-        `Agent "${persona.name}" is an external ACP agent, which runs only in turns of the users in ${ACP_AGENT_OWNERS_ENV_VAR}; "${context.username}" is not one.`,
+        acpAgentOwners().has(context.username ?? "")
+          ? `Agent "${persona.name}" is an external ACP agent, which runs only in turns a signed-in owner started: ${ownerRefusal(context.username, ACP_AGENT_OWNERS_ENV_VAR, true)}`
+          : `Agent "${persona.name}" is an external ACP agent, which runs only in turns of the users in ${ACP_AGENT_OWNERS_ENV_VAR}; "${context.username}" is not one.`,
       );
     }
     if (!isAcpAgentOwner(persona.acp.owner)) {

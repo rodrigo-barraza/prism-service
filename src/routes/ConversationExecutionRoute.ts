@@ -5,6 +5,8 @@ import { handleApprovalDecision } from "./ApprovalDecisionRoute.ts";
 import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
 import { handleQuestionAnswer } from "./QuestionAnswerHandler.ts";
 import { applyExternalTurnAuthority, requireUserAuthority } from "#src/middleware/ExternalAuthority";
+import { limitServiceTurn } from "#src/utils/ServiceTurnLimits";
+import { requireSignedInUser } from "#src/middleware/AuthMiddleware";
 
 const router = express.Router();
 
@@ -16,6 +18,7 @@ const router = express.Router();
 router.post(
   "/approve",
   requireUserAuthority("approve a tool call"),
+  requireSignedInUser("approve a tool call"),
   asyncHandler(async (req: Request, res: Response) =>
     handleApprovalDecision(req, res, "[conversation/approve]"),
   ),
@@ -29,6 +32,7 @@ router.post(
 router.post(
   "/answer",
   requireUserAuthority("answer a question on the user's behalf"),
+  requireSignedInUser("answer a question"),
   asyncHandler(handleQuestionAnswer("conversation/answer")),
 );
 
@@ -53,7 +57,9 @@ router.post(
         agent: req.body.agent || req.agent || null,
         workspaceRoot: req.workspaceRoot || req.body.workspaceRoot || null,
       };
-      // A relay's turn runs unattended and cannot pick its own approval mode.
+      // A service's turn has no workspace and approves nothing for itself; a
+      // relay's also runs unattended and cannot pick its own approval mode.
+      limitServiceTurn(req.auth?.kind, params, "POST /conversation");
       applyExternalTurnAuthority(req, params);
 
       if (req.query.stream !== "false") {
@@ -71,6 +77,7 @@ router.post(
         profileId: req.profileId,
         clientIp: req.clientIp,
       };
+      limitServiceTurn(req.auth?.kind, params, "POST /conversation");
 
       if (req.query.stream !== "false") {
         await handleSseRequest(req, res, params);

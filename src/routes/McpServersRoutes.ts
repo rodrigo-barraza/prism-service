@@ -3,6 +3,7 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import express, { type Request, type Response, type NextFunction } from "express";
 import { ObjectId, type Db } from "mongodb";
 import requireDb from "#src/middleware/RequireDbMiddleware";
+import { refuseServiceRequest, requireSignedInUser } from "#src/middleware/AuthMiddleware";
 import MCPClientService, {
   McpServerNameConflictError,
 } from "#src/services/MCPClientService";
@@ -67,6 +68,17 @@ interface McpServerDocument {
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * A server that runs a command on this host — stdio, or any config naming a
+ * command — is a signed-in user's to add, change or start: a service's
+ * request is refused (AuthMiddleware.requireSignedInUser).
+ */
+function runsACommand(config: { transport?: unknown; command?: unknown } | null | undefined): boolean {
+  return config?.transport === "stdio" || (typeof config?.command === "string" && config.command.trim() !== "");
+}
+
+const COMMAND_SERVER_ACTION = "add or change an MCP server that runs a command on this host";
 
 /** Whether `id` parses as the ObjectId it spells (a bad id is a 404, not a 500). */
 function isObjectId(id: string): boolean {
@@ -179,6 +191,10 @@ router.get(
  */
 router.post(
   "/",
+  // No transport is stdio: the schema's default.
+  requireSignedInUser(COMMAND_SERVER_ACTION, (req) =>
+    runsACommand({ transport: req.body?.transport ?? "stdio", command: req.body?.command }),
+  ),
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { project, username, profileId } = resolveScope(req);
@@ -233,6 +249,19 @@ router.put(
       const parsed = PutMcpServerSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.format() });
+      }
+
+      // A command server — before this change or after it — is a signed-in
+      // user's to change, whatever the field (enabling one starts it).
+      if (req.auth?.kind !== "user") {
+        const stored = runsACommand(parsed.data)
+          ? null
+          : await db
+              .collection<McpServerDocument>(COLLECTION)
+              .findOne({ _id: new ObjectId(serverId), ...scopeFilter(req) });
+        if (runsACommand(parsed.data) || runsACommand(stored)) {
+          return refuseServiceRequest(req, res, COMMAND_SERVER_ACTION);
+        }
       }
 
       if (
@@ -337,6 +366,10 @@ router.post(
 
       if (!server) {
         return res.status(404).json({ error: "MCP server not found" });
+      }
+      // Connecting a stdio server runs its command on this host.
+      if (req.auth?.kind !== "user" && runsACommand(server)) {
+        return refuseServiceRequest(req, res, "start an MCP server that runs a command on this host");
       }
 
       const result = await MCPClientService.connect({
@@ -523,11 +556,12 @@ router.post(
  * POST /mcp-servers/:id/tools/approve   { tools?: string[] }
  * Re-approve quarantined tools at their current definitions (all of them
  * when `tools` is omitted). Allowed on the scope's own servers and on shared
- * ones — the API's identity is a header until authentication lands, so a
- * narrower rule for shared servers would protect nothing.
+ * ones, for a signed-in user: approving a tool is the user's decision, never
+ * a service's (AuthMiddleware).
  */
 router.post(
   "/:id/tools/approve",
+  requireSignedInUser("approve an MCP server's tools"),
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { db } = req;
