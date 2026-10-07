@@ -218,9 +218,27 @@ export const COMMAND_TIMEOUT_BEHAVIORS = ["fail_open", "fail_closed"] as const;
 export type CommandTimeoutBehavior = (typeof COMMAND_TIMEOUT_BEHAVIORS)[number];
 
 /**
+ * Where a repository hooks file's command came from (WorkspaceHooks). Only
+ * set on hooks built in process from a trusted file — the stored schema
+ * refuses the field, so no document can ask to run in a workspace.
+ */
+export interface WorkspaceHookSource {
+  /** The directory holding `.prism/` — the command's working directory. */
+  cwd: string;
+  /** The hooks file, and the content it was trusted at. */
+  path: string;
+  sha256: string;
+  scope: "user" | "project";
+  /** A sub-agent's worktree: the tools-service sandbox admits its paths only with the override header. */
+  worktreePath?: string | null;
+}
+
+/**
  * Run a shell command with the payload on stdin (Claude Code's `command`
- * handler). Executed by tools-service in its dedicated hooks directory — see
- * `CommandHookHandler` for the exit-code contract and the privilege note.
+ * handler). Executed by tools-service in its dedicated hooks directory — or,
+ * for a repository's own hook, in the repository, on the machine the
+ * workspace is on. See `CommandHookHandler` for the exit-code contract and
+ * the privilege note.
  */
 export interface CommandHookHandlerConfig {
   type: typeof HOOK_HANDLER_TYPES.COMMAND;
@@ -231,6 +249,8 @@ export interface CommandHookHandlerConfig {
    * into a block, for a command that IS the security gate.
    */
   timeoutBehavior?: CommandTimeoutBehavior;
+  /** Set on a repository hook: run it there (`{workspace: true, cwd}`), not in the hooks directory. */
+  workspace?: WorkspaceHookSource;
 }
 
 /**
@@ -327,22 +347,44 @@ export interface HookDecision {
   message?: string;
 }
 
-/** The payload every handler receives, mirroring Claude Code's hook input. */
+/**
+ * The payload every handler receives: Claude Code's hook input as a
+ * superset — a script written for Claude Code reads the same fields — plus
+ * Prism's own (`agent_conversation_id`, `project`, `username`, `agent`).
+ */
 export interface HookPayload {
   hook_event_name: HookEventName;
+  /** The conversation (a sub-agent run's own conversation). */
   session_id: string;
+  /** The conversation's Claude-shaped transcript (ClaudeTranscript); null until known, or when it keeps none. */
+  transcript_path?: string | null;
+  /**
+   * Where the event happens: `execute_command`'s own `cwd` (resolved against
+   * the workspace root) on its tool events, otherwise the workspace root —
+   * a sub-agent's worktree for a sub-agent working in one.
+   */
+  cwd: string | null;
+  /** The turn's permission mode, in Claude Code's names (`bypassPermissions` for bypass). */
+  permission_mode?: string;
+  /** Always `"prism"` — a hook shared with Claude Code or Codex can tell who fired it. */
+  harness?: string;
+  /** The workspace root the turn works in (a sub-agent's worktree, when it has one). */
+  workspace_root?: string | null;
   agent_conversation_id: string;
   project: string;
   username: string;
   agent: string | null;
-  cwd: string | null;
   /** Present on sub-agent runs, absent on the top-level loop. */
   parent_agent_conversation_id?: string;
+  /** Sub-agent runs: the sub-agent's own id (its `agent_conversation_id`), as Claude Code names a subagent. */
+  agent_id?: string;
   /** Tool events. */
   tool_name?: string;
   tool_input?: Record<string, unknown>;
   tool_use_id?: string;
   tool_output?: unknown;
+  /** `PostToolUse` / `PostToolUseFailure`: Claude Code's name for `tool_output` — the same value. */
+  tool_response?: unknown;
   tool_error?: string;
   /** `UserPromptSubmit`. */
   prompt?: string;

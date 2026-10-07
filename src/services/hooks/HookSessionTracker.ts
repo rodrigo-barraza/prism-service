@@ -3,7 +3,7 @@ import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { HOOKS } from "#src/constants";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
 import type AgentHooks from "#src/services/AgentHooks";
-import { buildHookPayload } from "#src/services/hooks/buildPayload";
+import { buildHookPayload, type HookPayloadIdentity } from "#src/services/hooks/buildPayload";
 import { HOOK_EVENTS } from "#src/services/hooks/types";
 
 /**
@@ -38,14 +38,12 @@ import { HOOK_EVENTS } from "#src/services/hooks/types";
 export type SessionStartSource = "startup" | "resume";
 export type SessionEndReason = "idle" | "shutdown";
 
-interface PayloadIdentity {
-  conversationId?: string | null;
-  agentConversationId?: string | null;
-  project?: string | null;
-  username?: string | null;
-  agent?: string | null;
-  workspaceRoot?: string | null;
-}
+/**
+ * The newest turn's identity. It carries that turn's TurnHookFacts, so the
+ * `SessionEnd` that fires after the turn closed still reports its
+ * workspace, permission mode and transcript.
+ */
+type PayloadIdentity = HookPayloadIdentity;
 
 interface SessionEntry {
   hooks: AgentHooks;

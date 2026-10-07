@@ -929,6 +929,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             state,
             pass.pendingToolCalls,
             results,
+            pass.finalStreamedText,
           );
 
           const validationFeedback = await validateAfterToolExecution(
