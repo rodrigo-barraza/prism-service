@@ -23,10 +23,12 @@ import ReActHarness from "../ReActHarness.ts";
 import AgenticLoopService from "#src/services/AgenticLoopService";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import agentRouter from "#src/routes/AgentRoutes";
+import { authMiddleware } from "#src/middleware/AuthMiddleware";
 import InternalToolRegistry from "#src/services/tool-definitions/InternalToolRegistry";
 import { ApprovalRegistry } from "#src/services/ApprovalRegistry";
 import QuestionRegistry from "#src/services/QuestionRegistry";
 import logger from "#src/utils/logger";
+import { signInAsHeaderUser } from "../../../../tests/helpers/auth.ts";
 import type {
   AgenticContext,
   ConversationMessage,
@@ -374,6 +376,9 @@ function toolResultText(messages: ConversationMessage[], toolName = "ask_user"):
 
 const app = express();
 app.use(express.json());
+// Signed in as the client is: only a signed-in user answers a question.
+app.use(signInAsHeaderUser);
+app.use(authMiddleware);
 app.use("/agent", agentRouter);
 
 // ── Scenarios ────────────────────────────────────────────────

@@ -15,8 +15,12 @@ import {
 } from "#src/types/index";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { TOOL_CONFIG_FETCH_TIMEOUT_MILLISECONDS } from "#src/constants";
+import { requireSignedInUserToChange } from "#src/middleware/AuthMiddleware";
 
 const router = express.Router();
+// The roots, the agents serving them: machine configuration, a signed-in
+// user's to change (reads stay open to every caller).
+router.use(requireSignedInUserToChange("change the workspaces"));
 
 // String() matches the previous template-literal coercion of the
 // (possibly undefined) env-derived base URL. Every call carries

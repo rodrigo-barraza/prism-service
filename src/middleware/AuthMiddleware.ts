@@ -15,7 +15,7 @@ import {
   type RequestContextStore,
 } from "#src/utils/RequestContext";
 import { normalizeProfileId, PROFILE_ID_HEADER } from "#src/utils/ProfileScope";
-import { secretsMatch, verifyUserToken } from "#src/utils/UserToken";
+import { USER_TOKEN_SECRET_ENV_VAR, secretsMatch, verifyUserToken } from "#src/utils/UserToken";
 import { TOOLS_SERVICE_API_SECRET_ENV_VAR } from "#src/utils/ToolsServiceAuth";
 import logger from "#src/utils/logger";
 
@@ -26,10 +26,12 @@ import logger from "#src/utils/logger";
 //
 //   1. `Authorization: Bearer <jwt>` — a signed-in user's token, minted by
 //      prism-client's server with PRISM_USER_TOKEN_SECRET (utils/UserToken:
-//      HS256 only, iss prism-client, aud prism-service, at most 12 h). The
-//      username is the token's `sub`; `x-username` is ignored. A bad or
-//      expired token is a 401 `INVALID_TOKEN` — it never falls through to
-//      another credential.
+//      HS256 only, iss prism-client, aud prism-service, at most 12 h), or the
+//      15-minute on-behalf token prism-service mints for the user a
+//      tools-service call is made for (iss prism-service), which tools-service
+//      hands back on its callbacks (ToolsServiceAuth). The username is the
+//      token's `sub`; `x-username` is ignored. A bad or expired token is a
+//      401 `INVALID_TOKEN` — it never falls through to another credential.
 //   2. `x-api-secret` equal to PRISM_SERVICE_API_SECRET — a server (lupos-bot,
 //      messages-service, a site's Next.js server, tools-service) speaking for
 //      its own end users: the username is its `x-username`, else
@@ -51,8 +53,6 @@ import logger from "#src/utils/logger";
 
 /** Servers' credential, sent as `x-api-secret`. */
 export const SERVICE_API_SECRET_ENV_VAR = "PRISM_SERVICE_API_SECRET";
-/** The HS256 key of user tokens (prism-client signs, prism-service verifies). */
-export const USER_TOKEN_SECRET_ENV_VAR = "PRISM_USER_TOKEN_SECRET";
 /** The role (from accounts-service, carried in the token) that opens /admin. */
 export const ADMIN_ROLE = "admin";
 /** A browser cannot set headers on a WebSocket: its token rides this query parameter. */
@@ -263,6 +263,35 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
         : "Admin only: sign in with an admin account.",
     code: AUTH_ERROR_CODES.FORBIDDEN,
   });
+}
+
+/**
+ * A power no server needs — answering or approving a pending decision, a
+ * command run on this host, the workspace roots: a signed-in user's alone. A
+ * service's request (`x-api-secret`) gets a 403 that says so. `when` narrows
+ * the guard to the requests that use the power (a stdio server, a write).
+ */
+export function requireSignedInUser(action: string, when: (req: Request) => boolean = () => true) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (req.auth?.kind === "user" || !when(req)) return next();
+    refuseServiceRequest(req, res, action);
+  };
+}
+
+/** requireSignedInUser's 403, for a route that decides inside its handler (it needs a stored document). */
+export function refuseServiceRequest(req: Request, res: Response, action: string): void {
+  logger.warn(
+    `[Auth] Refused ${req.method} ${req.originalUrl ?? req.url} to ${req.auth ? `${req.auth.kind} "${req.auth.username}"` : "an unauthenticated caller"}: only a signed-in user can ${action}`,
+  );
+  res.status(403).json({
+    error: `Only a signed-in user can ${action}; a service's request cannot.`,
+    code: AUTH_ERROR_CODES.FORBIDDEN,
+  });
+}
+
+/** The same guard for every request of a router that changes something (not GET/HEAD/OPTIONS). */
+export function requireSignedInUserToChange(action: string) {
+  return requireSignedInUser(action, (req) => !["GET", "HEAD", "OPTIONS"].includes(req.method));
 }
 
 /** At boot: name the credentials that are not configured — each fails closed. */

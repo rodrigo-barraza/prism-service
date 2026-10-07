@@ -8,7 +8,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import "./setup.ts";
-import { TOOLS_SERVICE_API_SECRET_ENV_VAR, toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
+import {
+  ON_BEHALF_TOKEN_HEADER,
+  TOOLS_SERVICE_API_SECRET_ENV_VAR,
+  _clearOnBehalfTokens,
+  toolsServiceAuthHeaders,
+} from "#src/utils/ToolsServiceAuth";
+import { USER_TOKEN_SECRET_ENV_VAR, verifyUserToken } from "#src/utils/UserToken";
+import { requestContext } from "#src/utils/RequestContext";
+import { TEST_USER_TOKEN_SECRET, runAs } from "./helpers/auth.ts";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
 import WorkspaceTaskClient from "#src/services/background-tasks/WorkspaceTaskClient";
 
@@ -86,5 +94,86 @@ describe("tools-service's credential", () => {
       .filter((path) => !readFileSync(path, "utf8").includes("toolsServiceAuthHeaders"))
       .map((path) => relative(SOURCE_ROOT, path));
     expect(missing).toEqual([]);
+    // LM Studio, a third-party process, gets the secret and never a user's token.
+    expect(readFileSync(join(SOURCE_ROOT, "providers", "lm-studio.ts"), "utf8")).toContain(
+      "toolsServiceAuthHeaders({ onBehalf: false })",
+    );
+  });
+});
+
+describe("the on-behalf token — the user a tools-service call is made for", () => {
+  const NOW = new Date("2026-10-06T12:00:00.000Z");
+
+  beforeEach(() => {
+    process.env[TOOLS_SERVICE_API_SECRET_ENV_VAR] = SECRET;
+    _clearOnBehalfTokens();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    delete process.env[TOOLS_SERVICE_API_SECRET_ENV_VAR];
+    process.env[USER_TOKEN_SECRET_ENV_VAR] = TEST_USER_TOKEN_SECRET;
+  });
+
+  /** The headers as a call made inside a signed-in request (its token's email and roles) builds them. */
+  const asSignedIn = (options?: { onBehalf?: boolean }) =>
+    requestContext.run(
+      {
+        project: "coding",
+        username: "rodrigo",
+        clientIp: null,
+        auth: { kind: "user", username: "rodrigo", email: "owner@example.com", roles: ["admin"] },
+      },
+      () => toolsServiceAuthHeaders(options),
+    );
+
+  it("rides beside the secret in a signed-in user's turn: prism-service's 15-minute token for that user", () => {
+    const headers = asSignedIn();
+    expect(headers["x-api-secret"]).toBe(SECRET);
+    const verified = verifyUserToken(headers[ON_BEHALF_TOKEN_HEADER], TEST_USER_TOKEN_SECRET);
+    expect(verified).toEqual({
+      ok: true,
+      token: {
+        username: "rodrigo",
+        email: "owner@example.com",
+        roles: ["admin"],
+        issuedAt: NOW.getTime() / 1000,
+        expiresAt: NOW.getTime() / 1000 + 900,
+      },
+    });
+    const claims = JSON.parse(Buffer.from(headers[ON_BEHALF_TOKEN_HEADER].split(".")[1], "base64url").toString());
+    expect(claims).toMatchObject({ iss: "prism-service", aud: "prism-service", sub: "rodrigo" });
+  });
+
+  it("a turn with no email or roles on record (a resumed or scheduled one) gets a token without them", () => {
+    const headers = runAs("user", "rodrigo", () => toolsServiceAuthHeaders());
+    expect(verifyUserToken(headers[ON_BEHALF_TOKEN_HEADER], TEST_USER_TOKEN_SECRET)).toMatchObject({
+      ok: true,
+      token: { username: "rodrigo", email: null, roles: [] },
+    });
+  });
+
+  it("is reused while more than 5 minutes are left, then minted afresh", () => {
+    const first = asSignedIn()[ON_BEHALF_TOKEN_HEADER];
+    vi.setSystemTime(new Date(NOW.getTime() + 9 * 60_000));
+    expect(asSignedIn()[ON_BEHALF_TOKEN_HEADER]).toBe(first);
+    vi.setSystemTime(new Date(NOW.getTime() + 10 * 60_000 + 1_000));
+    const renewed = asSignedIn()[ON_BEHALF_TOKEN_HEADER];
+    expect(renewed).not.toBe(first);
+    expect(verifyUserToken(renewed, TEST_USER_TOKEN_SECRET).ok).toBe(true);
+  });
+
+  it("is never sent for a service's turn, outside any turn, without the key — or to LM Studio", () => {
+    expect(runAs("service", "rodrigo", () => toolsServiceAuthHeaders())).toEqual({ "x-api-secret": SECRET });
+    expect(runAs(null, "rodrigo", () => toolsServiceAuthHeaders())).toEqual({ "x-api-secret": SECRET });
+    expect(toolsServiceAuthHeaders()).toEqual({ "x-api-secret": SECRET });
+    expect(asSignedIn({ onBehalf: false })).toEqual({ "x-api-secret": SECRET });
+    delete process.env[USER_TOKEN_SECRET_ENV_VAR];
+    expect(asSignedIn()).toEqual({ "x-api-secret": SECRET });
+    // Nor without tools-service's own secret: nothing goes out then.
+    process.env[USER_TOKEN_SECRET_ENV_VAR] = TEST_USER_TOKEN_SECRET;
+    delete process.env[TOOLS_SERVICE_API_SECRET_ENV_VAR];
+    expect(asSignedIn()).toEqual({});
   });
 });

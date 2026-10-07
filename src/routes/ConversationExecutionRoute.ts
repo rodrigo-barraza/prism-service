@@ -6,6 +6,7 @@ import { handleSseRequest, handleJsonRequest } from "#src/utils/SseUtilities";
 import { handleQuestionAnswer } from "./QuestionAnswerHandler.ts";
 import { applyExternalTurnAuthority, requireUserAuthority } from "#src/middleware/ExternalAuthority";
 import { limitServiceTurn } from "#src/utils/ServiceTurnLimits";
+import { requireSignedInUser } from "#src/middleware/AuthMiddleware";
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ const router = express.Router();
 router.post(
   "/approve",
   requireUserAuthority("approve a tool call"),
+  requireSignedInUser("approve a tool call"),
   asyncHandler(async (req: Request, res: Response) =>
     handleApprovalDecision(req, res, "[conversation/approve]"),
   ),
@@ -30,6 +32,7 @@ router.post(
 router.post(
   "/answer",
   requireUserAuthority("answer a question on the user's behalf"),
+  requireSignedInUser("answer a question"),
   asyncHandler(handleQuestionAnswer("conversation/answer")),
 );
 

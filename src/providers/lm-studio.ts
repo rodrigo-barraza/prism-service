@@ -1095,8 +1095,9 @@ export function createLmStudioProvider(
           }
           if (!skipMcp) {
             // LM Studio connects to tools-service's MCP adapter itself: the
-            // integration's headers carry tools-service's credential.
-            const mcpHeaders = toolsServiceAuthHeaders();
+            // integration's headers carry tools-service's credential — never
+            // a user's on-behalf token (a third-party process holds them).
+            const mcpHeaders = toolsServiceAuthHeaders({ onBehalf: false });
             (nativePayload as Record<string, unknown>).integrations = [
               {
                 type: "ephemeral_mcp",

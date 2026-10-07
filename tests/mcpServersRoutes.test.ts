@@ -3,6 +3,7 @@ import supertest from "supertest";
 import { ObjectId } from "mongodb";
 import { app } from "./setup.ts";
 import MongoWrapper from "#src/wrappers/MongoWrapper";
+import { serviceHeaders } from "./helpers/auth.ts";
 
 vi.mock("#src/services/MCPClientService", () => {
   class McpServerNameConflictError extends Error {}
@@ -254,5 +255,87 @@ describe("MCP server routes — naming, sharing, trust and approval", () => {
       new McpServerNameConflictError("github"),
     );
     await agent.post(`${BASE}/${doc._id}/connect`).set(OWNER).expect(409);
+  });
+});
+
+describe("MCP server routes — a server that runs a command on this host is a signed-in user's", () => {
+  const agent = supertest(app);
+  /** A service speaking for the same user, in the same scope as OWNER. */
+  const SERVICE = { ...serviceHeaders("rodrigo"), "x-project": "prism-client" };
+  const COMMAND_REFUSAL =
+    /Only a signed-in user can add or change an MCP server that runs a command on this host; a service's request cannot\./;
+
+  beforeEach(() => {
+    documents = [];
+    vi.clearAllMocks();
+    vi.spyOn(MongoWrapper, "getDb").mockReturnValue({
+      collection: () => collection,
+    } as never);
+  });
+
+  it("a service cannot add a stdio server, or any server that names a command; a user can", async () => {
+    for (const body of [
+      { name: "shell", transport: "stdio", command: "bash" },
+      // No transport is stdio (the schema's default).
+      { name: "implicit", command: "bash" },
+      { name: "sneaky", transport: "streamable-http", url: "https://mcp.example.com", command: "bash" },
+    ]) {
+      const refused = await agent.post(BASE).set(SERVICE).send(body).expect(403);
+      expect(refused.body).toMatchObject({ code: "FORBIDDEN" });
+      expect(refused.body.error).toMatch(COMMAND_REFUSAL);
+    }
+    expect(documents).toHaveLength(0);
+    await agent.post(BASE).set(OWNER).send({ name: "shell", transport: "stdio", command: "bash" }).expect(201);
+  });
+
+  it("a service may still add a remote server", async () => {
+    await agent
+      .post(BASE)
+      .set(SERVICE)
+      .send({ name: "remote", transport: "streamable-http", url: "https://mcp.example.com" })
+      .expect(201);
+  });
+
+  it("a service cannot change a stdio server — not even enable it — nor give a remote one a command", async () => {
+    const stdio = server({ name: "local", enabled: false });
+    const remote = server({ name: "remote", transport: "streamable-http", command: "", url: "https://mcp.example.com" });
+
+    const enable = await agent.put(`${BASE}/${stdio._id}`).set(SERVICE).send({ enabled: true }).expect(403);
+    expect(enable.body.error).toMatch(COMMAND_REFUSAL);
+    expect(stdio.enabled).toBe(false);
+    await agent.put(`${BASE}/${remote._id}`).set(SERVICE).send({ transport: "stdio", command: "bash" }).expect(403);
+    expect(remote.transport).toBe("streamable-http");
+
+    // A remote server stays a service's to change; a user changes either.
+    await agent.put(`${BASE}/${remote._id}`).set(SERVICE).send({ displayName: "Remote" }).expect(200);
+    await agent.put(`${BASE}/${stdio._id}`).set(OWNER).send({ enabled: true }).expect(200);
+    expect(stdio.enabled).toBe(true);
+  });
+
+  it("a service cannot start a stdio server; a user can", async () => {
+    const stdio = server({ name: "local" });
+    const refused = await agent.post(`${BASE}/${stdio._id}/connect`).set(SERVICE).expect(403);
+    expect(refused.body.error).toMatch(/start an MCP server that runs a command on this host/);
+    expect(MCPClientService.connect).not.toHaveBeenCalled();
+
+    vi.mocked(MCPClientService.connect).mockResolvedValue({
+      serverName: "local",
+      tools: [],
+      quarantinedTools: [],
+      protocolVersion: null,
+      protocolEra: null,
+    } as never);
+    await agent.post(`${BASE}/${stdio._id}/connect`).set(OWNER).expect(200);
+    expect(MCPClientService.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it("approving a server's quarantined tools is a signed-in user's decision", async () => {
+    const stdio = server({ name: "local" });
+    const refused = await agent.post(`${BASE}/${stdio._id}/tools/approve`).set(SERVICE).send({}).expect(403);
+    expect(refused.body.error).toMatch(/approve an MCP server's tools/);
+    expect(MCPClientService.approveTools).not.toHaveBeenCalled();
+    const allowed = await agent.post(`${BASE}/${stdio._id}/tools/approve`).set(OWNER).send({});
+    expect(allowed.status).not.toBe(403);
+    expect(MCPClientService.approveTools).toHaveBeenCalledTimes(1);
   });
 });

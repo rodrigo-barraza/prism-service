@@ -16,6 +16,7 @@ import {
   requireUserAuthority,
 } from "#src/middleware/ExternalAuthority";
 import { limitServiceTurn } from "#src/utils/ServiceTurnLimits";
+import { requireSignedInUser } from "#src/middleware/AuthMiddleware";
 
 const router = express.Router();
 
@@ -27,8 +28,10 @@ const router = express.Router();
  */
 router.post(
   "/approve",
-  // A relayed message is never the user's consent (ExternalAuthority).
+  // A relayed message is never the user's consent (ExternalAuthority), and
+  // no service's request decides for the user at all (AuthMiddleware).
   requireUserAuthority("approve a tool call"),
+  requireSignedInUser("approve a tool call"),
   asyncHandler(async (request: Request, response: Response) =>
     handleApprovalDecision(request, response, "[agent/approve]"),
   ),
@@ -46,6 +49,7 @@ router.post(
 router.post(
   "/answer",
   requireUserAuthority("answer a question on the user's behalf"),
+  requireSignedInUser("answer a question"),
   asyncHandler(handleQuestionAnswer("agent/answer")),
 );
 
