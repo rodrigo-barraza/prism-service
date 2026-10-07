@@ -22,14 +22,17 @@ It needs a prism-service checkout with its dependencies installed, and Node 22.1
 to stderr.
 
 ```bash
-PRISM_URL=http://localhost:7777 node /path/to/prism-service/src/acp/server.ts
+PRISM_URL=http://localhost:7777 PRISM_USERNAME=rodrigo PRISM_USER_TOKEN_SECRET=… \
+  node /path/to/prism-service/src/acp/server.ts
 ```
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `PRISM_URL` | **required** | The prism-service to drive. In this workspace, take it from `vault-service/projects.json`: `http://<defaultHost>:<port>` of `prism-service`. Never copy an IP from a doc. |
 | `PRISM_PROJECT` | `prism-chat` | `x-project` on every request. The CODING persona's conversations live in `prism-chat`. |
-| `PRISM_USERNAME` | the service's default user | `x-username`. |
+| `PRISM_USERNAME` | — | The user it signs in as when it mints its own token (required with `PRISM_USER_TOKEN_SECRET`). |
+| `PRISM_ACCESS_TOKEN` | — | A user token to sign in with, as it is (it is not renewed: once it expires, every request is a 401 until a new one is set). Wins over minting. |
+| `PRISM_USER_TOKEN_SECRET` | — | The key prism-client signs user tokens with. With it, the server mints its own one-hour token for `PRISM_USERNAME` and renews it five minutes before it expires, and once on a 401. |
 | `PRISM_PROFILE_ID` | the default profile | `x-profile-id`. |
 | `PRISM_AGENT` | the service's default (`CODING`) | The persona every session runs. |
 | `PRISM_PROVIDER` | `google` | The model provider. `/agent` requires one. |
@@ -37,9 +40,19 @@ PRISM_URL=http://localhost:7777 node /path/to/prism-service/src/acp/server.ts
 | `PRISM_WORKSPACE_ROOT` | `cwd` | Where the workspace tools work. `cwd` is the editor's project directory (ACP `session/new` `cwd`). A path sets one root for every session, for a tools-service that sees different paths than the editor. `none` sends no root and uses the service's default. tools-service refuses any root it has not registered, whatever is sent. |
 | `PRISM_PERMISSION_MODE` | the conversation's, else the service default | The permission mode new sessions start in (`default`, `plan`, `acceptEdits`, `auto`, `dontAsk`, `bypass`). |
 
-There is no authentication yet. The prism-service API is open to whoever can reach it
-(`harness_modernization_2026-09.md` item #1). The auth header will be added here when that
-work lands.
+**Signing in.** prism-service refuses an unauthenticated request (README "Authentication"),
+so the server signs in as the owner, the way prism-client does: every request carries
+`Authorization: Bearer <token>`, and the `/ws/chat` follow carries it as `access_token`. The
+username is the token's — `x-username` is not sent. Set one of:
+
+- `PRISM_ACCESS_TOKEN` — a token you minted (`node scripts/mint-user-token.ts --username rodrigo`
+  with the secret, or prism-client's `GET /api/prism-token` while signed in);
+- `PRISM_USER_TOKEN_SECRET` with `PRISM_USERNAME` — the server mints and renews its own.
+
+With neither, it exits at once with code 2 and says which to set. The secret signs tokens
+for any username, owner powers included: keep it only where the vault's `config` already is
+(this machine's environment for the editor), never in a checked-in settings file. Its turns
+are a signed-in user's, so the owner's command hooks, `bypass` and ACP agents work in them.
 
 ## Zed
 
@@ -54,7 +67,8 @@ Add a custom agent to `settings.json`:
       "args": ["/home/rodrigo/development/prism-service/src/acp/server.ts"],
       "env": {
         "PRISM_URL": "http://<prism-service host>:<port>",
-        "PRISM_USERNAME": "rodrigo"
+        "PRISM_USERNAME": "rodrigo",
+        "PRISM_USER_TOKEN_SECRET": "<from the vault's config>"
       }
     }
   }
@@ -76,7 +90,7 @@ startup warnings go to stderr, so stdout stays pure JSON-RPC.
         "--",
         "bash",
         "-lc",
-        "PRISM_URL=http://<prism-service host>:<port> PRISM_USERNAME=rodrigo node /home/rodrigo/development/prism-service/src/acp/server.ts"
+        "PRISM_URL=http://<prism-service host>:<port> PRISM_USERNAME=rodrigo PRISM_USER_TOKEN_SECRET=<from the vault's config> node /home/rodrigo/development/prism-service/src/acp/server.ts"
       ],
       "env": {}
     }
@@ -153,8 +167,10 @@ reports no cost, and background work such as memory extraction.
   errors, decisions made elsewhere, background work, and malformed JSON-RPC. Every message
   the server writes is checked against ACP's schemas. That includes the enum constants,
   which the SDK's zod accepts loosely, and only stable session updates are allowed.
-- `src/acp/__tests__/acpSupport.test.ts` covers configuration, SSE frame parsing and
-  prompt conversion.
+- `src/acp/__tests__/acpSupport.test.ts` covers configuration (the credential included),
+  SSE frame parsing, prompt conversion, and signing in: the token on every request, none of
+  `x-username`, a minted token renewed before it expires and once on a 401. The conformance
+  test checks the minted token on the requests and the `/ws/chat` follow.
 
 ## Prism as an ACP client: external agents as sub-agents
 
@@ -205,11 +221,14 @@ It must be a stored custom agent (`POST` / `PUT /custom-agents`):
 
 **Owner-only.** The agent is a process prism-service starts on its own host, with its
 privileges and no OS sandbox (#14). So, like a command hook, it is limited to the usernames
-in `PRISM_ACP_AGENT_OWNERS` (comma-separated; empty means nobody):
+in `PRISM_ACP_AGENT_OWNERS` (comma-separated; empty means nobody), signed in — a user's token,
+never a service naming them (README "Authentication"):
 
 - **Writing a definition.** Only those users may write `runtime: "acp"` or an `acp` object;
-  anyone else gets a 403. Switching back to `runtime: "prism"` narrows, so anyone may.
-- **Running it.** It runs only in a turn of one of those users, and only while its
+  anyone else, and any service, gets a 403. Switching back to `runtime: "prism"` narrows, so
+  anyone may.
+- **Running it.** It runs only in a turn of one of those users that a signed-in user started
+  (a scheduled task, timer, wake or resume carries its starter's auth), and only while its
   configuration's `owner` is still one of them. Both are checked again before every run.
 
 A `.prism/agents` or `.claude/agents` file that names a `runtime` or `acp` is rejected: a
