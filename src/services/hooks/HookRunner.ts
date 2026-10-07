@@ -23,6 +23,7 @@ import runCommandHook, {
   commandTimeoutDecision,
 } from "#src/services/hooks/handlers/CommandHookHandler";
 import runAgentHook from "#src/services/hooks/handlers/AgentHookHandler";
+import { WORKSPACE_HOOKS } from "#src/services/hooks/WorkspaceHookConstants";
 
 /**
  * HookRunner — the one place a configured hook actually executes.
@@ -327,13 +328,20 @@ const EVENT_TIMEOUTS: Partial<
 /**
  * The deadline a hook actually runs under: its own setting when it has a sane
  * one, otherwise the per-event default, always clamped to the event's ceiling
- * (`Interrupt`: 3 s) or the global one.
+ * (`Interrupt`: 3 s) or the global one. A repository's hook keeps the
+ * `timeout` its file gave it (Claude Code's default of 60 s when none) up to
+ * its own, wider ceiling.
  */
 export function resolveHookTimeout(hook: ConfiguredHookDocument): number {
   const eventTimeouts = EVENT_TIMEOUTS[hook.event];
   const eventDefault =
     eventTimeouts?.defaultMilliseconds ?? HOOKS.DEFAULT_TIMEOUT_MILLISECONDS;
-  const ceiling = eventTimeouts?.maxMilliseconds ?? HOOKS.MAX_TIMEOUT_MILLISECONDS;
+  const isWorkspaceHook =
+    hook.handler?.type === HOOK_HANDLER_TYPES.COMMAND &&
+    Boolean((hook.handler as CommandHookHandlerConfig).workspace);
+  const ceiling =
+    eventTimeouts?.maxMilliseconds ??
+    (isWorkspaceHook ? WORKSPACE_HOOKS.MAX_TIMEOUT_MILLISECONDS : HOOKS.MAX_TIMEOUT_MILLISECONDS);
 
   const configured = hook.timeoutMilliseconds;
   const base =
