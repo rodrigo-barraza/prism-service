@@ -91,6 +91,42 @@ PROVIDER_SGLANG_1_NICKNAME=Desktop
 
 Prism reads the model list and context window from `/v1/models`, and the parsers and image/audio support from `/model_info`. It demotes system messages after the first to the user role, because several chat templates reject them. It forwards media only as `data:` or `http(s)` URLs, since SGLang would read any other path from its own disk.
 
+## Authentication
+
+Every request proves who is calling (`src/middleware/AuthMiddleware.ts`). Prism trusts a credential, never a header that merely names someone. In order:
+
+1. **A signed-in user's token** — `Authorization: Bearer <jwt>`. prism-client's server mints it for its signed-in, allowlisted user (`GET /api/prism-token`). HS256 only (any other `alg`, `none` included, is refused), signed with `PRISM_USER_TOKEN_SECRET`; claims `sub` (the Prism username), `email`, `roles`, `iat`, `exp` (at most 12 h after `iat`), `iss: "prism-client"`, `aud: "prism-service"`. The username is the token's `sub`; `x-username` is ignored. `x-project` and `x-profile-id` are still read from headers. A bad or expired token is `401 {error, code: "INVALID_TOKEN"}` and never falls through to another credential.
+2. **A service's secret** — `x-api-secret` equal to `PRISM_SERVICE_API_SECRET` (lupos-bot, messages-service, clock-crew-service, tools-service, the Next.js servers of public sites). A service speaks for its own end users: the username is its `x-username`, else `anonymous`. Relays keep their lane (`ExternalAuthority`).
+3. **Nothing** — `401 {"error": "Sign in to use Prism.", "code": "UNAUTHENTICATED"}`. A wrong `x-api-secret` is the same 401 with its own message.
+
+**Public paths**, the only ones that need no credential: `OPTIONS` (CORS preflights), `GET`/`HEAD /health` and its sub-paths, `GET`/`HEAD /files/<key>` (media an `<img>` or `<audio>` tag loads), `GET /mcp/oauth/callback` (a third-party authorization server's redirect) and `GET /mcp/oauth/client-metadata.json` (the Client ID Metadata Document those servers fetch). Everything else, `GET /` and `/admin` included, signs in. CORS allows the `Authorization` and `x-api-secret` request headers.
+
+**WebSockets** authenticate the upgrade the same way: a user's token from the `access_token` query parameter (browsers cannot set headers on a WebSocket) or `Authorization`, a service's secret from `x-api-secret`. An unauthenticated upgrade gets an HTTP 401 before switching protocols.
+
+**Owner powers need a signed-in user.** Command hooks (`PRISM_HOOK_COMMAND_OWNERS`), trusting a repository's hooks, `bypass` (`PRISM_PERMISSION_BYPASS_OWNERS`) and ACP agents (`PRISM_ACP_AGENT_OWNERS`) check the owners list *and* that the request or turn authenticated as a `user`; a service claiming `x-username: rodrigo` gets none of them. Turns that run without a request (scheduled tasks, conversation timers, background-task and async-task wakes, turns re-driven after a restart) carry the auth of whoever started them (`authKind`, stored on the task, timer, detached-work and turn-run records) and run with it: a wake of the owner's work keeps owner powers, a turn a service started never gains them, and a record from before authentication has none.
+
+**Machine access is a user's alone.** On `/agent`, `/chat`, `/conversation` and `/ws/chat`, a service's `workspaceRoot` (body or `x-workspace-root`) and `autoApprove` are dropped (one debug line) and its turn gets no workspace tools; every agentic loop a service's request starts gets the same limits (`src/utils/ServiceTurnLimits.ts`).
+
+**Admin:** `/admin/*` and `POST /files/gc` need a signed-in user whose token carries the `admin` role (from accounts-service, via prism-client); anyone else gets `403 {error, code: "FORBIDDEN"}`.
+
+**Outbound:** every request to tools-service carries `x-api-secret: TOOLS_SERVICE_API_SECRET` (`src/utils/ToolsServiceAuth.ts`), LM Studio's MCP integration included.
+
+| Variable | Meaning |
+|---|---|
+| `PRISM_USER_TOKEN_SECRET` | HS256 key of user tokens (prism-client signs, prism-service verifies) |
+| `PRISM_SERVICE_API_SECRET` | Servers' credential, sent as `x-api-secret` |
+| `TOOLS_SERVICE_API_SECRET` | tools-service's credential, sent on every call to it |
+| `PRISM_HOOK_COMMAND_OWNERS`, `PRISM_PERMISSION_BYPASS_OWNERS`, `PRISM_ACP_AGENT_OWNERS` | The owners lists (comma-separated; empty = nobody) |
+
+Each secret is read per request, and an unset one fails closed: nothing matches it. The ACP server signs in with `PRISM_ACCESS_TOKEN`, or mints its own token with `PRISM_USER_TOKEN_SECRET` for `PRISM_USERNAME` (`docs/acp.md`). `node scripts/mint-user-token.ts --username <name> [--roles admin]` mints one for a script or a live test.
+
+**Rollout order:**
+
+1. Deploy the callers (lupos-bot, messages-service, clock-crew-service, meepothegeomancer-client, rod-dev-client): they send the secret, which an older prism-service ignores.
+2. Deploy tools-service and prism-service together (prism-service needs the tools secret).
+3. Deploy prism-client.
+4. Move the owner's data from `anonymous` to their username: `node scripts/migrate-owner-username.ts --from anonymous --to rodrigo` (a dry run that prints per-collection counts), then the same with `--apply --yes-production`. It never deletes, leaves a document whose unique key collides where it is, and stamps the owner's scheduled tasks and timers as a signed-in user's.
+
 ## API Endpoints
 
 ### REST
@@ -121,13 +157,15 @@ Prism reads the model list and context window from `/v1/models`, and the parsers
 | `/ws/text-to-audio` | Streaming TTS (binary audio frames) |
 | `/ws/live` | Persistent bidirectional Live API (Gemini Live) |
 
+Every upgrade signs in (see Authentication): a browser puts its token in `access_token`.
+
 ### Editors (ACP)
 
 `node src/acp/server.ts` is an [Agent Client Protocol](https://agentclientprotocol.com) agent: Zed and other ACP editors drive a Prism conversation through it (JSON-RPC over stdio → this service's HTTP API). Setup and the event mapping: `docs/acp.md`.
 
 The other direction, Prism handing a sub-agent to Claude Code, Codex or any other ACP agent (a custom agent with `runtime: "acp"`), is built but **turned off**: nothing works until `PRISM_ACP_AGENT_OWNERS` is set. To turn it on, follow "Turning it on" in `docs/acp.md`.
 
-### Admin (requires `x-admin-secret`)
+### Admin (a signed-in user with the `admin` role — see Authentication)
 
 | Method | Endpoint | Description |
 |---|---|---|

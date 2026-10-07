@@ -43,7 +43,7 @@ What it lacks falls into four groups:
 
 | # | What | Why now | Effort |
 |---|---|---|---|
-| 1 | Authenticate prism-service and tools-service (§2.1 S1) | Both are routed publicly by the Caddy edge with no auth. Identity is a header, and the request body can set `autoApprove` and `workspaceRoot` | S stopgap / M proper |
+| 1 | ~~Authenticate prism-service and tools-service (§2.1 S1)~~ **Done 2026-10-06** (the proper fix: README "Authentication") | Both were routed publicly by the Caddy edge with no auth. Identity was a header, and the request body could set `autoApprove` and `workspaceRoot` | S stopgap / M proper |
 | 2 | Claude 5-generation compatibility (§2.2 A1–A5) | Opus 5.5 and Fable 5.1 get a 400 on every agent request. Plan mode sends a prefill. Utility calls get 400s on Sonnet 5 / Fable 5. Refusals are retried as "empty output" | S |
 | 3 | Deliver `ask_user` answers to the running turn (§2.3 B1) | The client never sends `agentConversationId`, so answers 404 and blocking questions time out | S |
 | 4 | Stop destroying sub-agent worktree edits (§2.3 B2) | The branch-name contract is broken between prism-service and tools-service | S |
@@ -62,7 +62,7 @@ What it lacks falls into four groups:
 
 ### 2.1 Security
 
-**S1. No authentication on the API (re-checked).**
+**S1. No authentication on the API (re-checked).** — **Done 2026-10-06**, the proper fix below (README "Authentication"): a signed-in user's HS256 token from prism-client or a service's `x-api-secret` on every request and WebSocket upgrade, `/admin` behind the admin role, owner powers only for a signed-in user (internal turns carry their starter's auth), `autoApprove`/`workspaceRoot` dropped for services, and tools-service's gated routes behind its own secret. What follows is the finding as it stood.
 - **Identity is spoofable.** `src/middleware/AuthMiddleware.ts` wraps the utilities-library `createAuthMiddleware`, which only *resolves* identity from the `x-username` / `x-project` headers and authenticates nothing.
 - **`/admin` skips even that.** `src/index.ts` mounts `app.use("/admin", adminRouter)` *before* `app.use(authMiddleware)`.
 - **The body sets approval and filesystem root.** The `/agent` body schema accepts `autoApprove` (`src/types/schemas.ts:116`, forwarded at `src/routes/ChatRoutes.ts:268,330`) and `workspaceRoot`, described in code as a "user-selected workspace root path (absolute fs path)".
@@ -797,7 +797,7 @@ The client audit's ranked gaps, beyond §2.4:
   - F-4 / F-3 (Tree-of-Thoughts pruning is dead code) and the decay-floor mismatch (Tree-of-Thoughts `max(1)` vs Graph-of-Thoughts `max(2)`);
   - F-1 `Promise.all` → `allSettled` plus a concurrency cap; F-9; F-11;
   - D.2 shared tool filter (B12);
-  - §H tenancy (MCP pool key, log redaction, worktree prefix match); `/admin` auth (S1);
+  - §H tenancy (MCP pool key, log redaction, worktree prefix match); `/admin` auth (S1 — done 2026-10-06);
   - `TURN_INPUT` / `GOAL_UPDATE` taxonomy literals;
   - the Lupos artifact-tools exception; GitHub MCP.
 - **harness-next "not done":**

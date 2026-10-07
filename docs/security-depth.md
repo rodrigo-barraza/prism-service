@@ -7,6 +7,14 @@ authority, and a taint check on tool arguments. Built by prompt 22 (branches
 2026-09-22/23). The research behind each is in
 `harness_modernization_2026-09.md` §4.13.
 
+Underneath them all, every request is authenticated (README
+"Authentication", `middleware/AuthMiddleware.ts`, 2026-10-06): a signed-in
+user's token (prism-client) or a service's secret (`x-api-secret`), nothing
+else. Owner powers — command hooks, trusting a repository's hooks, `bypass`,
+ACP agents — need a signed-in user, and turns that run without a request
+carry the auth of whoever started them. A service's turns never get a
+workspace root, workspace tools or full auto (`utils/ServiceTurnLimits.ts`).
+
 ## 1. Memory provenance (`memory/MemoryProvenance.ts`)
 
 Every memory carries `source`, `trust` (`user | derived | untrusted`) and
@@ -84,10 +92,11 @@ pairs, default `lupos=discord`). Such a request:
   bot's conversation is left as it is (its persona already treats every
   message as a Discord user's, and its mode is pinned).
 
-This is a lane for well-behaved relays, not authentication (modernization
-item #1): a caller that lies about its project is not stopped here.
-Self-protection also refuses an agent's own call to `/answer`, `/input`,
-goals, budgets and the taint setting.
+This is a lane for well-behaved relays, not authentication: AuthMiddleware
+has proved who is calling before it runs, and a relay is a service holding
+PRISM_SERVICE_API_SECRET that names its own end users. Self-protection also
+refuses an agent's own call to `/answer`, `/input`, goals, budgets and the
+taint setting.
 
 ## 4. The taint check (`permissions/UntrustedSpans.ts`)
 
@@ -163,6 +172,16 @@ Inner checks — `run_async_task`, `run_tool_program`, `read_untrusted`'s fetch
 
 ## Tests
 
+- Authentication: `tests/authMiddleware.test.ts` (tokens, the service secret,
+  public paths, `/admin`, CORS, the request log), `tests/authWiring.test.ts`
+  (mount order, `/files/gc`), `src/websocket/__tests__/websocketAuth.test.ts`
+  (upgrades), `tests/serviceTurnLimits.test.ts`, `tests/toolsServiceAuth.test.ts`;
+  owner powers denied to a service: `hooksRoutes`, `workspaceHooksRoutes`,
+  `permissionsRoutes`, `customAgentsAcpRuntimeRoutes`, `commandHookHandler`,
+  `workspaceHookSemantics`, `permissionModes(InTheLoop)`, `acpClientRuntime`;
+  internal turns' auth: `scheduledTaskService`, `conversationTimerService`,
+  `taskNotificationDelivery`, `backgroundTaskWatcher`, `asyncTask*`,
+  `resumeParkedTurns`.
 - External input: `tests/externalInputLane.test.ts`, `tests/externalAuthority.test.ts`,
   `tests/nonBlockingSubAgentDispatch.test.ts` (scenario 3, real harness),
   `src/services/__tests__/mcpClientService.test.ts` (server notifications),
