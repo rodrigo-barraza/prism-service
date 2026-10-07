@@ -11,9 +11,13 @@ vi.mock("#config", async (importOriginal) => ({
 
 import runCommandHook, {
   interpretCommandOutcome,
-  isCommandHookOwner,
 } from "#src/services/hooks/handlers/CommandHookHandler";
-import { runConfiguredHook, normalizeDecision } from "#src/services/hooks/HookRunner";
+import { isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
+import {
+  runConfiguredHook,
+  normalizeDecision,
+  resolveHookTimeout,
+} from "#src/services/hooks/HookRunner";
 import { HOOK_EVENTS } from "#src/services/hooks/types";
 import type {
   CommandHookHandlerConfig,
@@ -281,5 +285,76 @@ exit 0`,
       env: expect.objectContaining({ PRISM_HOOK_EVENT: "PreToolUse", PRISM_HOOK_NAME: "gate" }),
     });
     expect(body.timeoutMilliseconds).toBeLessThan(5_000);
+    // A stored hook runs in its owner's hooks directory, never a workspace.
+    expect(body.workspace).toBeUndefined();
+    expect(body.cwd).toBeUndefined();
+  });
+
+  describe("a repository's own hook (workspace)", () => {
+    const workspace = {
+      cwd: "/repo",
+      path: "/repo/.prism/hooks.json",
+      sha256: "a".repeat(64),
+      scope: "project" as const,
+    };
+
+    it("asks tools-service to run it in the file's directory: {workspace: true, cwd}", async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ exitCode: 0, stdout: "", stderr: "", timedOut: false }),
+      });
+      await runCommandHook(
+        { type: "command", command: ".claude/hooks/prism-hook.sh", workspace },
+        { payloadJson: "{}", event: HOOK_EVENTS.PRE_TOOL_USE, timeoutMilliseconds: 15_000, owner: OWNER },
+      );
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const body = JSON.parse(String(init.body));
+      expect(body).toMatchObject({
+        command: ".claude/hooks/prism-hook.sh",
+        workspace: true,
+        cwd: "/repo",
+        owner: OWNER,
+      });
+      expect((init.headers as Record<string, string>)["x-workspace-override"]).toBeUndefined();
+    });
+
+    it("sends a sub-agent's worktree as the workspace override, so the sandbox admits its path", async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ exitCode: 0, stdout: "", stderr: "", timedOut: false }),
+      });
+      await runCommandHook(
+        {
+          type: "command",
+          command: "true",
+          workspace: { ...workspace, cwd: "/worktrees/agent-1", worktreePath: "/worktrees/agent-1" },
+        },
+        { payloadJson: "{}", event: HOOK_EVENTS.STOP, timeoutMilliseconds: 5_000, owner: OWNER },
+      );
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(JSON.parse(String(init.body)).cwd).toBe("/worktrees/agent-1");
+      expect((init.headers as Record<string, string>)["x-workspace-override"]).toBe("/worktrees/agent-1");
+    });
+
+    it("keeps the file's own timeout past the stored hooks' 60 s ceiling, up to 10 minutes", () => {
+      const stored = commandHook("true", { timeoutMilliseconds: 120_000 });
+      const repository = commandHook("true", { timeoutMilliseconds: 120_000 }, { workspace });
+      expect(resolveHookTimeout(stored)).toBe(HOOKS.MAX_TIMEOUT_MILLISECONDS);
+      expect(resolveHookTimeout(repository)).toBe(120_000);
+      expect(resolveHookTimeout(commandHook("true", { timeoutMilliseconds: 3_600_000 }, { workspace }))).toBe(
+        600_000,
+      );
+    });
+
+    it("is still refused for a user outside the owner list", async () => {
+      const result = await runCommandHook(
+        { type: "command", command: "true", workspace },
+        { payloadJson: "{}", event: HOOK_EVENTS.PRE_TOOL_USE, timeoutMilliseconds: 1_000, owner: "mallory" },
+      );
+      expect(result).toMatchObject({ _handlerFailed: true, _reason: "command_owner_required" });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 });
