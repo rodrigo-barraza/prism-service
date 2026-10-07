@@ -578,8 +578,6 @@ describe("AuthMiddleware — workspace scoping", () => {
 
 // ═══════════════════════════════════════════════════════════════
 describe("AuthMiddleware — AsyncLocalStorage propagation", () => {
-  const next: NextFunction = vi.fn();
-
   it("should populate the request context opened before it (requestLoggerMiddleware's)", async () => {
     const capturedStore = await new Promise<Record<string, unknown> | undefined>((resolve) => {
       requestContext.run(
