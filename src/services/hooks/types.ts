@@ -327,22 +327,44 @@ export interface HookDecision {
   message?: string;
 }
 
-/** The payload every handler receives, mirroring Claude Code's hook input. */
+/**
+ * The payload every handler receives: Claude Code's hook input as a
+ * superset — a script written for Claude Code reads the same fields — plus
+ * Prism's own (`agent_conversation_id`, `project`, `username`, `agent`).
+ */
 export interface HookPayload {
   hook_event_name: HookEventName;
+  /** The conversation (a sub-agent run's own conversation). */
   session_id: string;
+  /** The conversation's Claude-shaped transcript (ClaudeTranscript); null until known, or when it keeps none. */
+  transcript_path?: string | null;
+  /**
+   * Where the event happens: `execute_command`'s own `cwd` (resolved against
+   * the workspace root) on its tool events, otherwise the workspace root —
+   * a sub-agent's worktree for a sub-agent working in one.
+   */
+  cwd: string | null;
+  /** The turn's permission mode, in Claude Code's names (`bypassPermissions` for bypass). */
+  permission_mode?: string;
+  /** Always `"prism"` — a hook shared with Claude Code or Codex can tell who fired it. */
+  harness?: string;
+  /** The workspace root the turn works in (a sub-agent's worktree, when it has one). */
+  workspace_root?: string | null;
   agent_conversation_id: string;
   project: string;
   username: string;
   agent: string | null;
-  cwd: string | null;
   /** Present on sub-agent runs, absent on the top-level loop. */
   parent_agent_conversation_id?: string;
+  /** Sub-agent runs: the sub-agent's own id (its `agent_conversation_id`), as Claude Code names a subagent. */
+  agent_id?: string;
   /** Tool events. */
   tool_name?: string;
   tool_input?: Record<string, unknown>;
   tool_use_id?: string;
   tool_output?: unknown;
+  /** `PostToolUse` / `PostToolUseFailure`: Claude Code's name for `tool_output` — the same value. */
+  tool_response?: unknown;
   tool_error?: string;
   /** `UserPromptSubmit`. */
   prompt?: string;
