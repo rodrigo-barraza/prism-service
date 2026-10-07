@@ -2,7 +2,8 @@
  * Powers no server needs are a signed-in user's alone (AuthMiddleware
  * requireSignedInUser): answering or approving a pending decision (a tool
  * call, a plan, a question, a budget pause, a proposed goal), changing the
- * workspaces, and importing what brings MCP servers that run commands. A
+ * workspaces, importing what brings MCP servers that run commands, and
+ * changing or running benchmarks (their scorers run commands). A
  * service's request — any service, not only a relay — gets a 403 that says
  * so; a user's token goes through to the route.
  */
@@ -17,6 +18,7 @@ const { default: conversationsRouter } = await import("#src/routes/Conversations
 const { default: workspacesRouter } = await import("#src/routes/WorkspacesRoutes");
 const { default: pluginsRouter } = await import("#src/routes/PluginsRoutes");
 const { default: claudeConfigImportRouter } = await import("#src/routes/ClaudeConfigImportRoutes");
+const { default: benchmarkRouter } = await import("#src/routes/BenchmarkRoutes");
 
 app.use("/user-only/agent", agentRouter);
 app.use("/user-only/conversation", conversationExecutionRouter);
@@ -24,6 +26,7 @@ app.use("/user-only/conversations", conversationsRouter);
 app.use("/user-only/workspaces", workspacesRouter);
 app.use("/user-only/plugins", pluginsRouter);
 app.use("/user-only/claude-config-import", claudeConfigImportRouter);
+app.use("/user-only/benchmark", benchmarkRouter);
 const http = supertest(app);
 
 type Method = "post" | "put" | "patch" | "delete";
@@ -60,6 +63,10 @@ const GUARDED: Array<{
   },
   { method: "post", path: "/plugins/import", body: {}, action: /import a plugin/ },
   { method: "post", path: "/claude-config-import", body: {}, action: /import Claude Code configuration/ },
+  // A suite's command scorers run on this host. For a user, a run with no
+  // contestants and a suite with no name stop at validation.
+  { method: "post", path: "/benchmark/runs", body: {}, action: /change or run benchmarks/ },
+  { method: "post", path: "/benchmark/suites", body: {}, action: /change or run benchmarks/ },
 ];
 
 describe("a service's request is refused what only a signed-in user may do", () => {

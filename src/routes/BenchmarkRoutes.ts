@@ -44,8 +44,13 @@ import type {
   ScheduledBenchmarkConfig,
   SampleStatus,
 } from "#src/types/benchmark";
+import { requireSignedInUserToChange } from "#src/middleware/AuthMiddleware";
 
 const router = express.Router();
+// A run's scratch workspaces and command scorers write files and run a
+// suite's commands on this host: a signed-in user's to change or start
+// (AuthMiddleware). Reads stay open to every caller.
+router.use(requireSignedInUserToChange("change or run benchmarks (their scorers run commands on this host)"));
 
 const projectOf = (req: Request) => req.project || null;
 const usernameOf = (req: Request) => req.username || DEFAULT_USERNAME;

@@ -87,6 +87,7 @@ vi.mock("#src/wrappers/MongoWrapper", () => ({
 }));
 
 import { setupWebSocket } from "#src/websocket/index";
+import { registerToolCapabilities } from "#src/services/permissions/ToolCapabilities";
 import { serviceHeaders, userHeaders } from "../../../tests/helpers/auth.ts";
 import {
   LiveTurnBuffer,
@@ -938,6 +939,58 @@ describe("WebSocket Handler Suite", () => {
           }],
         });
       });
+    });
+
+    it("a service's session: a tool its scope denies is neither offered nor run (ServiceTurnLimits)", async () => {
+      // tools-service's tags: get_weather reads the network; execute_shell is the shell.
+      registerToolCapabilities([{ name: "get_weather", capabilities: ["network"] }], "test");
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      mockWss.emitConnection(mockSocket, {
+        url: "/ws/live",
+        headers: { host: "localhost", ...serviceHeaders("visitor") },
+        socket: { remoteAddress: "127.0.0.1" },
+      });
+      mockGetToolSchemas.mockReturnValue([
+        { name: "get_weather", description: "Get weather details", parameters: {} },
+        { name: "execute_shell", description: "Run a command", parameters: {} },
+      ]);
+      mockSocket.emit(
+        "message",
+        Buffer.from(JSON.stringify({ type: "setup", config: { enabledTools: ["get_weather", "execute_shell"] } })),
+      );
+      await vi.waitFor(() => {
+        expect(mockSocket.send).toHaveBeenCalledWith(JSON.stringify({ type: "setupComplete" }));
+      });
+      expect(mockConvertToolsToGoogle).toHaveBeenCalledWith([
+        { name: "get_weather", description: "Get weather details", parameters: {} },
+      ]);
+
+      // The model calls it anyway: refused, never run; the read runs.
+      mockExecuteTool.mockResolvedValue({ temperature: "68F" });
+      mockConnect.mock.calls[0][0].callbacks.onmessage({
+        toolCall: {
+          functionCalls: [
+            { id: "call-shell", name: "execute_shell", args: { command: "cat ~/.ssh/id_ed25519" } },
+            { id: "call-weather", name: "get_weather", args: { city: "SF" } },
+          ],
+        },
+      });
+      await vi.waitFor(() => {
+        expect(mockLiveSession.sendToolResponse).toHaveBeenCalled();
+      });
+      expect(mockExecuteTool.mock.calls.map((call) => call[0])).toEqual(["get_weather"]);
+      const [{ functionResponses }] = mockLiveSession.sendToolResponse.mock.calls[0];
+      expect(functionResponses).toEqual([
+        expect.objectContaining({
+          id: "call-shell",
+          response: expect.objectContaining({
+            error: "CAPABILITY_SCOPE_DENIED",
+            message: expect.stringContaining('[Capability scope] "execute_shell"'),
+          }),
+        }),
+        { id: "call-weather", name: "get_weather", response: { temperature: "68F" } },
+      ]);
     });
 
     it("should handle tool execution errors without crashing", async () => {
