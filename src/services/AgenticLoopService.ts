@@ -45,6 +45,8 @@ import BudgetPauseRegistry, {
 } from "./BudgetPauseRegistry.ts";
 import type { SharedCostBudget } from "./harnesses/lifecycle/CostBudgetEnforcer.ts";
 import logger from "#src/utils/logger";
+import { currentAuthKind } from "#src/utils/RequestContext";
+import { limitServiceTurn } from "#src/utils/ServiceTurnLimits";
 
 import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
 
@@ -113,6 +115,14 @@ export default class AgenticLoopService {
 
     const resolvedAgentConversationId = agentConversationId || "";
     const resolvedParentAgentConversationId = parentAgentConversationId || null;
+
+    // A service's request reaches the owner's machine through no entry point
+    // — a route, a scheduled task or timer it created, a wake, a sub-agent:
+    // no workspace root, no workspace tools, no full auto (ServiceTurnLimits).
+    if (currentAuthKind() === "service") {
+      limitServiceTurn("service", options as Record<string, unknown>, `loop ${conversationId ?? resolvedAgentConversationId}`);
+      context.workspaceRoot = null;
+    }
 
     // An external runtime (an ACP agent process) runs the turn itself: no
     // Prism tools, provider or harness are resolved for it.

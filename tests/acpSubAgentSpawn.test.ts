@@ -60,6 +60,7 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import { TopologyExecutionService } from "#src/services/orchestrator/TopologyExecutionService";
 import { GitWorktreeHelper } from "#src/services/orchestrator/GitWorktreeHelper";
 import { ACP_AGENT_OWNERS_ENV_VAR } from "#src/services/agents/AgentRuntime";
+import { runAs } from "./helpers/auth.ts";
 
 const FAKE_AGENT = fileURLToPath(new URL("../src/acp/__tests__/fixtures/fakeAcpAgent.ts", import.meta.url));
 const OWNER = "acp-owner";
@@ -90,11 +91,14 @@ function parentContext(events: Event[]) {
   };
 }
 
+/** The parent's tool call, in its turn — one the owner signed in to (an ACP agent needs that). */
 async function spawnAcpAgent(prompt: string, events: Event[]) {
-  const result = await ToolOrchestratorService.executeTool(
-    "create_subagent",
-    { description: "Delegate to Claude Code", prompt, agent: "Claude Code" },
-    parentContext(events),
+  const result = await runAs("user", OWNER, () =>
+    ToolOrchestratorService.executeTool(
+      "create_subagent",
+      { description: "Delegate to Claude Code", prompt, agent: "Claude Code" },
+      parentContext(events),
+    ),
   );
   expect(result).not.toHaveProperty("error");
 }
@@ -212,10 +216,12 @@ describe("a custom agent on the acp runtime, spawned by a parent", () => {
     expect(subAgent.worktreePath).toBeNull();
     const created = vi.mocked(GitWorktreeHelper.createWorktree).mock.calls.length;
 
-    const resumed = await ToolOrchestratorService.executeTool(
-      "resume_subagent",
-      { agent_id: subAgent.agentId, prompt: "SCENARIO=echo again" },
-      parentContext(events),
+    const resumed = await runAs("user", OWNER, () =>
+      ToolOrchestratorService.executeTool(
+        "resume_subagent",
+        { agent_id: subAgent.agentId, prompt: "SCENARIO=echo again" },
+        parentContext(events),
+      ),
     );
     expect(resumed).not.toHaveProperty("error");
     await vi.waitFor(() => expect(events.filter(isComplete)).toHaveLength(2), { timeout: 15_000, interval: 25 });
@@ -224,6 +230,19 @@ describe("a custom agent on the acp runtime, spawned by a parent", () => {
       new RegExp(`^orchestrator/${subAgent.agentId}-[a-z0-9]+$`),
     );
     expect(subAgent.output).toContain("SCENARIO=echo again");
+  });
+
+  it("never runs in a service's turn, even one under the owner's name", async () => {
+    const events: Event[] = [];
+    await runAs("service", OWNER, () =>
+      ToolOrchestratorService.executeTool(
+        "create_subagent",
+        { description: "Delegate to Claude Code", prompt: "SCENARIO=echo hi", agent: "Claude Code" },
+        parentContext(events),
+      ),
+    );
+    const failed = await waitFor(events, (event) => event.type === "sub_agent_status" && event.message === "failed");
+    expect(failed.error).toMatch(/owner powers need a signed-in user and this is a service's request/);
   });
 
   it("never runs outside a worktree of its own", async () => {

@@ -2,6 +2,7 @@ import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import { TOOLS_SERVICE_URL } from "#config";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import { traceHeaders } from "#src/services/Tracing";
 import { HOOKS } from "#src/constants";
 import {
@@ -13,7 +14,7 @@ import type {
   HookEventName,
 } from "#src/services/hooks/types";
 import { extractFirstJsonObject } from "#src/services/hooks/handlers/PromptHookHandler";
-import { isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
+import { commandHookOwnerRefusal, isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
 import { pickHookDecision } from "#src/services/hooks/HookRunner";
 import type { HookHandlerResult } from "#src/services/hooks/HookRunner";
 
@@ -36,9 +37,11 @@ import type { HookHandlerResult } from "#src/services/hooks/HookRunner";
  * **Privilege.** There is no OS sandbox yet (#14). A command hook runs with
  * tools-service's own privileges: whatever that service's user can read,
  * write or reach, the hook can too. That is why owning one is restricted to
- * the usernames in `PRISM_HOOK_COMMAND_OWNERS` (empty = nobody) — checked
- * when the hook is written AND again here, before every run, so a document
- * that reached the collection some other way still cannot execute.
+ * the usernames in `PRISM_HOOK_COMMAND_OWNERS` (empty = nobody), in a
+ * turn a signed-in user started (AuthMiddleware) — checked when the hook is
+ * written AND again here, before every run, so a document that reached the
+ * collection some other way, or a service's turn under the owner's name,
+ * still cannot execute.
  *
  * **Exit codes** (Claude Code's contract):
  *   - `0` — success. Stdout that is a JSON object is read as a decision; any
@@ -178,7 +181,7 @@ export default async function runCommandHook(
   }
   if (!isCommandHookOwner(options.owner)) {
     logger.warn(
-      `[CommandHookHandler] "${hookName}" belongs to "${options.owner ?? "?"}", who is not in ${HOOKS.COMMAND_OWNERS_ENV_VAR}. Not running it.`,
+      `[CommandHookHandler] "${hookName}" belongs to "${options.owner ?? "?"}": ${commandHookOwnerRefusal(options.owner)} Not running it.`,
     );
     return { _handlerFailed: true, _reason: "command_owner_required" };
   }
@@ -198,6 +201,7 @@ export default async function runCommandHook(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...toolsServiceAuthHeaders(),
         [IDENTITY_HEADERS.project]: options.project || "any",
         [IDENTITY_HEADERS.username]: options.owner || "any",
         // A worktree's paths reach the tools-service sandbox only with this.

@@ -3,6 +3,7 @@
  * Every test file gets a pre-configured supertest agent via `createAgent()`.
  */
 import { vi } from 'vitest';
+import { TEST_SERVICE_API_SECRET } from './helpers/authSecrets.ts';
 
 // ── Mock secrets before anything imports them ──────────────────────────
 vi.mock('#config', () => ({
@@ -341,6 +342,7 @@ const { default: express } = await import('express');
 const { default: cors } = await import('cors');
 const { errorHandler } = await import('#src/utils/errors');
 const { authMiddleware } = await import('#src/middleware/AuthMiddleware');
+const { signInAsHeaderUser } = await import('./helpers/auth.ts');
 const { listProviders } = await import('#src/providers/index');
 
 const { default: chatRouter } = await import('#src/routes/ChatRoutes');
@@ -371,6 +373,10 @@ app.get('/', (_req, res) => {
     });
 });
 
+// The test client signs in as the user its x-username names — with a real
+// token, which AuthMiddleware verifies (tests/helpers/auth.ts). A request
+// that brings its own credential (the auth tests) is left as it is.
+app.use(signInAsHeaderUser);
 app.use(authMiddleware);
 app.use('/config', configRouter);
 app.use('/chat', chatRouter);
@@ -380,7 +386,9 @@ app.use('/webhooks', webhookRouter);
 app.use(errorHandler);
 
 // ── Helpers ───────────────────────────────────────────────────
-export const TEST_SECRET = 'test-secret';
+// The service secret AuthMiddleware accepts in tests: `x-api-secret:
+// TEST_SECRET` signs a request in as a service (helpers/authSecrets.ts).
+export const TEST_SECRET = TEST_SERVICE_API_SECRET;
 
 export const TEST_PROJECT = "coding";
 export const TEST_USER = "testuser";

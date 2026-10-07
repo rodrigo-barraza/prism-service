@@ -1,5 +1,6 @@
 import { canonicalValues, normalizePath, type MatchableCall } from "./PermissionMatcher.ts";
 import type { Capability } from "./types.ts";
+import { isAuthenticatedUser, ownerRefusal } from "#src/utils/RequestContext";
 
 /**
  * Permission modes — how much of the tier system asks a person.
@@ -104,8 +105,14 @@ export function bypassOwners(): Set<string> {
   );
 }
 
+/** A bypass owner, in a request or turn a signed-in user started (a service naming one gets no bypass). */
 export function canUseBypass(username: string | null | undefined): boolean {
-  return Boolean(username) && bypassOwners().has(username!);
+  return Boolean(username) && isAuthenticatedUser() && bypassOwners().has(username!);
+}
+
+/** Why `username` may not use bypass here (canUseBypass said no). */
+export function bypassRefusal(username: string | null | undefined): string {
+  return ownerRefusal(username, BYPASS_OWNERS_ENV_VAR, !!username && bypassOwners().has(username));
 }
 
 // ── What each mode lets through ──────────────────────────────────

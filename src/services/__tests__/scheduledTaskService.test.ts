@@ -209,6 +209,8 @@ vi.mock("#src/services/AgentPersonaRegistry", () => ({
 const { default: ScheduledTaskService, matchCron } = await import(
   "#src/services/ScheduledTaskService"
 );
+const { currentAuthKind } = await import("#src/utils/RequestContext");
+const { runAs } = await import("../../../tests/helpers/auth.ts");
 
 // ── Test fixtures ──────────────────────────────────────────────
 const TASK_FIXTURE = {
@@ -972,6 +974,59 @@ describe("ScheduledTaskService — Comprehensive Tests", () => {
     it("should return false when deleting non-existent task", async () => {
       const isDeleted = await ScheduledTaskService.deleteTask("nonexistent-id", "prism-chat", "rodrigo");
       expect(isDeleted).toBe(false);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────
+  // Who a run is: the auth of the request that last saved the task
+  // ──────────────────────────────────────────────────────────────
+  describe("Who a run is", () => {
+    const fields = {
+      name: "Nightly",
+      project: "prism-chat",
+      prompt: "Summarize",
+      agent: "OMNI",
+      provider: PROVIDERS.GOOGLE,
+      model: "gemini-3.5-flash",
+      scheduleType: "once",
+      enabled: true,
+      username: "rodrigo",
+    };
+
+    it("a save stamps how its request authenticated — never what a body claims", async () => {
+      await runAs("user", "rodrigo", () => ScheduledTaskService.createTask({ ...fields } as any));
+      await runAs("service", "rodrigo", () =>
+        ScheduledTaskService.createTask({ ...fields, name: "From a service", authKind: "user" } as any),
+      );
+      expect(mockDatabase._collections.scheduled_tasks.map((task: any) => [task.name, task.authKind])).toEqual([
+        ["Nightly", "user"],
+        ["From a service", "service"],
+      ]);
+
+      // An edit re-stamps it: a service's edit takes the user's task out of owner powers.
+      const [userTask] = mockDatabase._collections.scheduled_tasks;
+      const edited = await runAs("service", "rodrigo", () =>
+        ScheduledTaskService.updateTask(userTask.id, "prism-chat", "rodrigo", { prompt: "Changed", authKind: "user" } as any),
+      );
+      expect(edited.authKind).toBe("service");
+    });
+
+    it("a run re-applies the task's auth, whoever fired it", async () => {
+      const seen: Array<string | null> = [];
+      const record = async () => {
+        seen.push(currentAuthKind());
+      };
+      mockRunAgenticLoop.mockImplementationOnce(record).mockImplementationOnce(record).mockImplementationOnce(record);
+      // The daemon (no request), and a signed-in user's trigger, alike.
+      await ScheduledTaskService.executeTask({ ...TASK_FIXTURE, authKind: "user" } as any, undefined, { username: "rodrigo" });
+      await runAs("user", "rodrigo", () =>
+        ScheduledTaskService.executeTask({ ...TASK_FIXTURE, authKind: "service" } as any, undefined, { username: "rodrigo" }),
+      );
+      // A task saved before authentication runs with no owner powers.
+      await runAs("user", "rodrigo", () =>
+        ScheduledTaskService.executeTask({ ...TASK_FIXTURE } as any, undefined, { username: "rodrigo" }),
+      );
+      expect(seen).toEqual(["user", "service", null]);
     });
   });
 

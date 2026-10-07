@@ -8,7 +8,7 @@ import { resolveScope } from "#src/utils/ProfileScope";
 import logger from "#src/utils/logger";
 import { HOOKS } from "#src/constants";
 import ToolOrchestratorService from "#src/services/ToolOrchestratorService";
-import { isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
+import { commandHookOwnerRefusal, isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
 import {
   fetchWorkspaceHooksConfig,
   parseWorkspaceHooksFile,
@@ -51,7 +51,7 @@ router.use(requireUserAuthorityToChange("trust a repository's hooks"));
 function ownershipError(username: string): string {
   return (
     `repository hooks run shell commands on the workspace's machine (no OS sandbox): ` +
-    `only the users in ${HOOKS.COMMAND_OWNERS_ENV_VAR} may trust them, and "${username}" is not one.`
+    `only the users in ${HOOKS.COMMAND_OWNERS_ENV_VAR}, signed in, may trust them. ${commandHookOwnerRefusal(username)}`
   );
 }
 

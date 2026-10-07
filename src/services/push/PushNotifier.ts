@@ -12,6 +12,7 @@ import MongoWrapper from "#src/wrappers/MongoWrapper";
 import WebSocketConnectionRegistry from "#src/websocket/WebSocketConnectionRegistry";
 import { DEFAULT_PROFILE_ID } from "#src/utils/ProfileScope";
 import logger from "#src/utils/logger";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import PushSubscriptionService, {
@@ -216,7 +217,7 @@ export async function sendNtfyMessage(message: NtfyMessage): Promise<boolean> {
   if (!message.topic || !TOOLS_SERVICE_URL) return false;
   const response = await fetch(`${TOOLS_SERVICE_URL}/communication/push`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...toolsServiceAuthHeaders() },
     body: JSON.stringify({
       topic: message.topic,
       title: message.title,

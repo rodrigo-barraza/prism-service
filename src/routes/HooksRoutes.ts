@@ -21,7 +21,7 @@ import type {
   HookPayload,
 } from "#src/services/hooks/types";
 import { runConfiguredHook } from "#src/services/hooks/HookRunner";
-import { isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
+import { commandHookOwnerRefusal, isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
 import { invalidateHookCache } from "#src/services/hooks/ConfiguredHookRegistry";
 import { resolveScope, scopeFilter } from "#src/utils/ProfileScope";
 import { requireUserAuthorityToChange } from "#src/middleware/ExternalAuthority";
@@ -59,13 +59,13 @@ function toApiHook(document: ConfiguredHookDocument) {
 /**
  * A `command` hook runs a shell command with tools-service's privileges —
  * there is no OS sandbox yet (#14) — so only the usernames listed in
- * `PRISM_HOOK_COMMAND_OWNERS` may create one, or edit one. Empty means
- * nobody. (The runner re-checks the stored owner before every execution.)
+ * `PRISM_HOOK_COMMAND_OWNERS`, signed in, may create one, or edit one. Empty
+ * means nobody. (The runner re-checks the stored owner before every execution.)
  */
 function commandOwnershipError(username: string): string {
   return (
     `command hooks are owner-only: they run shell commands with tools-service's ` +
-    `privileges (no OS sandbox). "${username}" is not in ${HOOKS.COMMAND_OWNERS_ENV_VAR}.`
+    `privileges (no OS sandbox). ${commandHookOwnerRefusal(username)}`
   );
 }
 

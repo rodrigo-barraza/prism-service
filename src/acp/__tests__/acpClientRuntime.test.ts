@@ -71,6 +71,8 @@ import { SharedCostBudget } from "#src/services/harnesses/lifecycle/CostBudgetEn
 import { ACP_AGENT_OWNERS_ENV_VAR } from "#src/services/agents/AgentRuntime";
 import { validateTurnEvent } from "#src/protocol/events";
 import type { AgenticContext, ConversationMessage, LLMProvider } from "#src/services/harnesses/types";
+import type { AuthKind } from "#src/utils/RequestContext";
+import { runAs } from "../../../tests/helpers/auth.ts";
 
 const FAKE_AGENT = fileURLToPath(new URL("./fixtures/fakeAcpAgent.ts", import.meta.url));
 const OWNER = "acp-owner";
@@ -104,6 +106,8 @@ interface RunOptions {
   unattended?: boolean;
   autoApprove?: boolean;
   username?: string;
+  /** How the turn's request authenticated: an owner power needs a signed-in user. */
+  authKind?: AuthKind | null;
   isSubAgent?: boolean;
   history?: ConversationMessage[];
   budget?: SharedCostBudget;
@@ -115,6 +119,7 @@ function startRun({
   unattended = false,
   autoApprove = false,
   username = OWNER,
+  authKind = "user",
   isSubAgent = true,
   history = [],
   budget,
@@ -157,7 +162,7 @@ function startRun({
     signal: abort.signal,
     workspaceRoot: workspace,
   };
-  const run = AgenticLoopService.runAgenticLoop(context);
+  const run = runAs(authKind, username, () => AgenticLoopService.runAgenticLoop(context));
   // Surface a rejection through the test's own await, never as unhandled.
   run.catch(() => {});
   return { run, events, abort, conversationId };
@@ -492,6 +497,15 @@ describe("Prism as an ACP client: a sub-agent on an external agent process", () 
     it("only in a turn of an owner", async () => {
       await expect(startRun({ task: "SCENARIO=echo", username: "someone-else" }).run).rejects.toThrow(
         /runs only in turns of the users in PRISM_ACP_AGENT_OWNERS; "someone-else" is not one/,
+      );
+    });
+
+    it("never in a service's turn, even under an owner's name", async () => {
+      await expect(startRun({ task: "SCENARIO=echo", authKind: "service" }).run).rejects.toThrow(
+        /runs only in turns a signed-in owner started: "acp-owner" is in PRISM_ACP_AGENT_OWNERS, but owner powers need a signed-in user and this is a service's request/,
+      );
+      await expect(startRun({ task: "SCENARIO=echo", authKind: null }).run).rejects.toThrow(
+        /owner powers need a signed-in user and this turn has no signed-in user/,
       );
     });
 

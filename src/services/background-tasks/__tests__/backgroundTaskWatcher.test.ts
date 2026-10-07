@@ -58,6 +58,7 @@ vi.mock("#src/websocket/WebSocketConnectionRegistry", () => ({
 
 import BackgroundTaskWatcher from "#src/services/background-tasks/BackgroundTaskWatcher";
 import DetachedWorkStore from "#src/services/DetachedWorkStore";
+import { runAs } from "../../../../tests/helpers/auth.ts";
 
 // ── The fake tools-service ────────────────────────────────────────────
 
@@ -338,6 +339,55 @@ describe("BackgroundTaskWatcher", () => {
     await vi.waitFor(() => expect(fakeTasks.get("monitor-dddd4444")!.stops).toBe(1));
     await vi.waitFor(() => expect(detachedWork()[0].deliveredVia).toBe("stopped"));
     expect(delivered.notices).toHaveLength(0);
+  });
+
+  it("a task keeps the auth of the turn that started it — on its notices, its record, and a re-attach", async () => {
+    fakeTasks.set("shell-auth0001", {
+      afterSeen: [],
+      stops: 0,
+      connections: [
+        (response) => {
+          openStream(response);
+          send(response, exit(1, { kind: "shell", status: "completed", exitCode: 0, eventCount: 0 }));
+          response.end();
+        },
+      ],
+    });
+    // Started from inside a signed-in user's turn (the tool runs in it).
+    await runAs("user", "rod", () =>
+      BackgroundTaskWatcher.watch({ taskId: "shell-auth0001", taskType: "shell", description: "build", owner }),
+    );
+    await vi.waitFor(() => expect(delivered.notices).toHaveLength(1));
+    expect(delivered.notices[0].authKind).toBe("user");
+    expect(detachedWork()[0].authKind).toBe("user");
+
+    // A service's task, picked up again after a restart, wakes nothing with owner powers.
+    await DetachedWorkStore.started({
+      id: "workspace_task:conv-1:shell-auth0002",
+      itemId: "shell-auth0002",
+      kind: "workspace_task",
+      loopKey: "conv-1",
+      conversationId: "conv-1",
+      agentConversationId: "agent-conv-1",
+      project: "coding",
+      username: "rod",
+      authKind: "service",
+      task: { type: "shell", description: "lint", status: "running", lastSeq: 0, eventCount: 0, startedAt: new Date().toISOString() },
+    });
+    fakeTasks.set("shell-auth0002", {
+      afterSeen: [],
+      stops: 0,
+      connections: [
+        (response) => {
+          openStream(response);
+          send(response, exit(1, { kind: "shell", status: "completed", exitCode: 0, eventCount: 0 }));
+          response.end();
+        },
+      ],
+    });
+    await expect(BackgroundTaskWatcher.reattach()).resolves.toBe(1);
+    await vi.waitFor(() => expect(delivered.notices).toHaveLength(2));
+    expect(delivered.notices[1].authKind).toBe("service");
   });
 
   it("re-attaches at boot from the last seq on record", async () => {

@@ -48,6 +48,7 @@ import {
   requestTelemetryChunk,
 } from "#src/utils/PromptPrefixHashes";
 import { ORCHESTRATOR_ONLY_TOOLS } from "#src/services/OrchestratorPrompt";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import { streamEndedEarlyError } from "#src/utils/ProviderStreamResilience";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import { PROVIDERS } from "#src/constants";
@@ -1093,12 +1094,16 @@ export function createLmStudioProvider(
             };
           }
           if (!skipMcp) {
+            // LM Studio connects to tools-service's MCP adapter itself: the
+            // integration's headers carry tools-service's credential.
+            const mcpHeaders = toolsServiceAuthHeaders();
             (nativePayload as Record<string, unknown>).integrations = [
               {
                 type: "ephemeral_mcp",
                 server_label: "tools",
                 server_url: `${MCP_SERVER_URL}/mcp/sse?project=${encodeURIComponent(options.project || DEFAULT_PROJECT)}&agent=${encodeURIComponent(options.agent || AGENT_IDS.CODING)}${options.username ? `&username=${encodeURIComponent(String(options.username))}` : ""}`,
                 allowed_tools: toolNames,
+                ...(Object.keys(mcpHeaders).length > 0 && { headers: mcpHeaders }),
               },
             ];
             logger.info(

@@ -18,8 +18,13 @@
 //     is otherwise unreadable (prompt 22 L3's live check);
 //   - every other tool call is refused (403) and logged.
 //
-//   LOCAL_PRISM_PORT=<port> STANDIN_PORT=<port2> [STANDIN_WEB_ORIGIN=…] \
-//     node scripts/live-tools-standin.mjs          (Bash run_in_background: true)
+// Both hops authenticate as the real ones do (README "Authentication"): the
+// GET proxy passes on the x-api-secret the local prism sent (tools-service's
+// secret), and the save_memory forward signs in to the local prism as a
+// service with PRISM_SERVICE_API_SECRET from this process's environment.
+//
+//   LOCAL_PRISM_PORT=<port> STANDIN_PORT=<port2> PRISM_SERVICE_API_SECRET=<the local prism's> \
+//     [STANDIN_WEB_ORIGIN=…] node scripts/live-tools-standin.mjs   (Bash run_in_background: true)
 //
 // Host and ports come from vault-service/projects.json (CLAUDE.md §0).
 import fs from "node:fs";
@@ -51,7 +56,11 @@ app.post("/agentic/memory/save", async (request, response) => {
   console.log(`[standin] save_memory → local prism, headers ${JSON.stringify(getTraceHeaders())}`);
   const forwarded = await fetch(`${localPrism}/agent-memories`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getTraceHeaders() },
+    headers: {
+      "Content-Type": "application/json",
+      ...getTraceHeaders(),
+      ...(process.env.PRISM_SERVICE_API_SECRET ? { "x-api-secret": process.env.PRISM_SERVICE_API_SECRET } : {}),
+    },
     body: JSON.stringify({
       agent: request.headers["x-agent"] || "CODING",
       project: request.headers["x-project"],
@@ -85,8 +94,9 @@ app.post("/agentic/web/fetch", async (request, response) => {
 });
 
 app.get(/.*/, async (request, response) => {
+  const secret = request.headers["x-api-secret"];
   const upstream = await fetch(`${productionTools}${request.originalUrl}`, {
-    headers: { accept: "application/json" },
+    headers: { accept: "application/json", ...(typeof secret === "string" ? { "x-api-secret": secret } : {}) },
   });
   response
     .status(upstream.status)

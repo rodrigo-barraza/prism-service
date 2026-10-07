@@ -4,6 +4,8 @@ import { AutoModeSession } from "./AutoModeSession.ts";
 import {
   DEFAULT_PERMISSION_MODE,
   UNATTENDED_PERMISSION_MODE,
+  bypassOwners,
+  bypassRefusal,
   canUseBypass,
   isPermissionMode,
   isPinnablePermissionMode,
@@ -188,8 +190,9 @@ export interface ResolvedPermissionMode {
  *   3. the conversation's stored mode;
  *   4. the settings default.
  *
- * `bypass` survives only for a username in PRISM_PERMISSION_BYPASS_OWNERS;
- * anyone else gets `default` and the refusal is reported.
+ * `bypass` survives only for a username in PRISM_PERMISSION_BYPASS_OWNERS,
+ * in a turn a signed-in user started (a service naming that user is not
+ * one); anyone else gets `default` and the refusal is reported.
  */
 export async function resolveTurnPermissionMode({
   requested,
@@ -227,7 +230,9 @@ export async function resolveTurnPermissionMode({
       source: "owner_check",
       refusedBypass: {
         from: resolved.source,
-        reason: `bypass is owner-only and "${username || "anonymous"}" is not a bypass owner`,
+        reason: bypassOwners().has(username ?? "")
+          ? `bypass is owner-only: ${bypassRefusal(username)}`
+          : `bypass is owner-only and "${username || "anonymous"}" is not a bypass owner`,
       },
     };
   }

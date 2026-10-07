@@ -2,6 +2,7 @@ import path from "node:path";
 import { WORKSPACE_MAX_LINES_PER_READ } from "@rodrigo-barraza/utilities-library/workspace";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import { TOOLS_SERVICE_URL } from "#config";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import { traceHeaders } from "#src/services/Tracing";
 import type { FileStat, WorkspaceFileSource } from "./WorkspaceInstructions.ts";
 
@@ -107,6 +108,7 @@ export function createToolsServiceFileSource({
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...traceHeaders(),
+      ...toolsServiceAuthHeaders(),
     };
     if (workspaceOverride) headers[IDENTITY_HEADERS.workspaceOverride] = workspaceOverride;
     const response = await fetchImplementation(`${baseUrl}/agentic${route}`, {

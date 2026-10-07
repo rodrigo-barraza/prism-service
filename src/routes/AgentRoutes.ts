@@ -15,6 +15,7 @@ import {
   relayedInputOrigin,
   requireUserAuthority,
 } from "#src/middleware/ExternalAuthority";
+import { limitServiceTurn } from "#src/utils/ServiceTurnLimits";
 
 const router = express.Router();
 
@@ -197,7 +198,7 @@ router.post(
       // Multi-workspace: override the default workspace root when the user has
       // selected a non-default workspace in the Prism Client sidebar. Sources:
       //   1. x-workspace-root header (set by Prism Client's serviceHeaders.js)
-      //   2. body.workspaceRoot (for server-to-server / API callers)
+      //   2. body.workspaceRoot (a signed-in user's API call)
       workspaceRoot: request.workspaceRoot || request.body.workspaceRoot || null,
       // A turn that brings no conversationId (a new conversation from an
       // API caller or bot) still gets one: minted HERE, so the session
@@ -207,8 +208,10 @@ router.post(
       // reaches the caller on the stream's first event.
       serverConversationId: request.body.conversationId ? undefined : crypto.randomUUID(),
     };
-    // A relay's turn (a webhook, the Discord bot) runs unattended and cannot
-    // pick its own approval mode (ExternalAuthority).
+    // A service's turn has no workspace and approves nothing for itself
+    // (ServiceTurnLimits); a relay's (a webhook, the Discord bot) also runs
+    // unattended and cannot pick its own approval mode (ExternalAuthority).
+    limitServiceTurn(request.auth?.kind, params, "POST /agent");
     applyExternalTurnAuthority(request, params);
 
     if (request.query.stream !== "false") {

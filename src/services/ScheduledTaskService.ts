@@ -26,7 +26,13 @@ import {
   profileFilter,
   type ProfileIdFilter,
 } from "#src/utils/ProfileScope";
-import { getRequestContext } from "#src/utils/RequestContext";
+import {
+  authOfRecord,
+  currentAuthKind,
+  getRequestContext,
+  requestContext,
+  type AuthKind,
+} from "#src/utils/RequestContext";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import {
   externalInputMessageFields,
@@ -104,6 +110,14 @@ export interface ScheduledTask {
   kind?: "agent" | "benchmark";
   /** What a benchmark task runs, and when it alerts. */
   benchmark?: import("#src/types/benchmark").ScheduledBenchmarkConfig;
+  /**
+   * How the request that last saved it authenticated (AuthMiddleware) —
+   * stamped on every create and update, never taken from a body. Its runs
+   * re-apply it: a signed-in user's task keeps its owner powers, a
+   * service's never gains them. Absent on a task saved before that: its
+   * runs have none.
+   */
+  authKind?: AuthKind | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -149,6 +163,14 @@ export interface ScheduledTaskRunResult {
   benchmarkRunId?: string;
   /** Set when a continuation run did not start (paused goal, duplicate, busy). */
   skipped?: string;
+}
+
+export interface ScheduledTaskRunOptions {
+  username?: string;
+  profileId?: string;
+  agentConversationId?: string;
+  /** Who fired the trigger that carried `payload` (a webhook, by default). */
+  payloadOrigin?: ExternalOrigin | null;
 }
 
 /** "YYYY-MM-DDTHH:mm" in local time — the scheduler's per-minute identity. */
@@ -456,22 +478,42 @@ const ScheduledTaskService = {
   /**
    * Programmatically executes a scheduled task in the background.
    * Decoupled completely from live WebSockets/browser clients.
+   *
+   * The run is the task's, whatever fired it (the daemon, a trigger, a
+   * webhook): it runs as the task's user with the auth of the request that
+   * saved it (`authKind`) — a signed-in user's task keeps its owner powers,
+   * a service's, or one saved before authentication, has none.
    */
   async executeTask(
     task: ScheduledTask,
     payload?: Record<string, unknown>,
+    options: ScheduledTaskRunOptions = {},
+  ): Promise<ScheduledTaskRunResult> {
+    const username = options.username ?? "system";
+    const profileId = options.profileId ?? getRequestContext().profileId ?? DEFAULT_PROFILE_ID;
+    return requestContext.run(
+      {
+        project: task.project,
+        username,
+        profileId,
+        clientIp: "127.0.0.1",
+        agent: task.agent ?? null,
+        auth: authOfRecord(task.authKind, username),
+      },
+      () => this.runTask(task, payload, { ...options, username, profileId }),
+    );
+  },
+
+  /** executeTask's run, inside the task's own request context. */
+  async runTask(
+    task: ScheduledTask,
+    payload: Record<string, unknown> | undefined,
     {
       username = "system",
-      profileId = getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
+      profileId = DEFAULT_PROFILE_ID,
       agentConversationId,
       payloadOrigin,
-    }: {
-      username?: string;
-      profileId?: string;
-      agentConversationId?: string;
-      /** Who fired the trigger that carried `payload` (a webhook, by default). */
-      payloadOrigin?: ExternalOrigin | null;
-    } = {},
+    }: ScheduledTaskRunOptions,
   ): Promise<ScheduledTaskRunResult> {
     const db = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!db) throw new Error("Database not connected");
@@ -969,6 +1011,8 @@ const ScheduledTaskService = {
       // execution time, exactly like username.
       profileId:
         data.profileId ?? getRequestContext().profileId ?? DEFAULT_PROFILE_ID,
+      // Who saved it: its runs re-apply this (executeTask).
+      authKind: currentAuthKind(),
       id: crypto.randomUUID(),
       createdAt: nowISO,
       updatedAt: nowISO,
@@ -999,6 +1043,9 @@ const ScheduledTaskService = {
     const nowISO = new Date().toISOString();
     const cleanUpdates: Record<string, unknown> = {
       ...updates,
+      // The last save decides how its runs authenticate — never a body field:
+      // a service's edit takes a signed-in user's task out of owner powers.
+      authKind: currentAuthKind(),
       updatedAt: nowISO,
     };
     delete cleanUpdates.id;

@@ -12,6 +12,7 @@ import {
   PermissionModeRegistry,
 } from "#src/services/permissions/PermissionModeState";
 import { BYPASS_OWNERS_ENV_VAR } from "#src/services/permissions/PermissionModes";
+import { serviceHeaders } from "./helpers/auth.ts";
 
 const { default: permissionsRouter } = await import("#src/routes/PermissionsRoutes");
 app.use("/permissions", permissionsRouter);
@@ -352,6 +353,28 @@ describe("PermissionsRoutes", () => {
       process.env[BYPASS_OWNERS_ENV_VAR] = USERNAME;
       await put("/mode", { conversationId: "conv-1", mode: "bypass" }).expect(200);
       expect(conversations[0].approvals.permissionMode).toBe("bypass");
+    });
+
+    it("a service naming the owner gets no bypass: refused, and offered as unavailable with the reason", async () => {
+      conversations.push({ id: "conv-1", project: PROJECT, username: USERNAME });
+      process.env[BYPASS_OWNERS_ENV_VAR] = USERNAME;
+      const refused = await agent
+        .put("/permissions/mode")
+        .set("x-project", PROJECT)
+        .set(serviceHeaders(USERNAME))
+        .send({ conversationId: "conv-1", mode: "bypass" })
+        .expect(403);
+      expect(refused.body.error).toMatch(/owner powers need a signed-in user and this is a service's request/);
+      expect(conversations[0].approvals).toBeUndefined();
+
+      const described = await agent
+        .get("/permissions/mode")
+        .set("x-project", PROJECT)
+        .set(serviceHeaders(USERNAME))
+        .expect(200);
+      expect(described.body.bypassAllowed).toBe(false);
+      const bypass = described.body.modes.find((mode: any) => mode.id === "bypass");
+      expect(bypass.unavailableReason).toMatch(/Owner only: .*signed-in user/);
     });
 
     it("refuses to switch a turn whose agent pins its mode, and stores nothing", async () => {

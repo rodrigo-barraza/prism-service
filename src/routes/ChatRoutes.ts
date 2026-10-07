@@ -87,6 +87,7 @@ import {
   MESSAGE_ROLES,
 } from "#src/constants";
 import { getRequestContext } from "#src/utils/RequestContext";
+import { limitServiceTurn } from "#src/utils/ServiceTurnLimits";
 import {
   routeAgentTurn,
   saveConversationModelRouting,
@@ -1819,6 +1820,8 @@ router.post(
       profileId: req.profileId,
       clientIp: req.clientIp,
     };
+    // A service's turn has no workspace and approves nothing for itself.
+    limitServiceTurn(req.auth?.kind, params, "POST /chat");
     if (req.query.stream !== "false") {
       await handleSseRequest(req, res, params);
     } else {
