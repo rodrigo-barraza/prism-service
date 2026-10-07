@@ -102,6 +102,24 @@ rides `options.permissionMode`; until prompt 12's mode layer lands,
 `partial` — in the completion message and in `wait_for_tasks` — and a
 resume is told its current workspace when merge-back removed the old one.
 
+### 2.3b Background commands, monitors, task_stop (Claude Code parity, 2026-10-06)
+`execute_command` with `run_in_background` and the `monitor` tool run as
+tasks on the workspace (tools-service's task engine, on the bridge or in
+tools-service): the call returns at once with the task id and its output
+file. `background-tasks/BackgroundTaskWatcher` follows each task's event
+stream (`GET /agentic/tasks/:id/events?after=`) with a durable
+`detached_work` record (kind `workspace_task`, `task.lastSeq`), re-attaches
+at boot, and hands every notification to
+`background-tasks/TaskNotificationDelivery` — the one delivery path async
+task completions use too: the open turn's mailbox (kind `task_notification`,
+several joined into one message), else ONE coalesced wake turn per
+conversation in the conversation's own permission mode (a user's turn that
+got there first takes them through its mailbox), never a sub-agent whose run
+ended (its monitors stop with the run). `task_stop` stops a background
+command, a monitor, an async task or a sub-agent; a task prism stopped is not
+announced when it ends. Foreground commands are waited for their own timeout
+plus 30 s (`tool-orchestrator/CommandTimeout`), not the 65 s proxy timeout.
+
 ### 2.4 Event sequence ids and cursor replay
 `SseEvent.seq` stamped in `withDirectViewerBroadcast` (monotonic per
 conversation, never reset between turns, TTL-swept with the buffer).
