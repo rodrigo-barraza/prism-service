@@ -15,6 +15,12 @@ import { getProvider } from "#src/providers/index";
 import { getModelByName } from "#src/config";
 import { matchCron } from "./ScheduledTaskService.ts";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
+import {
+  authOfRecord,
+  currentAuthKind,
+  requestContext,
+  type AuthKind,
+} from "#src/utils/RequestContext";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import type { ConversationMessage, LLMProvider } from "./harnesses/types.ts";
 import type { TransformedConversation, ConversationSettings } from "./conversation/types.ts";
@@ -35,6 +41,12 @@ export interface ConversationTimer {
   firesAt: string; // ISO timestamp for one-shot next fire time
   lastFiredMinuteKey?: string; // "YYYY-MM-DDTHH:mm" for preventing cron double-fires
   status: typeof TIMER_STATUSES[keyof typeof TIMER_STATUSES];
+  /**
+   * How the request or turn that set it authenticated: its turns re-apply
+   * it (a signed-in user's keep their owner powers, a service's never gain
+   * them). Absent on a timer from before authentication: none.
+   */
+  authKind?: AuthKind | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -170,6 +182,8 @@ const ConversationTimerService = {
       iterationCount: 0,
       firesAt,
       status: TIMER_STATUSES.ACTIVE,
+      // Who set it — set_timer runs inside its turn — re-applied when it fires.
+      authKind: currentAuthKind(),
       createdAt: timestampString,
       updatedAt: timestampString,
     };
@@ -431,13 +445,34 @@ const ConversationTimerService = {
   },
 
   /**
-   * Reconstruct generation context and invoke AgenticLoopService in the background.
+   * Reconstruct generation context and invoke AgenticLoopService in the
+   * background — as whoever set the timer, with the auth that turn had: the
+   * daemon has no request of its own.
    */
   async executeAgenticLoop(
     timer: ConversationTimer,
     conversation: TimerConversationContext,
     reminderMessage: ConversationMessage,
     collection: string = COLLECTIONS.AGENT_CONVERSATIONS,
+  ): Promise<void> {
+    return requestContext.run(
+      {
+        project: timer.project,
+        username: timer.username,
+        clientIp: "127.0.0.1",
+        agent: null,
+        auth: authOfRecord(timer.authKind, timer.username),
+      },
+      () => this.runTimerTurn(timer, conversation, reminderMessage, collection),
+    );
+  },
+
+  /** executeAgenticLoop's turn, inside the timer's own request context. */
+  async runTimerTurn(
+    timer: ConversationTimer,
+    conversation: TimerConversationContext,
+    reminderMessage: ConversationMessage,
+    collection: string,
   ): Promise<void> {
     const database = MongoWrapper.getDb(MONGO_DB_NAME);
     if (!database) return;

@@ -20,6 +20,7 @@ import {
 } from "#src/services/permissions/PermissionModeState";
 import { findProtectedPathWrite, protectedTargetOf } from "#src/services/permissions/ProtectedPaths";
 import type { ToolCall } from "#src/services/harnesses/types";
+import { runAs } from "../../../../tests/helpers/auth.ts";
 
 vi.mock("#src/utils/logger", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), success: vi.fn() },
@@ -261,17 +262,35 @@ describe("the mode a turn starts in", () => {
   });
 
   it("bypass requires the owner flag", async () => {
+    // The turn of a signed-in user (AuthMiddleware).
+    const signedIn = <T>(fn: () => T) => runAs("user", "rodrigo", fn);
     delete process.env[BYPASS_OWNERS_ENV_VAR];
-    const refused = await resolveTurnPermissionMode({ requested: "bypass", storedMode: null, username: "rodrigo" });
+    const refused = await signedIn(() =>
+      resolveTurnPermissionMode({ requested: "bypass", storedMode: null, username: "rodrigo" }),
+    );
     expect(refused).toMatchObject({ mode: "default", source: "owner_check" });
     expect(refused.refusedBypass?.reason).toContain("owner-only");
 
     process.env[BYPASS_OWNERS_ENV_VAR] = "someone, rodrigo";
     expect(
-      await resolveTurnPermissionMode({ requested: "bypass", storedMode: null, username: "rodrigo" }),
+      await signedIn(() => resolveTurnPermissionMode({ requested: "bypass", storedMode: null, username: "rodrigo" })),
     ).toMatchObject({ mode: "bypass", source: "request" });
     expect(
-      await resolveTurnPermissionMode({ requested: "bypass", storedMode: null, username: "mallory" }),
+      await signedIn(() => resolveTurnPermissionMode({ requested: "bypass", storedMode: null, username: "mallory" })),
+    ).toMatchObject({ mode: "default", source: "owner_check" });
+  });
+
+  it("bypass needs a signed-in owner: a service naming one, or a turn nobody signed in to, gets default", async () => {
+    process.env[BYPASS_OWNERS_ENV_VAR] = "rodrigo";
+    const asService = await runAs("service", "rodrigo", () =>
+      resolveTurnPermissionMode({ requested: "bypass", storedMode: null, username: "rodrigo" }),
+    );
+    expect(asService).toMatchObject({ mode: "default", source: "owner_check" });
+    expect(asService.refusedBypass?.reason).toMatch(
+      /"rodrigo" is in PRISM_PERMISSION_BYPASS_OWNERS, but owner powers need a signed-in user and this is a service's request/,
+    );
+    expect(
+      await resolveTurnPermissionMode({ requested: "bypass", storedMode: null, username: "rodrigo" }),
     ).toMatchObject({ mode: "default", source: "owner_check" });
   });
 

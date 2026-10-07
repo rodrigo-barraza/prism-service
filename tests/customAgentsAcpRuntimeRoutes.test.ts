@@ -7,7 +7,7 @@
  * runtime narrows, so anyone may.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import express, { type NextFunction, type Request, type Response } from "express";
+import express from "express";
 import request from "supertest";
 import "./setup.ts";
 
@@ -30,13 +30,15 @@ import customAgentsRouter from "#src/routes/CustomAgentsRoutes";
 import CustomAgentService from "#src/services/CustomAgentService";
 import AgentPersonaRegistry from "#src/services/AgentPersonaRegistry";
 import { ACP_AGENT_OWNERS_ENV_VAR } from "#src/services/agents/AgentRuntime";
+import { authMiddleware } from "#src/middleware/AuthMiddleware";
+import { serviceHeaders, signInAsHeaderUser } from "./helpers/auth.ts";
 
+// The client signs in as its x-username (a real token, verified by the real
+// AuthMiddleware); a test that sends a service's secret speaks as a service.
 const app = express();
 app.use(express.json());
-app.use((req: Request, _res: Response, next: NextFunction) => {
-  req.username = req.header("x-username") ?? undefined;
-  next();
-});
+app.use(signInAsHeaderUser);
+app.use(authMiddleware);
 app.use("/custom-agents", customAgentsRouter);
 
 const OWNER = "rodrigo";
@@ -89,6 +91,20 @@ describe("custom-agents routes — the acp runtime", () => {
 
     // A launch configuration alone is gated the same way.
     await request(app).put(`/custom-agents/${STORED_ID}`).set("x-username", "mallory").send({ acp: LAUNCH }).expect(403);
+    expect(CustomAgentService.update).not.toHaveBeenCalled();
+  });
+
+  it("a service naming the owner is refused: writing one needs the owner signed in", async () => {
+    const refused = await request(app)
+      .post("/custom-agents")
+      .set(serviceHeaders(OWNER))
+      .send({ name: "Claude Code", runtime: "acp", acp: LAUNCH })
+      .expect(403);
+    expect(refused.body.error).toMatch(
+      /"rodrigo" is in PRISM_ACP_AGENT_OWNERS, but owner powers need a signed-in user and this is a service's request/,
+    );
+    await request(app).put(`/custom-agents/${STORED_ID}`).set(serviceHeaders(OWNER)).send({ acp: LAUNCH }).expect(403);
+    expect(CustomAgentService.create).not.toHaveBeenCalled();
     expect(CustomAgentService.update).not.toHaveBeenCalled();
   });
 

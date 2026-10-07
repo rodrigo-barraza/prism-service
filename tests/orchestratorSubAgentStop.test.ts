@@ -34,6 +34,7 @@ vi.mock("#src/services/orchestrator/GitWorktreeHelper", () => ({
 import OrchestratorService from "#src/services/OrchestratorService";
 import orchestratorRouter from "#src/routes/OrchestratorRoutes";
 import { authMiddleware } from "#src/middleware/AuthMiddleware";
+import { userHeaders } from "./helpers/auth.ts";
 import { TopologyExecutionService } from "#src/services/orchestrator/TopologyExecutionService";
 import type { OrchestratorContext } from "#src/types/orchestrator";
 
@@ -115,7 +116,7 @@ describe("POST /orchestrator/sub-agents/:agentId/stop", () => {
 
     const response = await request(app)
       .post(`/orchestrator/sub-agents/${first.agentId}/stop`)
-      .set("x-username", "test-user")
+      .set(userHeaders("test-user"))
       .set("x-project", "test-project");
 
     expect(response.status).toBe(200);
@@ -130,7 +131,7 @@ describe("POST /orchestrator/sub-agents/:agentId/stop", () => {
   it("answers 404 for an unknown agent", async () => {
     const response = await request(app)
       .post("/orchestrator/sub-agents/agent-nope/stop")
-      .set("x-username", "test-user");
+      .set(userHeaders("test-user"));
     expect(response.status).toBe(404);
   });
 
@@ -139,7 +140,7 @@ describe("POST /orchestrator/sub-agents/:agentId/stop", () => {
 
     const response = await request(app)
       .post(`/orchestrator/sub-agents/${first.agentId}/stop`)
-      .set("x-username", "someone-else");
+      .set(userHeaders("someone-else"));
 
     expect(response.status).toBe(404);
     expect(signalOf(first.subAgentConversationId).aborted).toBe(false);
@@ -153,7 +154,7 @@ describe("POST /orchestrator/sub-agents/:agentId/stop", () => {
 
     const response = await request(app)
       .post(`/orchestrator/sub-agents/${first.agentId}/stop`)
-      .set("x-username", "test-user");
+      .set(userHeaders("test-user"));
 
     expect(response.status).toBe(409);
     expect(first.status).toBe("complete");

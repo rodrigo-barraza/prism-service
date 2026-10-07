@@ -174,6 +174,8 @@ vi.mocked(MongoWrapper.getDb).mockImplementation(() => {
 
 // ── Import AFTER mocks are wired ───────────────────────────────
 import ConversationTimerService, { type ConversationTimer } from "#src/services/ConversationTimerService";
+import { currentAuthKind } from "#src/utils/RequestContext";
+import { runAs } from "./helpers/auth.ts";
 
 // ── Test fixtures ──────────────────────────────────────────────
 const TIMER_FIXTURE: ConversationTimer = {
@@ -853,6 +855,44 @@ describe("ConversationTimerService", () => {
       await ConversationTimerService.tick();
 
       expect(executeSpy).toHaveBeenCalled();
+    });
+  });
+
+  // ── Who a timer's turn is ────────────────────────────────────
+  describe("the auth of the turn that set it", () => {
+    it("is stamped when the timer is set, and re-applied when it fires — the daemon has no request", async () => {
+      const userTimer = await runAs("user", "testuser", () =>
+        ConversationTimerService.createTimer({
+          conversationId: "session-abc-123",
+          project: "coding",
+          username: "testuser",
+          prompt: "Check the build",
+          durationSeconds: 60,
+        }),
+      );
+      const serviceTimer = await runAs("service", "testuser", () =>
+        ConversationTimerService.createTimer({
+          conversationId: "session-abc-123",
+          project: "coding",
+          username: "testuser",
+          prompt: "Post the score",
+          durationSeconds: 60,
+        }),
+      );
+      expect([userTimer.authKind, serviceTimer.authKind]).toEqual(["user", "service"]);
+
+      const seen: Array<string | null> = [];
+      const record = async () => {
+        seen.push(currentAuthKind());
+      };
+      mockRunAgenticLoop.mockImplementationOnce(record).mockImplementationOnce(record).mockImplementationOnce(record);
+      await ConversationTimerService.executeAgenticLoop(userTimer, CONVERSATION_FIXTURE, REMINDER_MESSAGE);
+      await runAs("user", "testuser", () =>
+        ConversationTimerService.executeAgenticLoop(serviceTimer, CONVERSATION_FIXTURE, REMINDER_MESSAGE),
+      );
+      // A timer set before authentication: no owner powers.
+      await ConversationTimerService.executeAgenticLoop(TIMER_FIXTURE, CONVERSATION_FIXTURE, REMINDER_MESSAGE);
+      expect(seen).toEqual(["user", "service", null]);
     });
   });
 

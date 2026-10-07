@@ -16,17 +16,21 @@
 // **Privilege.** An ACP agent is a process prism-service starts on its own
 // host, as its own user, with no OS sandbox (#14). So, like a command hook
 // (PRISM_HOOK_COMMAND_OWNERS), it is owner-only: only the usernames in
-// PRISM_ACP_AGENT_OWNERS (empty = nobody) may write an `acp` definition —
-// the route stamps the writer as its `owner` — and it runs only in a turn of
-// one of those users whose stored owner is still one of them, checked again
-// before every run. A workspace agent file never gets a runtime: a file
-// that names one is rejected (AgentDefinitionFiles).
+// PRISM_ACP_AGENT_OWNERS (empty = nobody), signed in (AuthMiddleware: a
+// user's token, never a service naming them), may write an `acp`
+// definition — the route stamps the writer as its `owner` — and it runs
+// only in a signed-in turn of one of those users whose stored owner is
+// still one of them, checked again before every run. A workspace agent file
+// never gets a runtime: a file that names one is rejected
+// (AgentDefinitionFiles).
 //
 // **Environment.** The process never inherits prism-service's environment
 // (which holds every secret the vault serves): it gets the base variables
 // below, needed to find programs and the user's own configuration, plus
 // exactly the names its definition allowlists.
 // ────────────────────────────────────────────────────────────
+
+import { isAuthenticatedUser, ownerRefusal } from "#src/utils/RequestContext";
 
 export const AGENT_RUNTIMES = ["prism", "acp"] as const;
 export type AgentRuntime = (typeof AGENT_RUNTIMES)[number];
@@ -101,15 +105,16 @@ export function acpAgentOwners(): Set<string> {
   );
 }
 
+/** An owner, in a request or turn a signed-in user started — what writing and running an ACP agent need. */
 export function isAcpAgentOwner(username: string | null | undefined): boolean {
-  return Boolean(username) && acpAgentOwners().has(username!);
+  return Boolean(username) && isAuthenticatedUser() && acpAgentOwners().has(username!);
 }
 
-/** The route's refusal for a writer who is not an owner. */
+/** The route's refusal for a writer who is not an owner (or not signed in as one). */
 export function acpOwnershipError(username: string): string {
   return (
     `ACP agents are owner-only: an agent with runtime "acp" starts a process on the prism-service ` +
-    `host with its privileges (no OS sandbox). "${username}" is not in ${ACP_AGENT_OWNERS_ENV_VAR}.`
+    `host with its privileges (no OS sandbox). ${ownerRefusal(username, ACP_AGENT_OWNERS_ENV_VAR, acpAgentOwners().has(username))}`
   );
 }
 

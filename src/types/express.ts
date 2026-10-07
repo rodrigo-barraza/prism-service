@@ -25,6 +25,8 @@ declare global {
       workspaceId?: string;
       workspaceRoot?: string;
       agent?: string;
+      /** Who the request authenticated as (AuthMiddleware) — unset on a public path. */
+      auth?: import("#src/utils/RequestContext").RequestAuth;
       files?: unknown;
       file?: unknown;
       db: import("mongodb").Db;

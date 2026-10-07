@@ -10,6 +10,11 @@ import { requestContext } from "#src/utils/RequestContext";
  *      so deep call-stack code (providers, services) can read it.
  *   2. Logs every completed request with identity, IP, method, path,
  *      status, timing, and transfer sizes.
+ *
+ * The identity it logs is the AUTHENTICATED one: AuthMiddleware runs after
+ * it and fills the context with the username its credential proved. A
+ * claimed `x-username` is never logged as who called — a refused request
+ * shows no user.
  */
 export function requestLoggerMiddleware(
   req: Request,
@@ -18,10 +23,10 @@ export function requestLoggerMiddleware(
 ) {
   const start = performance.now();
 
-  // Resolve identity + IP early (before authMiddleware for admin/files routes)
-  // Fall back to headers, then to path-based extraction for /files/projects/{project}/{username}/
+  // Resolve the project + IP early; the username is AuthMiddleware's to
+  // set. A public media path names its owner: /files/projects/{project}/{username}/
   let project = req.project || (req.headers[IDENTITY_HEADERS.project] as string) || "any";
-  let username = req.username || (req.headers[IDENTITY_HEADERS.username] as string) || "any";
+  let username = req.username || "any";
   if (project === "any" && req.originalUrl.startsWith("/files/projects/")) {
     const segments = req.originalUrl.split("/");
     // /files/projects/{project}/{username}/...
@@ -54,9 +59,9 @@ export function requestLoggerMiddleware(
       return;
 
     const elapsed = performance.now() - start;
-    // Re-read project/username in case authMiddleware set them after us
+    // Re-read project/username: authMiddleware set them after us
     const finalProject = req.project || project;
-    const finalUsername = req.username || username;
+    const finalUsername = req.auth?.username || username;
     const finalIp = req.clientIp || clientIp;
     const method = req.method;
     const path = req.originalUrl;
@@ -77,12 +82,14 @@ export function requestLoggerMiddleware(
     );
     const totalBytes = inBytes + outBytes;
     const sizeTag = `(in: ${formatBytes(inBytes)}, out: ${formatBytes(outBytes)}, total: ${formatBytes(totalBytes)})`;
+    // A service names the user it speaks for; say that it was a service.
+    const serviceTag = req.auth?.kind === "service" ? " via service" : "";
 
     logger.request(
       finalProject,
       finalUsername,
       finalIp,
-      `${method} ${path} ${status} — ${time} ${sizeTag}`,
+      `${method} ${path} ${status} — ${time} ${sizeTag}${serviceTag}`,
     );
   });
 

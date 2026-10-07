@@ -37,9 +37,10 @@ import logger from "#src/utils/logger";
 // external, is external input. Either way it cannot approve: nobody
 // answers a card from a relay.
 //
-// This is not authentication (modernization item #1): a caller that lies
-// about its project is not stopped here. It is the lane a well-behaved relay
-// is held to, so a relayed message can never become the user's consent.
+// This is not authentication — AuthMiddleware proved who is calling before
+// any route runs, and a relay is a service holding PRISM_SERVICE_API_SECRET.
+// This is the lane a well-behaved relay is held to, so a relayed message can
+// never become the user's consent.
 // ────────────────────────────────────────────────────────────
 
 /** Set by a relay that carries input from outside the conversation. */
@@ -55,6 +56,11 @@ function headerValue(request: Request, name: string): string | null {
   const value = request.headers?.[name];
   const first = Array.isArray(value) ? value[0] : value;
   return typeof first === "string" && first.trim() ? first.trim() : null;
+}
+
+/** Who a request speaks as: a signed-in user is their token's; a service (a relay) names its user in x-username. */
+function requestUsername(request: Request): string | null {
+  return request.auth?.kind === "user" ? request.auth.username : headerValue(request, IDENTITY_HEADERS.username);
 }
 
 /** The relay projects and the source each speaks for. */
@@ -75,8 +81,7 @@ export function relayProjects(): Map<string, ExternalInputSource> {
  */
 export function externalOriginOfRequest(request: Request): ExternalOrigin | null {
   const declared = headerValue(request, EXTERNAL_SOURCE_HEADER);
-  const sender =
-    headerValue(request, EXTERNAL_SENDER_HEADER) ?? headerValue(request, IDENTITY_HEADERS.username);
+  const sender = headerValue(request, EXTERNAL_SENDER_HEADER) ?? requestUsername(request);
   if (declared) {
     // Any value declares an outside source; an unknown one is a webhook's.
     return externalOrigin(isExternalInputSource(declared) ? declared : "webhook", sender);
@@ -118,7 +123,7 @@ export function relayedInputOrigin(
   if (!origin) return null;
   const declared = headerValue(request, EXTERNAL_SOURCE_HEADER) !== null;
   const project = headerValue(request, IDENTITY_HEADERS.project);
-  const username = headerValue(request, IDENTITY_HEADERS.username);
+  const username = requestUsername(request);
   if (!declared && turnUser && username && project === turnUser.project && username === turnUser.username) {
     return null;
   }

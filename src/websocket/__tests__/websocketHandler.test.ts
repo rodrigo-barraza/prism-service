@@ -87,6 +87,8 @@ vi.mock("#src/wrappers/MongoWrapper", () => ({
 }));
 
 import { setupWebSocket } from "#src/websocket/index";
+import { registerToolCapabilities } from "#src/services/permissions/ToolCapabilities";
+import { serviceHeaders, userHeaders } from "../../../tests/helpers/auth.ts";
 import {
   LiveTurnBuffer,
   withDirectViewerBroadcast,
@@ -94,6 +96,10 @@ import {
 import WebSocketConnectionRegistry from "#src/websocket/WebSocketConnectionRegistry";
 import type { SseEvent } from "#src/types/SseTypes";
 import { PROTOCOL_VERSION } from "#src/protocol/events";
+
+// Every connection signs in, as prism-client's does (an upgrade without a
+// credential is refused — websocketAuth.test.ts).
+const SIGNED_IN = userHeaders("ws-user");
 
 // ── Helper Mock Classes ───────────────────────────────────────────────
 class MockWebSocket {
@@ -151,7 +157,7 @@ describe("WebSocket Handler Suite", () => {
     const mockSocket = new MockWebSocket();
     const mockRequest = {
       url: "/ws/unknown-path",
-      headers: { host: "localhost" },
+      headers: { host: "localhost", ...SIGNED_IN },
       socket: { remoteAddress: "127.0.0.1" },
     };
 
@@ -170,7 +176,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/chat?project=my-proj",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -202,7 +208,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/chat",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -226,7 +232,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       mockWss.emitConnection(mockSocket, {
         url: "/ws/chat",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       });
 
@@ -238,7 +244,7 @@ describe("WebSocket Handler Suite", () => {
     describe("subscribe", () => {
       const chatRequest = {
         url: "/ws/chat?project=my-proj",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -431,7 +437,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/text-to-audio",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -463,7 +469,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/text-to-audio",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -481,7 +487,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/text-to-audio",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -502,7 +508,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/text-to-audio",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -519,7 +525,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -559,7 +565,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -608,7 +614,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -654,7 +660,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -680,7 +686,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -713,7 +719,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -741,7 +747,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -769,7 +775,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -801,7 +807,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -842,7 +848,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -886,7 +892,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -935,12 +941,64 @@ describe("WebSocket Handler Suite", () => {
       });
     });
 
+    it("a service's session: a tool its scope denies is neither offered nor run (ServiceTurnLimits)", async () => {
+      // tools-service's tags: get_weather reads the network; execute_shell is the shell.
+      registerToolCapabilities([{ name: "get_weather", capabilities: ["network"] }], "test");
+      setupWebSocket(mockWss);
+      const mockSocket = new MockWebSocket();
+      mockWss.emitConnection(mockSocket, {
+        url: "/ws/live",
+        headers: { host: "localhost", ...serviceHeaders("visitor") },
+        socket: { remoteAddress: "127.0.0.1" },
+      });
+      mockGetToolSchemas.mockReturnValue([
+        { name: "get_weather", description: "Get weather details", parameters: {} },
+        { name: "execute_shell", description: "Run a command", parameters: {} },
+      ]);
+      mockSocket.emit(
+        "message",
+        Buffer.from(JSON.stringify({ type: "setup", config: { enabledTools: ["get_weather", "execute_shell"] } })),
+      );
+      await vi.waitFor(() => {
+        expect(mockSocket.send).toHaveBeenCalledWith(JSON.stringify({ type: "setupComplete" }));
+      });
+      expect(mockConvertToolsToGoogle).toHaveBeenCalledWith([
+        { name: "get_weather", description: "Get weather details", parameters: {} },
+      ]);
+
+      // The model calls it anyway: refused, never run; the read runs.
+      mockExecuteTool.mockResolvedValue({ temperature: "68F" });
+      mockConnect.mock.calls[0][0].callbacks.onmessage({
+        toolCall: {
+          functionCalls: [
+            { id: "call-shell", name: "execute_shell", args: { command: "cat ~/.ssh/id_ed25519" } },
+            { id: "call-weather", name: "get_weather", args: { city: "SF" } },
+          ],
+        },
+      });
+      await vi.waitFor(() => {
+        expect(mockLiveSession.sendToolResponse).toHaveBeenCalled();
+      });
+      expect(mockExecuteTool.mock.calls.map((call) => call[0])).toEqual(["get_weather"]);
+      const [{ functionResponses }] = mockLiveSession.sendToolResponse.mock.calls[0];
+      expect(functionResponses).toEqual([
+        expect.objectContaining({
+          id: "call-shell",
+          response: expect.objectContaining({
+            error: "CAPABILITY_SCOPE_DENIED",
+            message: expect.stringContaining('[Capability scope] "execute_shell"'),
+          }),
+        }),
+        { id: "call-weather", name: "get_weather", response: { temperature: "68F" } },
+      ]);
+    });
+
     it("should handle tool execution errors without crashing", async () => {
       setupWebSocket(mockWss);
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -977,7 +1035,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1015,8 +1073,9 @@ describe("WebSocket Handler Suite", () => {
       setupWebSocket(mockWss);
       const mockSocket = new MockWebSocket();
       const mockRequest = {
-        url: "/ws/live?project=my-project&username=rbarraza",
-        headers: { host: "localhost" },
+        url: "/ws/live?project=my-project",
+        // The user is the token's (a `username` query parameter names nobody).
+        headers: { host: "localhost", ...userHeaders("rbarraza") },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1081,7 +1140,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1115,7 +1174,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1153,7 +1212,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1179,7 +1238,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1199,7 +1258,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1225,7 +1284,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1254,7 +1313,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1283,7 +1342,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1314,7 +1373,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1367,6 +1426,8 @@ describe("WebSocket Handler Suite", () => {
         url: "/ws/chat",
         headers: {
           host: "localhost",
+          // A service names the user it speaks for in x-username.
+          ...serviceHeaders(),
           "x-forwarded-for": "::ffff:1.2.3.4, 5.6.7.8",
           "x-project": "headers-project",
           "x-username": "headers-user",
@@ -1399,6 +1460,7 @@ describe("WebSocket Handler Suite", () => {
         url: "/ws/chat",
         headers: {
           host: "localhost",
+          ...SIGNED_IN,
           "x-forwarded-for": ["::ffff:9.8.7.6", "1.1.1.1"],
         },
         socket: { remoteAddress: "127.0.0.1" },
@@ -1423,7 +1485,7 @@ describe("WebSocket Handler Suite", () => {
       mockSocket.readyState = 2; // CLOSED
       const mockRequest = {
         url: "/ws/chat",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1446,7 +1508,7 @@ describe("WebSocket Handler Suite", () => {
       mockSocket.readyState = 2; // CLOSED
       const mockRequest = {
         url: "/ws/text-to-audio",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1471,7 +1533,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1497,7 +1559,8 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        // A service that names nobody speaks for "anonymous".
+        headers: { host: "localhost", ...serviceHeaders() },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1552,7 +1615,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1574,7 +1637,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1612,7 +1675,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 
@@ -1674,7 +1737,7 @@ describe("WebSocket Handler Suite", () => {
       const mockSocket = new MockWebSocket();
       const mockRequest = {
         url: "/ws/live",
-        headers: { host: "localhost" },
+        headers: { host: "localhost", ...SIGNED_IN },
         socket: { remoteAddress: "127.0.0.1" },
       };
 

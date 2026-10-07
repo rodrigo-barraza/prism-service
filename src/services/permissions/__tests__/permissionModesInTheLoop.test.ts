@@ -25,6 +25,8 @@ import { MODALITY_TYPES } from "#src/config";
 import { clearPermissionRuleCache } from "#src/services/permissions/PermissionRuleStore";
 import { PermissionModeRegistry } from "#src/services/permissions/PermissionModeState";
 import { BYPASS_OWNERS_ENV_VAR } from "#src/services/permissions/PermissionModes";
+import type { AuthKind } from "#src/utils/RequestContext";
+import { runAs } from "../../../../tests/helpers/auth.ts";
 
 vi.mock("#src/utils/logger", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), success: vi.fn(), request: vi.fn() },
@@ -38,12 +40,14 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
       { name: "write_file", description: "Write a file" },
       { name: "execute_shell", description: "Run a shell command" },
       { name: "exit_plan_mode", description: "Present the plan" },
+      { name: "read_url", description: "Fetch a URL" },
     ]),
     getClientToolSchemas: vi.fn().mockReturnValue([
       { name: "read_file", domain: "system", labels: ["safe"] },
       { name: "write_file", domain: "system", labels: [] },
       { name: "execute_shell", domain: "system", labels: [] },
       { name: "exit_plan_mode", domain: "system", labels: [] },
+      { name: "read_url", domain: "web", labels: [] },
     ]),
     getMCPToolSchemas: vi.fn().mockReturnValue([]),
     executeTool: vi.fn().mockResolvedValue({ success: true, result: "mocked" }),
@@ -165,8 +169,10 @@ describe("permission modes in a real loop", () => {
       });
   }
 
+  // A signed-in user's turn (AuthMiddleware), unless a test says otherwise.
+  let authKind: AuthKind | null = "user";
   const run = (options: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
-    AgenticLoopService.runAgenticLoop({
+    runAs(authKind, USERNAME, () => AgenticLoopService.runAgenticLoop({
       provider,
       providerName: "test-provider",
       resolvedModel: "test-model",
@@ -207,7 +213,7 @@ describe("permission modes in a real loop", () => {
       }),
       signal: new AbortController().signal,
       ...extra,
-    } as any);
+    } as any));
 
   const executed = () => vi.mocked(ToolOrchestratorService.executeTool).mock.calls.map((call) => [call[0], call[1]]);
   /** What ran — minus the approval card's diff preview, which reads the target file. */
@@ -228,6 +234,7 @@ describe("permission modes in a real loop", () => {
   beforeEach(() => {
     mongo.collections.clear();
     emitted = [];
+    authKind = "user";
     cardAnswer = "deny";
     onFirstModelCall = null;
     clearPermissionRuleCache();
@@ -333,6 +340,23 @@ describe("permission modes in a real loop", () => {
     expect(modeEvents()[0]).toMatchObject({ mode: "bypass", source: "request" });
     expect(cards()).toEqual([]);
     expect(executed()).toEqual([["execute_shell", { command: "npm test" }]]);
+  });
+
+  it("a service's turn under the owner's name gets no bypass: a write-tier call asks, and the shell is out of its reach", async () => {
+    process.env[BYPASS_OWNERS_ENV_VAR] = USERNAME;
+    authKind = "service";
+    script(
+      { name: "read_url", args: { url: "https://example.com" }, id: "call-fetch" },
+      { name: "execute_shell", args: { command: "npm test" }, id: "call-shell" },
+    );
+
+    await run({ permissionMode: "bypass" });
+
+    expect(modeEvents()[0]).toMatchObject({ mode: "default", refused: "bypass" });
+    // Default mode: the fetch asks (and the card is denied); a service's
+    // turn has no shell to call at all (ServiceTurnLimits).
+    expect(cards().map((card) => card.toolCall.name)).toEqual(["read_url"]);
+    expect(executed()).toEqual([]);
   });
 
   it("protected paths always ask — acceptEdits, bypass and full auto alike", async () => {

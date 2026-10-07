@@ -31,6 +31,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import express from "express";
 import supertest from "supertest";
 import { createMockCollection } from "../../../../tests/mongoMock.ts";
+import { signInAsHeaderUser } from "../../../../tests/helpers/auth.ts";
 
 // ── State that outlives a "process" ───────────────────────────────────
 
@@ -53,8 +54,8 @@ const shared = vi.hoisted(() => ({
   hangingTools: new Set<string>(),
   /** Events each process's turns emitted. */
   events: [] as Array<{ process: number; conversationId: string; event: Record<string, unknown> }>,
-  /** Every call of the /agent handler stand-in. */
-  handled: [] as Array<{ process: number; params: Record<string, unknown> }>,
+  /** Every call of the /agent handler stand-in, with the auth of the request context it ran in. */
+  handled: [] as Array<{ process: number; params: Record<string, unknown>; authKind?: string | null }>,
 }));
 
 function mockCollection(name: string) {
@@ -138,7 +139,8 @@ vi.mock("#src/routes/ChatRoutes", () => ({
     emit: (event: Record<string, unknown>) => void,
     { signal }: { signal?: AbortSignal } = {},
   ) => {
-    shared.handled.push({ process: shared.process, params });
+    const { currentAuthKind } = await import("#src/utils/RequestContext");
+    shared.handled.push({ process: shared.process, params, authKind: currentAuthKind() });
     const { default: AgenticLoopService } = await import("#src/services/AgenticLoopService");
     const { messages, _resume, ...request } = params;
     const process = shared.process;
@@ -341,8 +343,12 @@ async function bootProcess() {
   const { default: TurnInputMailbox } = await import("#src/services/TurnInputMailbox");
   const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
   const { PermissionModeRegistry } = await import("#src/services/permissions/PermissionModeState");
+  const { authMiddleware } = await import("#src/middleware/AuthMiddleware");
   const app = express();
   app.use(express.json());
+  // Signed in as the client is: only a signed-in user decides.
+  app.use(signInAsHeaderUser);
+  app.use(authMiddleware);
   app.use("/agent", agentRouter);
   return { TurnResumeService, http: supertest(app), handleAgent, TurnInputMailbox, AsyncTaskRegistry, PermissionModeRegistry };
 }
@@ -512,6 +518,36 @@ describe("a turn parked on an approval is re-driven after a restart", () => {
     expect(eventsOf(2, conversationId, "approval_required")).toHaveLength(0);
     expect(executionsOf(2, "write_file")).toHaveLength(1);
   });
+});
+
+// ── Who the re-driven turn is ─────────────────────────────────────────
+
+describe("a re-driven turn keeps the auth its request had", () => {
+  it.each(["user", "service"] as const)(
+    "a %s's turn is recorded with its auth and re-driven with it — owner powers only for a signed-in user's",
+    async (kind) => {
+      const conversationId = `resumed-as-${kind}`;
+      seedConversation(conversationId);
+      shared.passes.set(conversationId, [
+        { calls: [{ id: "call-1", name: "write_file", args: { path: "auth.txt" } }] },
+        { text: "Done." },
+      ]);
+      const first = await bootProcess();
+      // The request context of this process's modules (vi.resetModules gives each its own).
+      const { requestContext } = await import("#src/utils/RequestContext");
+      requestContext.run(
+        { project: PROJECT, username: USERNAME, clientIp: null, auth: { kind, username: USERNAME, roles: [] } },
+        () => startTurn(first.handleAgent, conversationId, "Write auth.txt"),
+      );
+      await until(() => eventsOf(1, conversationId, "approval_required").length === 1, "the card");
+      await until(() => !!turnRun(conversationId)?.pass, "the pass on record");
+      expect(turnRun(conversationId)?.authKind).toBe(kind);
+
+      await restart();
+      await until(() => shared.handled.some((entry) => entry.process === 2), "the re-drive");
+      expect(shared.handled.find((entry) => entry.process === 2)?.authKind).toBe(kind);
+    },
+  );
 });
 
 // ── Calls in flight at the crash ──────────────────────────────────────

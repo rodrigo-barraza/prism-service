@@ -50,6 +50,7 @@ vi.mock("#src/utils/DirectViewerBroadcast", () => ({
 
 import TaskNotificationDelivery, {
   type TaskNotice,
+  wakeAuthKind,
 } from "#src/services/background-tasks/TaskNotificationDelivery";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import AgentSessionRegistry from "#src/services/AgentSessionRegistry";
@@ -188,6 +189,36 @@ describe("TaskNotificationDelivery", () => {
     expect(observed).toEqual({ active: true, project: "coding", username: "rod" });
     await vi.waitFor(() => expect(AgentSessionRegistry.isActive(CONVERSATION)).toBe(false));
     expect(TaskNotificationDelivery.pendingWakeCount).toBe(0);
+  });
+
+  it("the woken turn keeps the auth of the work that sent it: a signed-in user's keeps owner powers, a service's never gains them", async () => {
+    const observed: Array<unknown> = [];
+    handleAgent.mockImplementation(async () => {
+      observed.push(getRequestContext().auth ?? null);
+    });
+
+    await TaskNotificationDelivery.deliver(notice("<user's/>", { authKind: "user" }));
+    await vi.waitFor(() => expect(observed).toHaveLength(1));
+    expect(observed[0]).toEqual({ kind: "user", username: "rod", roles: [] });
+    await vi.waitFor(() => expect(TaskNotificationDelivery.pendingWakeCount).toBe(0));
+
+    await TaskNotificationDelivery.deliver(notice("<service's/>", { authKind: "service" }));
+    await vi.waitFor(() => expect(observed).toHaveLength(2));
+    expect(observed[1]).toEqual({ kind: "service", username: "rod", roles: [] });
+    await vi.waitFor(() => expect(TaskNotificationDelivery.pendingWakeCount).toBe(0));
+
+    // Work recorded before authentication carries no auth: no owner powers.
+    await TaskNotificationDelivery.deliver(notice("<legacy/>"));
+    await vi.waitFor(() => expect(observed).toHaveLength(3));
+    expect(observed[2]).toBeNull();
+  });
+
+  it("a wake that carries several notices runs with the weakest auth among them", () => {
+    expect(wakeAuthKind([notice("a", { authKind: "user" }), notice("b", { authKind: "user" })])).toBe("user");
+    expect(wakeAuthKind([notice("a", { authKind: "user" }), notice("b", { authKind: "service" })])).toBe("service");
+    expect(wakeAuthKind([notice("a", { authKind: "user" }), notice("b")])).toBeNull();
+    expect(wakeAuthKind([notice("a", { authKind: "service" }), notice("b", { authKind: null })])).toBe("service");
+    expect(wakeAuthKind([])).toBeNull();
   });
 
   it("once the woken turn is open, later notifications go into its mailbox; those before it opened follow it in", async () => {

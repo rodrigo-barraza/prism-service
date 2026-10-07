@@ -45,6 +45,9 @@ import BudgetPauseRegistry, {
 } from "./BudgetPauseRegistry.ts";
 import type { SharedCostBudget } from "./harnesses/lifecycle/CostBudgetEnforcer.ts";
 import logger from "#src/utils/logger";
+import { currentAuthKind } from "#src/utils/RequestContext";
+import { limitServiceTurn, narrowServiceTurnScope } from "#src/utils/ServiceTurnLimits";
+import { describeScope } from "./permissions/CapabilityScope.ts";
 
 import type { AgenticContext, ConversationMessage } from "./harnesses/types.ts";
 
@@ -113,6 +116,25 @@ export default class AgenticLoopService {
 
     const resolvedAgentConversationId = agentConversationId || "";
     const resolvedParentAgentConversationId = parentAgentConversationId || null;
+
+    // A service's request reaches the owner's machine through no entry point
+    // — a route, a scheduled task or timer it created, a wake, a sub-agent:
+    // no workspace root, no workspace tools, no full auto, and a capability
+    // scope without the shell, file writes, outside actions or MCP unless
+    // its agent keeps them (ServiceTurnLimits). The scope only narrows the
+    // one the run arrived with; openRunSafety makes it the run's handle.
+    if (currentAuthKind() === "service") {
+      const label = `loop ${conversationId ?? resolvedAgentConversationId}`;
+      limitServiceTurn("service", options as Record<string, unknown>, label);
+      context.workspaceRoot = null;
+      const { default: AgentPersonaRegistry } = await import("./AgentPersonaRegistry.ts");
+      const scope = narrowServiceTurnScope(
+        options._capabilityScope,
+        agent ? AgentPersonaRegistry.get(agent) : null,
+      );
+      options._capabilityScope = scope;
+      logger.debug(`[ServiceTurnLimits] ${label}: a service's turn runs with ${describeScope(scope)}`);
+    }
 
     // An external runtime (an ACP agent process) runs the turn itself: no
     // Prism tools, provider or harness are resolved for it.
@@ -667,9 +689,10 @@ export default class AgenticLoopService {
    * The run's capability scope handle and its taint registry.
    *
    * `_capabilityScope` arrives as a plain scope from whoever started the run
-   * (the orchestrator for a sub-agent, the scheduler for a task) and becomes
-   * a CapabilityScopeHandle the goal gate can narrow while the agent works
-   * on its own. `_untrustedSpans` arrives as the PARENT's registry for a
+   * (the orchestrator for a sub-agent, the scheduler for a task, and for a
+   * service's turn runTurn's ServiceTurnLimits) and becomes a
+   * CapabilityScopeHandle the goal gate can narrow while the agent works on
+   * its own. `_untrustedSpans` arrives as the PARENT's registry for a
    * sub-agent; the turn gets its own, seeded from the messages it starts
    * with and the conversation's stored transcript, and chained to the
    * parent's. A value a request body smuggled in is not an instance and is

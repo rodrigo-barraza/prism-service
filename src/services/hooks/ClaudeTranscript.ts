@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
 import { IDENTITY_HEADERS } from "@rodrigo-barraza/utilities-library/service";
 import { TOOLS_SERVICE_URL } from "#config";
+import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
 import { TURN_INPUT } from "#src/constants";
 import { traceHeaders } from "#src/services/Tracing";
 import logger from "#src/utils/logger";
@@ -245,6 +246,7 @@ async function postLines(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...traceHeaders(),
+    ...toolsServiceAuthHeaders(),
   };
   if (target.project) headers[IDENTITY_HEADERS.project] = target.project;
   if (target.username) headers[IDENTITY_HEADERS.username] = target.username;

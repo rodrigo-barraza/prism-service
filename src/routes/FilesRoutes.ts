@@ -4,6 +4,7 @@ import FileService from "#src/services/FileService";
 import FileGarbageCollectionService from "#src/services/FileGarbageCollectionService";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
+import { requireAdmin } from "#src/middleware/AuthMiddleware";
 
 const router = express.Router();
 
@@ -128,14 +129,15 @@ router.post(
 
 /**
  * POST /files/gc
- * Admin: scan for orphaned upload objects (uploads older than 30 days
- * referenced by no conversation/workflow/artifact document) and
- * optionally delete them.
+ * Admin (a signed-in user with the admin role, like /admin): scan for
+ * orphaned upload objects (uploads older than 30 days referenced by no
+ * conversation/workflow/artifact document) and optionally delete them.
  * Body: { dryRun?: boolean (default TRUE), olderThanDays?: number (min 30) }
  * Response: GarbageCollectionReport
  */
 router.post(
   "/gc",
+  requireAdmin,
   asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { dryRun, olderThanDays } = req.body || {};
@@ -154,7 +156,8 @@ router.post(
 
 /**
  * GET /files/:key(*)
- * Stream a file from MinIO storage.
+ * Stream a file from MinIO storage. Public — an <img> or <audio> tag
+ * cannot send a token (AuthMiddleware.isPublicRequest); uploads sign in.
  * The key is the full object path, e.g. "files/abc-123.png"
  */
 router.get(

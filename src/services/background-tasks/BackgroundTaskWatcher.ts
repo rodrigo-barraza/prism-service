@@ -15,6 +15,7 @@ import {
 import { PROTOCOL_EVENT_TYPES } from "#src/protocol/events";
 import WebSocketConnectionRegistry from "#src/websocket/WebSocketConnectionRegistry";
 import { registerCleanup } from "#src/utils/CleanupRegistry";
+import { currentAuthKind, type AuthKind } from "#src/utils/RequestContext";
 import logger from "#src/utils/logger";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
 import WorkspaceTaskClient, {
@@ -55,6 +56,12 @@ import { formatMonitorEvent, formatTaskExit } from "./TaskNotificationFormatter.
 export interface TaskOwner extends TaskOwnerIdentity {
   /** The owner is a sub-agent: never woken, and its monitors end with its run. */
   isSubAgent: boolean;
+  /**
+   * How the turn that started the task authenticated (its own when unset:
+   * `watch` runs inside that turn). The wake its notification causes runs
+   * with it — owner powers only for a signed-in user's task.
+   */
+  authKind?: AuthKind | null;
 }
 
 export interface WatchRequest {
@@ -183,6 +190,7 @@ function taskFromRecord(record: DetachedWorkRecord): WatchedTask | null {
       username: record.username,
       workspaceRoot: fields.workspaceRoot ?? null,
       isSubAgent: fields.isSubAgent === true,
+      authKind: record.authKind ?? null,
     },
     status: "running",
     lastSeq: fields.lastSeq ?? 0,
@@ -227,6 +235,7 @@ function noticeOf(task: WatchedTask, text: string, seq: number): TaskNotice {
     project: task.owner.project,
     username: task.owner.username,
     isSubAgent: task.owner.isSubAgent,
+    authKind: task.owner.authKind ?? null,
     kind: "task_notification",
     text,
     timestamp: new Date().toISOString(),
@@ -391,6 +400,8 @@ const BackgroundTaskWatcher = {
   async watch(request: WatchRequest): Promise<void> {
     if (watchedTasks.has(request.taskId)) return;
     const startedAt = request.startedAt ?? new Date().toISOString();
+    // Called from the turn that started the task: its auth is the owner's.
+    const owner: TaskOwner = { ...request.owner, authKind: request.owner.authKind ?? currentAuthKind() };
     const task: WatchedTask = {
       recordId: detachedWorkId("workspace_task", request.owner.conversationId, request.taskId),
       taskId: request.taskId,
@@ -400,7 +411,7 @@ const BackgroundTaskWatcher = {
       ...(request.wsUrl !== undefined ? { wsUrl: request.wsUrl } : {}),
       ...(request.outputFile !== undefined ? { outputFile: request.outputFile } : {}),
       timeoutMs: request.timeoutMs ?? null,
-      owner: request.owner,
+      owner,
       status: "running",
       lastSeq: 0,
       eventCount: 0,
@@ -433,6 +444,7 @@ const BackgroundTaskWatcher = {
       agentConversationId: task.owner.agentConversationId,
       project: task.owner.project,
       username: task.owner.username,
+      authKind: task.owner.authKind ?? null,
       task: fields,
     });
     announce(task);

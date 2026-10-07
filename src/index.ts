@@ -1,4 +1,4 @@
-import { AGENT_IDS, CORS_ALLOWED_HEADERS_STRING } from "@rodrigo-barraza/utilities-library/taxonomy";
+import { AGENT_IDS } from "@rodrigo-barraza/utilities-library/taxonomy";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
 import http from "http";
@@ -8,7 +8,12 @@ import { errorHandler } from "./utils/errors.ts";
 import logger from "./utils/logger.ts";
 import { listProviders } from "./providers/index.ts";
 import { setupWebSocket } from "./websocket/index.ts";
-import { authMiddleware } from "./middleware/AuthMiddleware.ts";
+import {
+  authMiddleware,
+  CORS_ALLOWED_REQUEST_HEADERS,
+  requireAdmin,
+  warnAboutMissingSecrets,
+} from "./middleware/AuthMiddleware.ts";
 import { requestLoggerMiddleware } from "./middleware/RequestLoggerMiddleware.ts";
 import { MODALITY_TYPES, COLLECTIONS, CROSS_ORIGIN_RESOURCE_SHARING_MAXIMUM_AGE_SECONDS } from "./constants.ts";
 import { getErrorMessage } from "@rodrigo-barraza/utilities-library";
@@ -106,7 +111,6 @@ import webhookRouter from "./routes/WebhookRoutes.ts";
 import profilesRouter from "./routes/ProfilesRoutes.ts";
 import pushRouter from "./routes/PushRoutes.ts";
 import backgroundTasksRouter from "./routes/BackgroundTasksRoutes.ts";
-import { PROFILE_ID_HEADER } from "./utils/ProfileScope.ts";
 
 const app = express();
 const server = http.createServer(app);
@@ -123,14 +127,19 @@ app.use(
   cors({
     origin: true, // reflect request origin (equivalent to *)
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    // x-profile-id is prism-local (not yet in the shared IDENTITY_HEADERS
-    // taxonomy the allow-list derives from), so it is appended explicitly.
-    allowedHeaders: `${CORS_ALLOWED_HEADERS_STRING}, ${PROFILE_ID_HEADER}`,
+    // The shared identity headers, both credentials (Authorization,
+    // x-api-secret) and x-profile-id (AuthMiddleware).
+    allowedHeaders: CORS_ALLOWED_REQUEST_HEADERS,
     maxAge: CROSS_ORIGIN_RESOURCE_SHARING_MAXIMUM_AGE_SECONDS, // cache preflight for 24h — eliminates burst OPTIONS storms
   }),
 );
 app.use(express.json({ limit: "50mb" }));
 app.use(requestLoggerMiddleware);
+// Every request proves who it is — a user's token or a service's secret —
+// except the public few (health, media files, the MCP OAuth redirect and
+// CORS preflights: isPublicRequest). Then project / username / clientIp.
+app.use(authMiddleware);
+warnAboutMissingSecrets();
 
 // Endpoint registry (single source of truth for health check + startup logs)
 const ENDPOINTS = {
@@ -179,7 +188,7 @@ const ENDPOINTS = {
   admin: ["/admin", "/admin/lm-studio"],
 };
 
-// Health check (public — no auth required)
+// Service description (signed in: it names the providers and every route)
 app.get("/", (_request: Request, response: Response) => {
   response.json({
     name: "Prism the AI Gateway",
@@ -194,14 +203,11 @@ app.get("/health", (_request: Request, response: Response) => {
   response.json({ status: "ok" });
 });
 
-// Admin routes
-app.use("/admin", adminRouter);
+// Admin routes: a signed-in user with the admin role
+app.use("/admin", requireAdmin, adminRouter);
 
-// Public routes (no auth required)
+// GET /files/<key> is public (media tags load it); uploads sign in
 app.use("/files", filesRouter);
-
-// Extract project / username / clientIp from headers for downstream tracking
-app.use(authMiddleware);
 
 // REST routes
 app.use("/config", configRouter);
@@ -230,7 +236,8 @@ app.use("/project-instructions", projectInstructionsRouter);
 app.use("/agent-memories", agentMemoriesRouter);
 app.use("/workflow-memories", workflowMemoriesRouter);
 app.use("/mcp-servers", mcpServersRouter);
-// Browser redirects from MCP authorization servers (no identity headers).
+// Browser redirects from MCP authorization servers (no identity headers):
+// the callback and the metadata document are public (isPublicRequest).
 app.use("/mcp/oauth", mcpOAuthRouter);
 app.use("/favorites", favoritesRouter);
 app.use("/conversation", conversationRouter);
@@ -259,9 +266,10 @@ app.use(backgroundTasksRouter);
 // Error handler (must be last)
 app.use(errorHandler);
 
-// WebSocket server
-const wss = new WebSocketServer({ server });
-setupWebSocket(wss);
+// WebSocket server — every upgrade authenticates before it is accepted
+// (setupWebSocket answers a refused one with a 401).
+const wss = new WebSocketServer({ noServer: true });
+setupWebSocket(wss, server);
 
 // Start
 (async () => {
