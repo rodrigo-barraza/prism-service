@@ -40,12 +40,14 @@ vi.mock("#src/services/ToolOrchestratorService", () => ({
       { name: "write_file", description: "Write a file" },
       { name: "execute_shell", description: "Run a shell command" },
       { name: "exit_plan_mode", description: "Present the plan" },
+      { name: "read_url", description: "Fetch a URL" },
     ]),
     getClientToolSchemas: vi.fn().mockReturnValue([
       { name: "read_file", domain: "system", labels: ["safe"] },
       { name: "write_file", domain: "system", labels: [] },
       { name: "execute_shell", domain: "system", labels: [] },
       { name: "exit_plan_mode", domain: "system", labels: [] },
+      { name: "read_url", domain: "web", labels: [] },
     ]),
     getMCPToolSchemas: vi.fn().mockReturnValue([]),
     executeTool: vi.fn().mockResolvedValue({ success: true, result: "mocked" }),
@@ -340,15 +342,20 @@ describe("permission modes in a real loop", () => {
     expect(executed()).toEqual([["execute_shell", { command: "npm test" }]]);
   });
 
-  it("a service's turn under the owner's name gets no bypass: the shell call asks", async () => {
+  it("a service's turn under the owner's name gets no bypass: a write-tier call asks, and the shell is out of its reach", async () => {
     process.env[BYPASS_OWNERS_ENV_VAR] = USERNAME;
     authKind = "service";
-    script({ name: "execute_shell", args: { command: "npm test" }, id: "call-shell" });
+    script(
+      { name: "read_url", args: { url: "https://example.com" }, id: "call-fetch" },
+      { name: "execute_shell", args: { command: "npm test" }, id: "call-shell" },
+    );
 
     await run({ permissionMode: "bypass" });
 
     expect(modeEvents()[0]).toMatchObject({ mode: "default", refused: "bypass" });
-    expect(cards().map((card) => card.toolCall.name)).toEqual(["execute_shell"]);
+    // Default mode: the fetch asks (and the card is denied); a service's
+    // turn has no shell to call at all (ServiceTurnLimits).
+    expect(cards().map((card) => card.toolCall.name)).toEqual(["read_url"]);
     expect(executed()).toEqual([]);
   });
 

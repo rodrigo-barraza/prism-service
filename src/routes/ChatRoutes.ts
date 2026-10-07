@@ -86,8 +86,12 @@ import {
   SYSTEM_STATUSES,
   MESSAGE_ROLES,
 } from "#src/constants";
-import { getRequestContext } from "#src/utils/RequestContext";
-import { limitServiceTurn } from "#src/utils/ServiceTurnLimits";
+import { currentAuthKind, getRequestContext } from "#src/utils/RequestContext";
+import { deniedCapabilityOf, limitServiceTurn, serviceTurnScope } from "#src/utils/ServiceTurnLimits";
+import {
+  capabilityScopeDenialReason,
+  type CapabilityScope,
+} from "#src/services/permissions/CapabilityScope";
 import {
   routeAgentTurn,
   saveConversationModelRouting,
@@ -653,6 +657,16 @@ async function prepareGenerationContext(
 }
 // ─── Chat / Conversation persistence path ───────────────────
 /**
+ * The scope a service's turn runs under on /chat's function calling
+ * (ServiceTurnLimits): the default, whatever the agent — this path runs
+ * calls with no approval engine and no persona policy, so no agent's
+ * serviceCapabilities apply. Null for anyone else's turn.
+ */
+function functionCallingServiceScope(): CapabilityScope | null {
+  return currentAuthKind() === "service" ? serviceTurnScope(null) : null;
+}
+
+/**
  * Handle a conversation request: text generation, image generation,
  * vision/captioning — with conversationId-based persistence.
  *
@@ -796,6 +810,13 @@ export async function handleConversation(
               .map((toolSchema) => toolSchema.name),
           );
           tools = tools.filter((toolItem) => !workspaceToolNames.has(toolItem.name));
+        }
+        // A service's turn is offered nothing a service's turn runs without
+        // (ServiceTurnLimits): this path judges no persona policy, so the
+        // default scope, whatever the agent.
+        const serviceScope = functionCallingServiceScope();
+        if (serviceScope) {
+          tools = tools.filter((toolItem) => deniedCapabilityOf(toolItem.name, serviceScope) === null);
         }
         options.tools = tools;
 
@@ -1373,6 +1394,9 @@ async function handleStreamingText(context: GenerationContext) {
   // engine, no context manager, just direct execution.
   const MAX_FUNCTIONCALL_ITERATIONS = MAX_FUNCTION_CALL_ITERATIONS;
   let functionCallIteration = 0;
+  // No approval engine here: a service's call its scope denies is refused
+  // before it runs, whatever tool the model names (ServiceTurnLimits).
+  const serviceScope = options.functionCallingEnabled ? functionCallingServiceScope() : null;
   while (
     options.functionCallingEnabled &&
     streamState.toolCalls.length > 0 &&
@@ -1405,6 +1429,30 @@ async function handleStreamingText(context: GenerationContext) {
         args: toolCall.args,
         status: "calling",
       });
+      const deniedCapability = deniedCapabilityOf(toolCall.name as string, serviceScope);
+      if (serviceScope && deniedCapability) {
+        logger.warn(
+          `[chat/FC] Refused "${toolCall.name}" for a service's turn: it uses ${deniedCapability} (ServiceTurnLimits)`,
+        );
+        toolCall.result = {
+          success: false,
+          error: "CAPABILITY_SCOPE_DENIED",
+          capability: deniedCapability,
+          message: capabilityScopeDenialReason(toolCall.name as string, deniedCapability, serviceScope),
+        };
+        toolCall.status = SYSTEM_STATUSES.ERROR;
+        toolCall.durationMilliseconds = 0;
+        emit({
+          type: SERVER_SENT_EVENT_TYPES.TOOL_CALL,
+          id: toolCall.id,
+          name: toolCall.name,
+          args: toolCall.args,
+          result: toolCall.result,
+          status: SYSTEM_STATUSES.ERROR,
+          durationMilliseconds: 0,
+        });
+        continue;
+      }
       const startTime = Date.now();
       try {
         const result = await ToolOrchestratorService.executeTool(

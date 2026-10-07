@@ -27,6 +27,14 @@ import {
   THINKING_PATTERNS,
   LOCAL_PROVIDER_TYPES,
 } from "./local-provider/constants.ts";
+import {
+  currentScope,
+  type CapabilityScope,
+  type CapabilityScopeHandle,
+} from "./permissions/CapabilityScope.ts";
+import { toMcpScope } from "./mcp/McpScope.ts";
+import { currentAuthKind } from "#src/utils/RequestContext";
+import { deniedCapabilityOf } from "#src/utils/ServiceTurnLimits";
 
 /**
  * Tools a benchmark sample (AgenticOptions.evaluation) never gets, nor may
@@ -89,6 +97,8 @@ interface ResolveOptions {
   workspaceEnabled?: boolean;
   mcpServers?: string[];
   thinkingEnabled?: boolean;
+  /** The run's capability scope (AgenticLoopService.openRunSafety). */
+  _capabilityScope?: CapabilityScopeHandle | CapabilityScope | null;
 }
 
 interface ResolveParams {
@@ -430,6 +440,28 @@ export default class AgenticToolResolver {
         logger.info(
           `[AgenticToolResolver] Workspace disabled: removed ${previousCount - finalTools.length} workspace-domain tools`,
         );
+      }
+    }
+
+    // ── A service's turn: what its capability scope takes away ──────
+    // (ServiceTurnLimits) is neither declared nor discoverable, so the model
+    // is never offered a tool the approval engine would refuse. Other
+    // narrowed runs (a sub-agent, a scheduled task) keep the refusal alone.
+    if (currentAuthKind() === "service") {
+      const scope = currentScope(options._capabilityScope);
+      if (scope) {
+        const mcpScope = toMcpScope({ username, profileId });
+        const isOutOfScope = (toolName: string) => deniedCapabilityOf(toolName, scope, mcpScope) !== null;
+        const previousCount = finalTools.length;
+        finalTools = finalTools.filter((tool) => !isOutOfScope(tool.name));
+        for (const tool of dynamicTools) {
+          if (isOutOfScope(tool.name)) unreachableToolNames.add(tool.name);
+        }
+        if (finalTools.length < previousCount) {
+          logger.info(
+            `[AgenticToolResolver] Service turn: removed ${previousCount - finalTools.length} tools its capability scope denies`,
+          );
+        }
       }
     }
 

@@ -18,7 +18,19 @@ vi.mock("#src/utils/SseUtilities", () => ({
 
 import { app } from "./setup.ts";
 import { serviceHeaders, userHeaders, runAs } from "./helpers/auth.ts";
-import { limitServiceTurn, OWNER_ONLY_TURN_FIELDS } from "#src/utils/ServiceTurnLimits";
+import {
+  limitServiceTurn,
+  narrowServiceTurnScope,
+  OWNER_ONLY_TURN_FIELDS,
+  SERVICE_TURN_DENIED_CAPABILITIES,
+  serviceTurnScope,
+} from "#src/utils/ServiceTurnLimits";
+import {
+  CapabilityScopeHandle,
+  currentScope,
+  type CapabilityScope,
+} from "#src/services/permissions/CapabilityScope";
+import { LuposPersona } from "#src/services/personas/LuposPersona";
 
 const { default: agentRouter } = await import("#src/routes/AgentRoutes");
 const { default: conversationRouter } = await import("#src/routes/ConversationExecutionRoute");
@@ -89,25 +101,34 @@ describe("limitServiceTurn", () => {
   });
 });
 
-describe("every loop a service's request starts gets the same limits", () => {
-  /** A loop that stops right after its entry checks (an unknown runtime), so its context can be read. */
-  async function enterLoop(kind: "user" | "service") {
-    const context = {
-      options: { runtime: "no-such-runtime", autoApprove: true, workspaceEnabled: true },
-      workspaceRoot: "/home/rodrigo/repo",
-      conversationId: `limits-${kind}`,
-      agentConversationId: `limits-${kind}`,
-      project: "coding",
-      username: "rodrigo",
-      messages: [],
-      emit: () => {},
-    } as never as Parameters<typeof AgenticLoopService.runAgenticLoop>[0];
-    await expect(runAs(kind, "rodrigo", () => AgenticLoopService.runAgenticLoop(context))).rejects.toThrow(
-      /Unknown agent runtime/,
-    );
-    return context as unknown as { workspaceRoot: string | null; options: Record<string, unknown> };
-  }
+/** A loop that stops right after its entry checks (an unknown runtime), so its context can be read. */
+async function enterLoop(
+  kind: "user" | "service",
+  { agent, options = {} }: { agent?: string; options?: Record<string, unknown> } = {},
+) {
+  const context = {
+    options: { runtime: "no-such-runtime", autoApprove: true, workspaceEnabled: true, ...options },
+    workspaceRoot: "/home/rodrigo/repo",
+    conversationId: `limits-${kind}`,
+    agentConversationId: `limits-${kind}`,
+    project: "coding",
+    username: "rodrigo",
+    ...(agent && { agent }),
+    messages: [],
+    emit: () => {},
+  } as never as Parameters<typeof AgenticLoopService.runAgenticLoop>[0];
+  await expect(runAs(kind, "rodrigo", () => AgenticLoopService.runAgenticLoop(context))).rejects.toThrow(
+    /Unknown agent runtime/,
+  );
+  return context as unknown as { workspaceRoot: string | null; options: Record<string, unknown> };
+}
 
+/** The scope a loop entered with, as `{ denied }` (null: nothing taken away). */
+function scopeOf(context: { options: Record<string, unknown> }) {
+  return currentScope(context.options._capabilityScope as CapabilityScope | null | undefined);
+}
+
+describe("every loop a service's request starts gets the same limits", () => {
   it("a service's loop — a scheduled task, a timer, a wake, a sub-agent alike — has no workspace and no full auto", async () => {
     const context = await enterLoop("service");
     expect(context.workspaceRoot).toBeNull();
@@ -119,5 +140,58 @@ describe("every loop a service's request starts gets the same limits", () => {
     const context = await enterLoop("user");
     expect(context.workspaceRoot).toBe("/home/rodrigo/repo");
     expect(context.options).toMatchObject({ workspaceEnabled: true, autoApprove: true });
+  });
+});
+
+describe("a service's turn runs under a capability scope", () => {
+  const DEFAULT_DENIED = ["fs_write", "shell", "mcp", "external_side_effect"];
+
+  it("by default: no shell, no file writes, no outside actions, no MCP", () => {
+    expect([...SERVICE_TURN_DENIED_CAPABILITIES].sort()).toEqual([...DEFAULT_DENIED].sort());
+    expect(serviceTurnScope(null)).toEqual({ denied: DEFAULT_DENIED });
+    expect(serviceTurnScope({})).toEqual({ denied: DEFAULT_DENIED });
+  });
+
+  it("an agent's serviceCapabilities keep a default denial (true) or take one more away (false)", () => {
+    expect(serviceTurnScope({ serviceCapabilities: { shell: true } })).toEqual({
+      denied: ["fs_write", "mcp", "external_side_effect"],
+    });
+    expect(serviceTurnScope({ serviceCapabilities: { network: false } })).toEqual({
+      denied: ["fs_write", "shell", "network", "mcp", "external_side_effect"],
+    });
+  });
+
+  it("LUPOS keeps his sandboxes and Discord actions, and nothing else: only MCP is taken away", () => {
+    expect(LuposPersona.serviceCapabilities).toEqual({ shell: true, fs_write: true, external_side_effect: true });
+    expect(serviceTurnScope(LuposPersona)).toEqual({ denied: ["mcp"] });
+  });
+
+  it("is the scope every loop a service's request starts enters with — and a user's has none", async () => {
+    expect(scopeOf(await enterLoop("service"))).toEqual({ denied: DEFAULT_DENIED });
+    expect(scopeOf(await enterLoop("service", { agent: "CODING" }))).toEqual({ denied: DEFAULT_DENIED });
+    expect(scopeOf(await enterLoop("service", { agent: "LUPOS" }))).toEqual({ denied: ["mcp"] });
+    expect((await enterLoop("user")).options._capabilityScope).toBeUndefined();
+  });
+
+  it("only narrows the scope a run arrived with: a sub-agent of a service's turn keeps its parent's denials", async () => {
+    // A LUPOS sub-agent of a default service turn: his keeps cannot undo what the parent denies.
+    const child = await enterLoop("service", {
+      agent: "LUPOS",
+      options: { isSubAgent: true, _capabilityScope: { denied: [...DEFAULT_DENIED, "network"] } },
+    });
+    expect(scopeOf(child)).toEqual({ denied: ["fs_write", "shell", "network", "mcp", "external_side_effect"] });
+  });
+
+  it("nothing a request sends widens it", async () => {
+    const asked = await enterLoop("service", {
+      options: { _capabilityScope: { shell: true, fs_write: true, external_side_effect: true, mcp: true } },
+    });
+    expect(scopeOf(asked)).toEqual({ denied: DEFAULT_DENIED });
+  });
+
+  it("narrowServiceTurnScope reads a live handle's current narrowing", () => {
+    const handle = new CapabilityScopeHandle({ denied: ["network"] });
+    handle.narrow("goal", { denied: ["subagent"] });
+    expect(narrowServiceTurnScope(handle, LuposPersona)).toEqual({ denied: ["network", "mcp", "subagent"] });
   });
 });

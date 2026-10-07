@@ -40,7 +40,8 @@ import {
   wwwAuthenticate,
   type Authentication,
 } from "#src/middleware/AuthMiddleware";
-import { limitServiceTurn } from "#src/utils/ServiceTurnLimits";
+import { deniedCapabilityOf, limitServiceTurn, serviceTurnScope } from "#src/utils/ServiceTurnLimits";
+import { capabilityScopeDenialReason } from "#src/services/permissions/CapabilityScope";
 import type { WebSocket } from "ws";
 import type { IncomingMessage, Server } from "http";
 import type { Duplex } from "stream";
@@ -510,6 +511,11 @@ function handleWebsocketLive(
   auth: RequestAuth | null = null,
 ) {
   let liveSession: Session | null = null;
+  // Prism runs the session's tool calls with no approval engine: a
+  // service's session is offered nothing a service's turn runs without, and
+  // a call to one is refused (ServiceTurnLimits — the default scope, as on
+  // /chat's function calling).
+  const serviceScope = auth?.kind === "service" ? serviceTurnScope(null) : null;
   /** Accumulated base64 PCM audio chunks for current turn (model output, 24kHz) */
   let turnAudioChunks: string[] = [];
   let audioSampleRate = 24000;
@@ -665,8 +671,10 @@ function handleWebsocketLive(
             ...ToolOrchestratorService.getToolSchemas(defaultTopology),
           ];
 
-          const filtered = dynamicTools.filter((dynamicTool) =>
-            enabledSet.has(dynamicTool.name),
+          const filtered = dynamicTools.filter(
+            (dynamicTool) =>
+              enabledSet.has(dynamicTool.name) &&
+              deniedCapabilityOf(dynamicTool.name, serviceScope) === null,
           );
           const googleFormats = convertToolsToGoogle(
             filtered as {
@@ -861,6 +869,19 @@ function handleWebsocketLive(
 
                     const results: ToolResult[] = await Promise.all(
                       functionCalls.map(async (toolCall) => {
+                        const deniedCapability = deniedCapabilityOf(toolCall.name, serviceScope);
+                        if (serviceScope && deniedCapability) {
+                          logger.warn(
+                            `[Live API] Refused "${toolCall.name}" for a service's session: it uses ${deniedCapability} (ServiceTurnLimits)`,
+                          );
+                          const refusal: { [key: string]: ToolResultValue } = {
+                            success: false,
+                            error: "CAPABILITY_SCOPE_DENIED",
+                            capability: deniedCapability,
+                            message: capabilityScopeDenialReason(toolCall.name, deniedCapability, serviceScope),
+                          };
+                          return { id: toolCall.id, name: toolCall.name, result: refusal };
+                        }
                         const result =
                           (await ToolOrchestratorService.executeTool(
                             toolCall.name,
