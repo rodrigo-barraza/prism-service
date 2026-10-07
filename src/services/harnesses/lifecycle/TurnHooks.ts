@@ -38,6 +38,7 @@ import type {
   EmitFunction,
   ToolCall,
   ToolResult,
+  UsageAccumulator,
 } from "#src/services/harnesses/types";
 import type { LoadedInstruction } from "#src/services/instructions/InstructionsSection";
 
@@ -646,6 +647,7 @@ export async function runPostToolBatchStage(
   toolCalls: ToolCall[],
   results: ToolResult[],
   assistantText = "",
+  usage: UsageAccumulator | null = null,
 ): Promise<void> {
   if (toolCalls.length === 0) return;
   const transcript = turnHookFacts(context.agentConversationId)?.transcript;
@@ -656,6 +658,7 @@ export async function runPostToolBatchStage(
       results,
       messages: context._currentMessages,
       iteration: state.iterations,
+      usage,
     });
     if (hasHooks(hooks, "postToolBatch")) await transcript.flush();
   }
@@ -717,10 +720,11 @@ export async function runStopStage(
   state: AgenticLoopState,
   lastAssistantMessage: string,
   currentMessages: ConversationMessage[],
+  usage: UsageAccumulator | null = null,
 ): Promise<{ continueWith: string | null }> {
   const transcript = turnHookFacts(context.agentConversationId)?.transcript;
   if (transcript) {
-    void transcript.appendFinal(lastAssistantMessage, currentMessages, state.iterations);
+    void transcript.appendFinal(lastAssistantMessage, currentMessages, state.iterations, usage);
     if (hasHooks(hooks, "stop")) await transcript.flush();
   }
   if (!hasHooks(hooks, "stop")) return { continueWith: null };

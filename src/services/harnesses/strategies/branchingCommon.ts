@@ -923,7 +923,7 @@ export async function executeApprovedToolBatch(
 
   emitPostExecutionStatus(pass.pendingToolCalls, emit);
 
-  await runPostToolBatchStage(context, hooks, state, pass.pendingToolCalls, results, pass.finalStreamedText);
+  await runPostToolBatchStage(context, hooks, state, pass.pendingToolCalls, results, pass.finalStreamedText, pass.usage);
 
   return { results };
 }
@@ -1201,6 +1201,7 @@ export async function continueAfterStopHooks(
     state,
     answer,
     currentMessages,
+    pass.usage,
   );
   if (!continueWith || context.signal?.aborted) return false;
   currentMessages.push({
