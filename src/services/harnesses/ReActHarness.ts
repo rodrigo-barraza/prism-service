@@ -930,6 +930,7 @@ export default class ReActHarness extends BaseAgenticHarness {
             pass.pendingToolCalls,
             results,
             pass.finalStreamedText,
+            pass.usage,
           );
 
           const validationFeedback = await validateAfterToolExecution(
@@ -1053,6 +1054,7 @@ export default class ReActHarness extends BaseAgenticHarness {
               state,
               pass.finalStreamedText,
               currentMessages,
+              pass.usage,
             );
             if (!stopOutcome.continueWith || signal?.aborted) {
               logger.info(
@@ -1269,6 +1271,7 @@ export default class ReActHarness extends BaseAgenticHarness {
               state,
               pass.finalStreamedText || pass.streamedText,
               currentMessages,
+              pass.usage,
             );
             if (stopOutcome.continueWith && !signal?.aborted) {
               currentMessages.push({

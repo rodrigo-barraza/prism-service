@@ -3,6 +3,7 @@ import {
   TurnTranscript,
   _resetTranscriptsForTests,
   assistantLine,
+  claudeUsage,
   openTurnTranscript,
   toolResultLine,
   toolResultText,
@@ -85,6 +86,21 @@ describe("Claude Code line shapes", () => {
     expect(assistantLine(TARGET, "  ", [{ id: "c", name: "x", args: {} }]).message.content).toEqual([
       { type: "tool_use", id: "c", name: "x", input: {} },
     ]);
+  });
+
+  it("a reply carries its call's token usage in Claude Code's names, and none when nothing was counted", () => {
+    const usage = { inputTokens: 5, outputTokens: 40, cacheReadInputTokens: 1000, cacheCreationInputTokens: 100 };
+    expect(assistantLine(TARGET, "Done.", [], usage).message.usage).toEqual({
+      input_tokens: 5,
+      cache_creation_input_tokens: 100,
+      cache_read_input_tokens: 1000,
+      output_tokens: 40,
+    });
+    expect(assistantLine(TARGET, "Done.").message).not.toHaveProperty("usage");
+    expect(claudeUsage({ inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 })).toBeNull();
+    expect(claudeUsage({ inputTokens: Number.NaN, outputTokens: 3 })).toEqual({
+      input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 3,
+    });
   });
 
   it("a tool_result line: one block per call in call order, the text the model read, is_error on failure", () => {
