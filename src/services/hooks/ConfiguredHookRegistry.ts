@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { Db } from "mongodb";
 import logger from "#src/utils/logger";
 import { errorMessage } from "@rodrigo-barraza/utilities-library";
@@ -21,6 +22,15 @@ import type {
 } from "#src/services/hooks/types";
 import { matchesMatcher, matchesToolCall } from "#src/services/hooks/HookMatcher";
 import { summarizeTranscript } from "#src/services/hooks/buildPayload";
+import { transcriptPathFor } from "#src/services/hooks/ClaudeTranscript";
+import {
+  claudePermissionModeOf,
+  noteCommandHooks,
+  turnHookFacts,
+} from "#src/services/hooks/TurnHookFacts";
+import { HOOK_HARNESS_NAME } from "#src/services/hooks/WorkspaceHookConstants";
+import { redirectArgumentsToWorktree } from "#src/services/tool-orchestrator/WorktreePathRewrite";
+import type { WorktreeState } from "#src/services/tool-orchestrator/types";
 import TurnInputMailbox from "#src/services/TurnInputMailbox";
 import { DEFAULT_PROFILE_ID, profileFilter } from "#src/utils/ProfileScope";
 import { getRequestContext } from "#src/utils/RequestContext";
@@ -250,6 +260,30 @@ interface AdaptedArguments {
   messages?: Array<Record<string, unknown>>;
 }
 
+/** The shell tool whose own `cwd` argument is the payload's `cwd`. */
+const COMMAND_TOOL_NAME = "execute_command";
+
+/**
+ * Where an `execute_command` call runs: its `cwd` argument — moved into the
+ * worktree when it names the checkout a worktree session stands in for
+ * (WorktreePathRewrite), resolved against the workspace root when relative
+ * — or the workspace root when it names none.
+ */
+export function commandWorkingDirectory(
+  cwdArgument: unknown,
+  workspaceRoot: string | null,
+  worktree: WorktreeState | null = null,
+): string | null {
+  if (typeof cwdArgument !== "string" || !cwdArgument.trim()) return workspaceRoot;
+  let requested = cwdArgument.trim();
+  if (worktree) {
+    const redirected = redirectArgumentsToWorktree({ cwd: requested }, worktree).cwd;
+    if (typeof redirected === "string") requested = redirected;
+  }
+  if (path.posix.isAbsolute(requested)) return path.posix.normalize(requested);
+  return workspaceRoot ? path.posix.resolve(workspaceRoot, requested) : requested;
+}
+
 /**
  * Fold an event's positional arguments into one flat payload.
  *
@@ -262,6 +296,11 @@ interface AdaptedArguments {
  *     is what makes a new event work without touching this file.
  * The agentic context, when passed, is never spread — it only lends the
  * provider, signal and live transcript.
+ *
+ * Where the turn runs and in which mode come from its TurnHookFacts when it
+ * recorded them (every harness turn does), so a tool event's payload says
+ * the same as the turn's own events; the registration scope and the
+ * agentic context stand in for a caller that did not.
  */
 export function adaptHookArguments(
   event: HookEventName,
@@ -271,26 +310,47 @@ export function adaptHookArguments(
   const agenticContext = args.find(looksLikeAgenticContext);
   const scope = resolveScope(context);
 
+  const agentConversationId =
+    (agenticContext?.agentConversationId as string | undefined) ||
+    context.agentConversationId ||
+    "";
+  const conversationId =
+    context.conversationId ||
+    (agenticContext?.conversationId as string | undefined) ||
+    context.sessionId ||
+    "";
+  const facts = turnHookFacts(agentConversationId);
+  const workspaceRoot =
+    facts?.workspaceRoot ??
+    context.cwd ??
+    context.workspaceRoot ??
+    ((agenticContext?.workspaceRoot as string | null | undefined) || null);
+
   const payload: HookPayload = {
     hook_event_name: event,
-    session_id: context.sessionId || "",
-    agent_conversation_id:
-      (agenticContext?.agentConversationId as string | undefined) ||
-      context.agentConversationId ||
-      "",
+    session_id: context.sessionId || conversationId,
+    transcript_path: transcriptPathFor(conversationId),
+    cwd: workspaceRoot,
+    permission_mode: facts
+      ? facts.permissionMode()
+      : claudePermissionModeOf(
+          agenticContext?.options as { _permissionMode?: unknown; autoApprove?: unknown } | undefined,
+        ),
+    harness: HOOK_HARNESS_NAME,
+    workspace_root: workspaceRoot,
+    agent_conversation_id: agentConversationId,
     project: scope.project,
     username: scope.username,
     agent: scope.agent ?? null,
-    cwd:
-      context.cwd ??
-      context.workspaceRoot ??
-      ((agenticContext?.workspaceRoot as string | null | undefined) || null),
   };
 
   const parentId =
     (agenticContext?.parentAgentConversationId as string | undefined) ||
     context.parentAgentConversationId;
-  if (parentId) payload.parent_agent_conversation_id = parentId;
+  if (parentId) {
+    payload.parent_agent_conversation_id = parentId;
+    payload.agent_id = agentConversationId;
+  }
 
   const [first, second] = args;
 
@@ -298,12 +358,20 @@ export function adaptHookArguments(
     payload.tool_name = first.name;
     payload.tool_input = (first.args || {}) as Record<string, unknown>;
     if (first.id) payload.tool_use_id = first.id;
+    if (first.name === COMMAND_TOOL_NAME) {
+      payload.cwd = commandWorkingDirectory(
+        payload.tool_input.cwd,
+        workspaceRoot,
+        facts?.worktree ?? null,
+      );
+    }
 
     if (
       event === HOOK_EVENTS.POST_TOOL_USE ||
       event === HOOK_EVENTS.POST_TOOL_USE_FAILURE
     ) {
       payload.tool_output = second;
+      payload.tool_response = second;
       const errorText = isPlainObject(second) ? second.error : undefined;
       if (typeof errorText === "string") payload.tool_error = errorText;
     } else if (isPlainObject(second) && !looksLikeAgenticContext(second)) {
@@ -531,6 +599,8 @@ export function registerConfiguredHooks(
       categoryForEvent(hook.event, isAsync),
     );
     registered += 1;
+    // A command hook reads files on the workspace's machine: the turn keeps its transcript.
+    if (hook.handler?.type === HOOK_HANDLER_TYPES.COMMAND) noteCommandHooks(hooks);
   }
 
   if (registered > 0) {
@@ -562,6 +632,7 @@ const ConfiguredHookRegistry = {
   categoryForEvent,
   adaptHookArguments,
   hookSelects,
+  commandWorkingDirectory,
 };
 
 export default ConfiguredHookRegistry;
