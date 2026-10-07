@@ -95,11 +95,16 @@ export function buildJsonResponseFromEvents(
   // (e.g. lupos-bot) read finalText; `text` stays untouched for
   // back-compat. Last NON-EMPTY so a reply written just before a
   // trailing tool call still counts when the final pass emits nothing.
+  // A Stop hook that keeps the turn going ends a pass too: the answer it
+  // interrupted is not the reply the turn ends with.
   const textSegments: string[] = [""];
   for (const event of events) {
     if (event.type === "chunk") {
       textSegments[textSegments.length - 1] += event.content ?? "";
-    } else if (event.type === "tool_execution" && event.status === "calling") {
+    } else if (
+      (event.type === "tool_execution" && event.status === "calling") ||
+      (event.type === "status" && event.message === "stop_hook_continue")
+    ) {
       textSegments.push("");
     }
   }
