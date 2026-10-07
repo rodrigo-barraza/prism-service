@@ -97,3 +97,60 @@ describe("TurnInputMailbox", () => {
     expect(TurnInputMailbox.post("conv-1", { kind: "user_update", text: "next turn" }).accepted).toBe(true);
   });
 });
+
+describe("TurnInputMailbox — background task notifications", () => {
+  beforeEach(() => TurnInputMailbox._clearAll());
+
+  const notification = (text: string, taskId = "monitor-aaaa1111") => ({
+    kind: "task_notification" as const,
+    text,
+    meta: { _notificationSource: "workspace_task", taskId },
+  });
+
+  it("joins notifications that arrive before the turn looks into the one waiting", () => {
+    TurnInputMailbox.open("conv-1");
+    const first = TurnInputMailbox.post("conv-1", notification("<task-notification>one</task-notification>"));
+    const second = TurnInputMailbox.post(
+      "conv-1",
+      notification("<task-notification>two</task-notification>", "shell-bbbb2222"),
+    );
+    expect(second).toMatchObject({ accepted: true, id: first.id, position: 1 });
+    expect(TurnInputMailbox.pendingCount("conv-1")).toBe(1);
+
+    const [entry] = TurnInputMailbox.drain("conv-1");
+    expect(entry.text).toBe("<task-notification>one</task-notification>\n<task-notification>two</task-notification>");
+    // The first notification's meta stays: its source names the whole message.
+    expect(entry.meta).toEqual({ _notificationSource: "workspace_task", taskId: "monitor-aaaa1111" });
+  });
+
+  it("starts a new entry once the waiting one was drained, and never joins other kinds", () => {
+    TurnInputMailbox.open("conv-1");
+    TurnInputMailbox.post("conv-1", notification("one"));
+    TurnInputMailbox.drain("conv-1");
+    TurnInputMailbox.post("conv-1", { kind: "user_update", text: "steer" });
+    TurnInputMailbox.post("conv-1", notification("two"));
+    TurnInputMailbox.post("conv-1", { kind: "task_completion", text: "async done" });
+    const drained = TurnInputMailbox.drain("conv-1");
+    expect(drained.map((entry) => [entry.kind, entry.text])).toEqual([
+      ["user_update", "steer"],
+      ["task_notification", "two"],
+      ["task_completion", "async done"],
+    ]);
+  });
+
+  it("starts a new entry when joining would pass the text cap, and a full box still takes a join", () => {
+    TurnInputMailbox.open("conv-1");
+    const big = "x".repeat(TURN_INPUT_MAXIMUM_TEXT_LENGTH - 5);
+    TurnInputMailbox.post("conv-1", notification(big));
+    const separate = TurnInputMailbox.post("conv-1", notification("long enough"));
+    expect(separate.position).toBe(2);
+
+    for (let index = 2; index < TURN_INPUT_MAXIMUM_PENDING; index++) {
+      TurnInputMailbox.post("conv-1", { kind: "user_update", text: `m${index}` });
+    }
+    expect(TurnInputMailbox.post("conv-1", { kind: "user_update", text: "overflow" }).reason).toBe("mailbox_full");
+    // A notification joins the second (still roomy) one instead of needing a slot.
+    expect(TurnInputMailbox.post("conv-1", notification("joins")).accepted).toBe(true);
+    expect(TurnInputMailbox.drain("conv-1")[1].text).toBe("long enough\njoins");
+  });
+});

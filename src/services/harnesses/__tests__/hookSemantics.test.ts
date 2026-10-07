@@ -400,6 +400,13 @@ function buildHarness(
         pass.finalStreamedText = turn.text;
         pass.pendingToolCalls = [];
         state.finalStreamedText = turn.text;
+        // The display data the stream router keeps (StreamChunkRouter).
+        if (state.lastDisplaySegType !== "text") {
+          state.displaySegments.push({ type: "text", fragmentIndex: state.displayTextFragments.length } as never);
+          state.displayTextFragments.push("");
+          state.lastDisplaySegType = "text";
+        }
+        state.displayTextFragments[state.displayTextFragments.length - 1] += turn.text;
       }
       pass.usage = {
         inputTokens: 100,
@@ -419,7 +426,7 @@ function buildHarness(
   stubbed.emitUsageUpdate = vi.fn();
   stubbed.checkAndApplyToolSetChanges = vi.fn();
 
-  return { harness, emit, eventLog, seenMessages, iterations: () => iteration };
+  return { harness, state, emit, eventLog, seenMessages, iterations: () => iteration };
 }
 
 /** Inspect hooks are fire-and-forget — let them settle before asserting. */
@@ -550,7 +557,7 @@ describe("configured hooks — B9 semantics against a real ReActHarness", () => 
         ? { decision: "block", reason: "The tests have not been run yet." }
         : {};
 
-    const { harness, seenMessages, iterations } = buildHarness([
+    const { harness, state, seenMessages, iterations } = buildHarness([
       { kind: "text", text: "All done." },
       { kind: "text", text: "Ran them, all done." },
       { kind: "text", text: "Really done." },
@@ -581,6 +588,11 @@ describe("configured hooks — B9 semantics against a real ReActHarness", () => 
     );
     expect(answerIndex).toBeGreaterThan(-1);
     expect(reasonIndex).toBe(answerIndex + 1);
+
+    // Each interrupted answer is its own assistant message in the history, so
+    // the message the turn ends with shows only the last one — not every
+    // answer run together (seen live on 2026-10-06 as "Hello!…Hello!… ⚠️").
+    expect(state.getCleanDisplayData().cleanTextFragments).toEqual(["Done for real."]);
   });
 });
 

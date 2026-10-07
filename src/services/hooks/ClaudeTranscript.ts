@@ -125,11 +125,27 @@ export function userTextLine(target: TranscriptTarget, text: string): Transcript
   return line(target, "user", { role: "user", content: text });
 }
 
-/** The assistant's text and its tool calls, in Claude Code's content blocks. */
+/** A model call's token usage in Claude Code's names (`message.usage`), or null when unknown. */
+export function claudeUsage(
+  usage: Partial<Record<"inputTokens" | "outputTokens" | "cacheReadInputTokens" | "cacheCreationInputTokens", number>> | null | undefined,
+): Record<string, number> | null {
+  if (!usage) return null;
+  const count = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0);
+  const claude = {
+    input_tokens: count(usage.inputTokens),
+    cache_creation_input_tokens: count(usage.cacheCreationInputTokens),
+    cache_read_input_tokens: count(usage.cacheReadInputTokens),
+    output_tokens: count(usage.outputTokens),
+  };
+  return Object.values(claude).some((value) => value > 0) ? claude : null;
+}
+
+/** The assistant's text and its tool calls, in Claude Code's content blocks, with the call's usage. */
 export function assistantLine(
   target: TranscriptTarget,
   text: string,
   toolCalls: readonly ToolCall[] = [],
+  usage: Parameters<typeof claudeUsage>[0] = null,
 ): TranscriptLine {
   const content: Array<Record<string, unknown>> = [];
   if (text.trim()) content.push({ type: "text", text });
@@ -141,10 +157,12 @@ export function assistantLine(
       input: toolCall.args ?? {},
     });
   }
+  const claude = claudeUsage(usage);
   return line(target, "assistant", {
     role: "assistant",
     ...(target.model ? { model: target.model } : {}),
     content,
+    ...(claude ? { usage: claude } : {}),
   });
 }
 
@@ -310,6 +328,7 @@ export class TurnTranscript {
     results,
     messages,
     iteration = null,
+    usage = null,
   }: {
     text: string;
     toolCalls: readonly ToolCall[];
@@ -317,11 +336,13 @@ export class TurnTranscript {
     messages?: readonly unknown[];
     /** The loop iteration of the pass that made the calls. */
     iteration?: number | null;
+    /** That pass's token usage (Claude Code's transcript carries it on the reply). */
+    usage?: Parameters<typeof claudeUsage>[0];
   }): Promise<string | null> {
     if (toolCalls.length === 0) return this.last;
     const lines = [
       ...this.inputLines(messages),
-      assistantLine(this.target, text, toolCalls),
+      assistantLine(this.target, text, toolCalls, usage),
       toolResultLine(this.target, toolCalls, results),
     ];
     this.reply = text.trim() ? { text, iteration } : null;
@@ -333,6 +354,7 @@ export class TurnTranscript {
     text: string,
     messages?: readonly unknown[],
     iteration: number | null = null,
+    usage: Parameters<typeof claudeUsage>[0] = null,
   ): Promise<string | null> {
     const lines = this.inputLines(messages);
     const alreadyWritten =
@@ -341,7 +363,7 @@ export class TurnTranscript {
       this.reply.text === text &&
       this.reply.iteration === iteration;
     this.reply = null;
-    if (text.trim() && !alreadyWritten) lines.push(assistantLine(this.target, text));
+    if (text.trim() && !alreadyWritten) lines.push(assistantLine(this.target, text, [], usage));
     return lines.length > 0 ? this.append(lines) : this.last;
   }
 

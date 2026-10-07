@@ -323,8 +323,8 @@ export class TurnTranslator {
         return this.finishOpenTools("failed");
       default:
         // audio, turn_input, goal_update, brief_update, task_notification,
-        // conversation_state_update, memory_consolidation_complete, subscribed:
-        // nothing an ACP client renders.
+        // background_task, conversation_state_update,
+        // memory_consolidation_complete, subscribed: nothing an ACP client renders.
         return { updates: [] };
     }
   }

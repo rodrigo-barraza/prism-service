@@ -60,6 +60,10 @@ export const INTERNAL_TOOL_EMOJIS: Record<string, string[]> = {
   list_async_tasks: ["📋", "🔄"],
   wait_for_tasks: ["⏳", "🔄"],
 
+  // Background tasks (monitors, background commands)
+  monitor: ["👀", "📡"],
+  task_stop: ["⏹️", "📡"],
+
   // Programmatic tool composition
   run_tool_program: ["🧮", "🔧"],
 

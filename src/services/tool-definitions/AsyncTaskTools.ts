@@ -858,9 +858,10 @@ export function formatTaskCompletionNotification(
 //   1. a wait_for_tasks call is blocked on it → the waiter returns it
 //   2. the parent's turn is open → TurnInputMailbox (drained at the next
 //      boundary) — for continueWorking dispatches and for sub-agents
-//   3. otherwise → wake a new turn through handleAgent (root only;
-//      sub-agents are the orchestrator's to wake, so their completion is
-//      logged and dropped)
+//   3. otherwise → wake a new turn through handleAgent (root only, through
+//      the shared background-tasks/TaskNotificationDelivery; sub-agents are
+//      the orchestrator's to wake, so their completion is logged and
+//      dropped)
 
 interface CompletionDeliveryOptions {
   continueWorking: boolean;
@@ -1052,216 +1053,59 @@ async function markTaskDelivered(
   AsyncTaskRegistry.markDelivered(taskState, via);
 }
 
+/**
+ * Wake the parent conversation with the completion — the shared delivery
+ * service (background-tasks/TaskNotificationDelivery), which background
+ * commands and monitors use too. A default dispatch's turn has broken its
+ * loop and is ending: the completion waits for it to end rather than join
+ * it, then wakes a turn of its own (in the conversation's own permission
+ * mode). The woken turn having run (or failed) pays back the counter the
+ * dispatching turn recorded, as before.
+ */
 async function triggerAsyncTaskAutoResponse(
   taskState: AsyncTaskState,
   context: InternalToolContext,
 ): Promise<void> {
-  // Lazy imports to avoid circular dependencies
-  const { default: WebSocketConnectionRegistry } =
-    await import("#src/websocket/WebSocketConnectionRegistry");
-  const ConversationServiceModule = await import("#src/services/ConversationService");
-  const ConversationService = ConversationServiceModule.default;
-  const MongoWrapper = (await import("#src/wrappers/MongoWrapper")).default;
-  const { MONGO_DB_NAME: databaseName } = await import("../../../config.ts");
-  const { handleAgent } = await import("#src/routes/ChatRoutes");
-  const collectionNames = COLLECTIONS;
-
-  // Find the parent conversation that dispatched this task.
-  // The agentConversationId on the task points to the agentic loop session,
-  // but we need the client-facing conversationId for persistence and emit lookup.
-  const database = MongoWrapper.getDb(databaseName);
-  if (!database) {
-    logger.warn(
-      `[AsyncTaskTools] Cannot trigger auto-response for task ${taskState.taskId}: database not connected`,
-    );
-    return;
-  }
-
-  const conversationCollection = MongoWrapper.getCollection(
-    databaseName,
-    collectionNames.AGENT_CONVERSATIONS,
+  const { default: TaskNotificationDelivery } = await import(
+    "#src/services/background-tasks/TaskNotificationDelivery"
   );
-  if (!conversationCollection) return;
-
-  // Look up the conversation by agentConversationId
-  const conversation = await conversationCollection.findOne({
-    agentConversationId: taskState.agentConversationId,
-    ...(context.project && { project: context.project }),
-    ...(context.username && { username: context.username }),
-  });
-
-  if (!conversation) {
-    logger.warn(
-      `[AsyncTaskTools] Cannot trigger auto-response for task ${taskState.taskId}: conversation not found for session ${taskState.agentConversationId}`,
-    );
-    return;
-  }
-
-  const conversationId = conversation.id as string;
-  const project = (conversation.project || context.project) as string;
-  const username = (conversation.username || context.username) as string;
-
-  // Wait if the conversation is currently generating
-  const { AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES, AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS } = ORCHESTRATOR;
-
-  if (conversation.isGenerating) {
-    logger.info(
-      `[AsyncTaskTools] Conversation ${conversationId} is generating — waiting before auto-response for task ${taskState.taskId}`,
-    );
-
-    let conversationBecameIdle = false;
-    for (let waitAttempt = 0; waitAttempt < AUTO_RESPONSE_GENERATION_WAIT_MAXIMUM_RETRIES; waitAttempt++) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, AUTO_RESPONSE_GENERATION_WAIT_DELAY_MILLISECONDS),
-      );
-
-      const refreshedConversation = await conversationCollection.findOne({
-        id: conversationId,
-        project,
-        username,
-      });
-
-      if (!refreshedConversation) return;
-
-      if (!refreshedConversation.isGenerating) {
-        conversationBecameIdle = true;
-        break;
-      }
-    }
-
-    if (!conversationBecameIdle) {
-      logger.warn(
-        `[AsyncTaskTools] Conversation ${conversationId} never became idle — skipping auto-response for task ${taskState.taskId}`,
-      );
-      return;
-    }
-  }
-
-  // Build the completion notification message
   const notification = formatTaskCompletionNotification(taskState);
-  const completionMessage = {
-    role: "user" as const,
-    content: notification.content,
-    timestamp: notification.timestamp,
-    _alreadyPersisted: true,
-    _notificationSource: NOTIFICATION_SOURCES.ASYNC_TASK,
-    _notificationId: notification.notificationId,
-    ...(taskState.nativeCallId ? { asyncCallId: taskState.nativeCallId } : {}),
-  };
-
-  // Persist the completion message
-  await ConversationService.appendMessages(
-    conversationId,
-    project,
-    username,
-    [completionMessage],
-    null,
-    { collection: collectionNames.AGENT_CONVERSATIONS },
-  );
-
-  // Reload the conversation from DB (source of truth) to get the freshest
-  // message array, including any messages added concurrently.
-  const updatedConversation = await conversationCollection.findOne({
-    id: conversationId,
-    project,
-    username,
-  });
-
-  if (!updatedConversation) return;
-
-  // Reconstruct transient _alreadyPersisted flag: every message loaded
-  // from MongoDB is by definition already persisted. Without this, the
-  // Finalizer re-persists the completion message (it's the last message
-  // in the array, so AgenticLoopService's [0..n-2] marking skips it).
-  const freshMessages = (updatedConversation.messages || []) as Array<Record<string, unknown>>;
-  for (const message of freshMessages) {
-    message._alreadyPersisted = true;
-  }
-
-  // Resolve emit from WebSocketConnectionRegistry
-  const registeredEmit = WebSocketConnectionRegistry.getEmitFunction(conversationId);
-  const autoResponseEmit = registeredEmit || ((event: {
-    type: string;
-    [key: string]: unknown;
-  }) => {
-    logger.debug(
-      `[AsyncTaskTools][AutoResponse][${conversationId}][Event] type=${event.type}`,
-    );
-  });
-
-  if (registeredEmit) {
-    logger.info(
-      `[AsyncTaskTools] Auto-response will stream to live WebSocket for task ${taskState.taskId}`,
-    );
-  }
-
-  // Resolve provider/model from conversation settings
-  const settings = (updatedConversation.settings || {}) as Record<string, unknown>;
-  const providerName = settings.provider as string;
-  const resolvedModel = settings.model as string;
-  const agent = settings.agent as string | null;
-  const workspaceRoot = settings.workspaceRoot as string | null;
-
-  if (!providerName || !resolvedModel) {
-    logger.warn(
-      `[AsyncTaskTools] Cannot trigger auto-response for task ${taskState.taskId}: missing provider/model in conversation settings`,
-    );
-    return;
-  }
-
-  logger.info(
-    `[AsyncTaskTools] Triggering auto-response for task ${taskState.taskId} in conversation ${conversationId}`,
-  );
-
-  try {
-    await handleAgent(
-      {
-        provider: providerName,
-        model: resolvedModel,
-        messages: freshMessages,
-        conversationId,
-        agent,
-        project,
-        username,
-        clientIp: "async-task-auto-response",
-        agenticLoopEnabled: true,
-        functionCallingEnabled: true,
-        autoApprove: true,
-        // Nobody is watching the continuation: an ask no "approve all"
-        // answers is denied, and the conversation's mode (plan stays
-        // read-only) still holds.
-        unattended: true,
-        planFirst: false,
-        minContextLength: 120_000,
-        ...(workspaceRoot ? { workspaceRoot } : {}),
-        ...(typeof settings.toolConfig === "object" &&
-        settings.toolConfig !== null
-          ? {
-              disabledTools: (settings.toolConfig as Record<string, unknown>)
-                .disabledTools as string[] | undefined,
-            }
-          : {}),
+  const conversationId = taskState.conversationId || context.conversationId || null;
+  const outcome = await TaskNotificationDelivery.wake(
+    {
+      loopKey: resolveLoopKey({ conversationId, agentConversationId: taskState.agentConversationId }),
+      conversationId,
+      agentConversationId: taskState.agentConversationId,
+      project: context.project || taskState.project,
+      username: context.username || taskState.username,
+      isSubAgent: false,
+      kind: "task_completion",
+      text: notification.content,
+      timestamp: notification.timestamp,
+      meta: {
+        _notificationSource: NOTIFICATION_SOURCES.ASYNC_TASK,
+        _notificationId: notification.notificationId,
+        ...(taskState.nativeCallId ? { asyncCallId: taskState.nativeCallId } : {}),
       },
-      autoResponseEmit as unknown as (event: import("../../types/SseTypes.ts").SseEvent) => void,
-    );
-
-    logger.success(
-      `[AsyncTaskTools] Auto-response completed for task ${taskState.taskId} in conversation ${conversationId}`,
-    );
-  } catch (autoResponseError: unknown) {
-    logger.error(
-      `[AsyncTaskTools] Auto-response error for task ${taskState.taskId}: ${getErrorMessage(autoResponseError)}`,
-    );
-  } finally {
-    // The turn that dispatched this task ended with it still running, so
-    // the harness bumped pendingBackgroundTasks (+1) to keep the
-    // conversation "active" until the completion woke a new turn. That
-    // turn has now run (or failed) — pay the counter back, mirroring
-    // OrchestratorService._triggerParentAutoResponse.
-    const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
-    AsyncTaskRegistry.clearCountedAsPending(taskState.agentConversationId);
-    await decrementPendingBackgroundTasks(conversationId, project, username, taskState.taskId);
-  }
+      afterDelivery: async (via, conversation) => {
+        // A running turn took it in the wake's place: the mailbox's rule.
+        if (via === "mailbox") {
+          await payBackCountedPending(taskState);
+          return;
+        }
+        // The turn that dispatched this task ended with it still running, so
+        // the harness bumped pendingBackgroundTasks (+1) to keep the
+        // conversation "active" until the completion woke a new turn. That
+        // turn has now run (or failed) — pay the counter back, mirroring
+        // OrchestratorService._triggerParentAutoResponse.
+        const { default: AsyncTaskRegistry } = await import("#src/services/AsyncTaskRegistry");
+        AsyncTaskRegistry.clearCountedAsPending(taskState.agentConversationId);
+        await decrementPendingBackgroundTasks(conversation.id, conversation.project, conversation.username, taskState.taskId);
+      },
+    },
+    { joinRunningTurn: false },
+  );
+  logger.info(`[AsyncTaskTools] Completion of task ${taskState.taskId} handed over (${outcome})`);
 }
 
 /**

@@ -105,6 +105,7 @@ import promptsRouter from "./routes/PromptsRoutes.ts";
 import webhookRouter from "./routes/WebhookRoutes.ts";
 import profilesRouter from "./routes/ProfilesRoutes.ts";
 import pushRouter from "./routes/PushRoutes.ts";
+import backgroundTasksRouter from "./routes/BackgroundTasksRoutes.ts";
 import { PROFILE_ID_HEADER } from "./utils/ProfileScope.ts";
 
 const app = express();
@@ -253,6 +254,7 @@ app.use("/prompts", promptsRouter);
 app.use("/webhooks", webhookRouter);
 app.use("/profiles", profilesRouter);
 app.use("/push", pushRouter);
+app.use(backgroundTasksRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);
@@ -1069,6 +1071,15 @@ setupWebSocket(wss);
     }
   } catch (error: unknown) {
     logger.error(`Failed to re-drive interrupted turns: ${getErrorMessage(error)}`);
+  }
+
+  // Background commands and monitors outlive a restart (they run on the
+  // workspace): follow each one again from the last event handled.
+  try {
+    const { default: BackgroundTaskWatcher } = await import("./services/background-tasks/BackgroundTaskWatcher.ts");
+    await BackgroundTaskWatcher.reattach();
+  } catch (error: unknown) {
+    logger.error(`Failed to re-attach background tasks: ${getErrorMessage(error)}`);
   }
 
   server.listen(PORT, () => {

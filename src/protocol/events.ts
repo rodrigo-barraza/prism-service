@@ -96,10 +96,37 @@ const ExecutedTool = z.strictObject({
   durationMs: z.number().optional(),
 });
 
-const TurnInputKind = z.enum(["user_update", "question_answer", "task_completion", "agent_message", "goal_revision", "external"]);
+const TurnInputKind = z.enum([
+  "user_update",
+  "question_answer",
+  "task_completion",
+  "agent_message",
+  "goal_revision",
+  "external",
+  "task_notification",
+]);
 /** Where an `external` turn input came from — never the user (external/ExternalInput). */
 const ExternalInputSource = z.enum(["webhook", "discord", "mcp", "subagent"]);
+/**
+ * Where a turn input came from when the user did not type it: an
+ * `external` input's source, or `task` — a `task_notification`, the
+ * agent's own background shell or monitor reporting.
+ */
+const TurnInputSource = z.enum([...ExternalInputSource.options, "task"]);
 const TurnInputBoundary = z.enum(["iteration_start", "after_tools", "before_end", "turn_end"]);
+
+const BackgroundTaskType = z.enum(["shell", "monitor"]);
+const BackgroundTaskStatus = z.enum([
+  "running",
+  "completed",
+  "failed",
+  "killed",
+  "timeout",
+  "too_many_events",
+  "closed",
+  "exited",
+  "lost",
+]);
 
 const GoalCriterion = z.strictObject({ id: z.string(), criterion: z.string() });
 const GoalCriterionResult = z.strictObject({ id: z.string(), pass: z.boolean(), evidence: z.string() });
@@ -410,11 +437,40 @@ const TurnInputEvent = event("turn_input", {
   kind: TurnInputKind,
   content: z.string(),
   images: z.array(z.string()).optional(),
-  /** `external` only: its source, and who sent it when known (a label, not an identity). */
-  source: ExternalInputSource.optional(),
+  /**
+   * `external`: its source, and who sent it when known (a label, not an
+   * identity). `task_notification`: `task`.
+   */
+  source: TurnInputSource.optional(),
   sender: z.string().optional(),
   boundary: TurnInputBoundary,
   iteration: z.number(),
+});
+
+/**
+ * A background shell (`execute_command` with `run_in_background`) or a
+ * monitor of the conversation: sent to its live viewers when it starts, when
+ * a monitor's batch of events arrives (`running`, `eventCount` up), and when
+ * it ends. Its notifications reach the agent as `turn_input`
+ * (`task_notification`) or as the message that wakes a new turn.
+ */
+const BackgroundTaskEvent = event("background_task", {
+  conversationId: z.string(),
+  taskId: z.string(),
+  taskType: BackgroundTaskType,
+  status: BackgroundTaskStatus,
+  description: z.string(),
+  command: z.string().optional(),
+  /** A `ws` monitor's socket. */
+  wsUrl: z.string().optional(),
+  /** Its stdout and stderr; read it with read_file. */
+  outputFile: z.string().optional(),
+  /** A monitor's stdout lines so far. */
+  eventCount: z.number().optional(),
+  /** On exit; null when a signal ended it. */
+  exitCode: z.number().nullable().optional(),
+  /** ISO time of this change. */
+  at: z.string(),
 });
 
 const GoalUpdateEvent = event("goal_update", {
@@ -822,6 +878,7 @@ const TurnEventByType = z.discriminatedUnion("type", [
   PlanProposalEvent,
   UserQuestionEvent,
   TurnInputEvent,
+  BackgroundTaskEvent,
   GoalUpdateEvent,
   TodoUpdateEvent,
   BriefUpdateEvent,
@@ -888,6 +945,7 @@ export type ApprovalDecidedEvent = TurnEventOf<"approval_decided">;
 export type PlanProposalEvent = TurnEventOf<"plan_proposal">;
 export type UserQuestionEvent = TurnEventOf<"user_question">;
 export type TurnInputEvent = TurnEventOf<"turn_input">;
+export type BackgroundTaskEvent = TurnEventOf<"background_task">;
 export type GoalUpdateEvent = TurnEventOf<"goal_update">;
 export type TodoUpdateEvent = TurnEventOf<"todo_update">;
 export type BriefUpdateEvent = TurnEventOf<"brief_update">;
@@ -927,6 +985,7 @@ export const PROTOCOL_EVENT_TYPES = {
   REFUSAL: "refusal",
   APPROVAL_DECIDED: "approval_decided",
   TURN_INPUT: "turn_input",
+  BACKGROUND_TASK: "background_task",
   GOAL_UPDATE: "goal_update",
   PERMISSION_MODE: "permission_mode",
   MEMORY_CONSOLIDATION_COMPLETE: "memory_consolidation_complete",

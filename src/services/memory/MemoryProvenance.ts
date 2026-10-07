@@ -2,6 +2,7 @@ import { TOOL_NAMES } from "@rodrigo-barraza/utilities-library/taxonomy";
 import { NOTIFICATION_SOURCES, PROMPT_DELIMITERS } from "#src/constants";
 import { LOCAL_TOOL_NAMES } from "#src/services/ToolTaxonomyConstants";
 import { ASYNC_TASK_TOOL_NAMES } from "#src/services/AsyncTaskConstants";
+import { WORKSPACE_TASK_NOTIFICATION_SOURCE } from "#src/constants/BackgroundTasks";
 import {
   externalOriginOfMessage,
   type ExternalOrigin,
@@ -331,6 +332,14 @@ const USER_NOTIFICATION_SOURCES = new Set<string>([
   NOTIFICATION_SOURCES.USER_ANSWER,
 ]);
 
+/**
+ * Notification sources that carry the agent's own command output — a
+ * monitor's events, a background command's exit. Like execute_command's
+ * own result it is derived, never untrusted: the owner's decision for
+ * monitors, as in Claude Code (a line a script prints is not a page).
+ */
+const OWN_OUTPUT_NOTIFICATION_SOURCES = new Set<string>([WORKSPACE_TASK_NOTIFICATION_SOURCE]);
+
 function contentText(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
@@ -381,6 +390,7 @@ function userMessageLabel(message: ProvenanceMessage): ProvenanceLabel {
     typeof message._notificationSource === "string" ? message._notificationSource : null;
   if (notification) {
     if (USER_NOTIFICATION_SOURCES.has(notification)) return { source: "user", trust: "user" };
+    if (OWN_OUTPUT_NOTIFICATION_SOURCES.has(notification)) return { source: "assistant", trust: "derived" };
     const untrustedSource = UNTRUSTED_NOTIFICATION_SOURCES[notification];
     if (untrustedSource) return { source: untrustedSource, trust: "untrusted" };
     // Timers, the scheduler: the harness speaking, not the user.

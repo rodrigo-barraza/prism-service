@@ -333,6 +333,20 @@ export default class AgenticLoopState {
     };
   }
 
+  /**
+   * Start the turn's display data over. A Stop hook that keeps the turn going
+   * puts the answer it interrupted into the history as its own assistant
+   * message; the message the turn ends with must not carry that answer's
+   * text (or thinking) a second time — the client renders a message from
+   * its fragments, so a kept fragment read as the answer written twice.
+   */
+  resetDisplayData(): void {
+    this.displaySegments = [];
+    this.displayTextFragments = [];
+    this.displayThinkingFragments = [];
+    this.lastDisplaySegType = null;
+  }
+
   /** Get clean display segments (trimmed, empty-filtered) for DB persistence. */
   getCleanDisplayData() {
     const cleanSegments: DisplaySegment[] = [];
