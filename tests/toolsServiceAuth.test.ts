@@ -128,7 +128,7 @@ describe("the on-behalf token — the user a tools-service call is made for", ()
       () => toolsServiceAuthHeaders(options),
     );
 
-  it("rides beside the secret in a signed-in user's turn: prism-service's 15-minute token for that user", () => {
+  it("rides beside the secret in a signed-in user's turn: prism-service's 15-minute token for that user, without their roles", () => {
     const headers = asSignedIn();
     expect(headers["x-api-secret"]).toBe(SECRET);
     const verified = verifyUserToken(headers[ON_BEHALF_TOKEN_HEADER], TEST_USER_TOKEN_SECRET);
@@ -137,7 +137,7 @@ describe("the on-behalf token — the user a tools-service call is made for", ()
       token: {
         username: "rodrigo",
         email: "owner@example.com",
-        roles: ["admin"],
+        roles: [],
         issuedAt: NOW.getTime() / 1000,
         expiresAt: NOW.getTime() / 1000 + 900,
       },

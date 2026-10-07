@@ -21,7 +21,7 @@ workspaces or run the importers: a 403 (`requireSignedInUser`) — a relay is
 told `external_input` first, as before.
 
 When a signed-in user's turn calls tools-service, prism-service sends a
-15-minute on-behalf token for that user beside its secret
+15-minute on-behalf token for that user (no roles) beside its secret
 (`x-prism-user-token`, `iss: "prism-service"`, `utils/ToolsServiceAuth.ts`);
 tools-service's callbacks hand it back as their bearer, so a task the agent
 schedules through tools-service stays the user's. It never goes to LM
