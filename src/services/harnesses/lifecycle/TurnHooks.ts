@@ -17,6 +17,16 @@ import {
 import { HOOK_EVENTS } from "#src/services/hooks/types";
 import type { HookEventName } from "#src/services/hooks/types";
 import HookSessionTracker from "#src/services/hooks/HookSessionTracker";
+import {
+  claudePermissionModeOf,
+  hostRootOf,
+  rememberTurnHookFacts,
+  resolveTurnWorkspace,
+  runsCommandHooks,
+  turnHookFacts,
+  type TurnHookFacts,
+} from "#src/services/hooks/TurnHookFacts";
+import { openTurnTranscript } from "#src/services/hooks/ClaudeTranscript";
 import type AgentHooks from "#src/services/AgentHooks";
 import type { ApprovalDecisionSource } from "#src/services/ApprovalRegistry";
 import type { TransformedHookResult } from "#src/services/AgentHooks";
@@ -50,6 +60,12 @@ import type { LoadedInstruction } from "#src/services/instructions/InstructionsS
  *   SubagentStop → TurnEnd → (idle) SessionEnd.
  *   StopFailure replaces Stop when the turn dies on an error; Interrupt fires
  *   the moment the user presses Stop.
+ *
+ * Before the first of them the turn records what every payload says about
+ * it (TurnHookFacts: workspace root, permission mode) and, when a command
+ * hook will run, opens its Claude-shaped transcript (ClaudeTranscript): the
+ * prompt at turn start, each batch before PostToolBatch, the answer before
+ * Stop.
  */
 
 function identityOf(context: AgenticContext) {
@@ -61,7 +77,57 @@ function identityOf(context: AgenticContext) {
     username: context.username,
     agent: context.agent as string | null | undefined,
     workspaceRoot: context.workspaceRoot,
+    options: context.options,
+    // Held by a SessionEnd that fires after the turn closed.
+    hookFacts: turnHookFacts(context.agentConversationId),
   };
+}
+
+/** Events whose payloads go out before the turn's first model call. */
+const TURN_OPENING_EVENTS = ["sessionStart", "subagentStart", "turnStart", "userPromptSubmit"] as const;
+
+/**
+ * Everything the turn's hooks learn about it before its first event: its
+ * facts (TurnHookFacts — workspace root, permission mode) and, when a
+ * command hook will run, its Claude-shaped transcript, opened with the
+ * prompt. The first turn of a conversation waits (bounded) for the
+ * transcript's path when an opening event has hooks, so their payloads
+ * carry it. Returns the facts' release. Never throws.
+ */
+async function openTurnFacts(
+  context: AgenticContext,
+  hooks: AgentHooks,
+  currentMessages: ConversationMessage[],
+): Promise<() => void> {
+  let release = () => {};
+  try {
+    const workspace = await resolveTurnWorkspace(context);
+    const facts: TurnHookFacts = {
+      workspaceRoot: workspace.root,
+      worktree: workspace.worktree,
+      permissionMode: () => claudePermissionModeOf(context.options),
+      transcript: null,
+    };
+    release = rememberTurnHookFacts(context.agentConversationId, facts);
+
+    if (runsCommandHooks(hooks)) {
+      facts.transcript = openTurnTranscript(context, { root: hostRootOf(workspace), cwd: workspace.root });
+    }
+    const transcript = facts.transcript;
+    if (transcript) {
+      // A turn re-driven after a restart wrote its prompt before it.
+      void transcript.appendPrompt(
+        context.resume ? null : extractLatestUserMessageText(currentMessages),
+        currentMessages,
+      );
+      if (!transcript.path && TURN_OPENING_EVENTS.some((event) => hasHooks(hooks, event))) {
+        await transcript.flush();
+      }
+    }
+  } catch (error: unknown) {
+    logger.warn(`[TurnHooks] Could not prepare the turn's hook facts: ${errorMessage(error)}`);
+  }
+  return release;
 }
 
 function payloadFor(
@@ -141,6 +207,8 @@ export async function openTurnHooks(
   const conversationId = context.conversationId;
   let sessionOpened = false;
 
+  const releaseFacts = await openTurnFacts(context, hooks, currentMessages);
+
   // SessionStart — once per conversation session (root runs only).
   if (!subAgent && conversationId) {
     const hasHistory = currentMessages.some((message) => message.role === "assistant");
@@ -180,6 +248,7 @@ export async function openTurnHooks(
   const release = () => {
     detachInterrupt();
     if (sessionOpened) HookSessionTracker.endSessionTurn(conversationId);
+    releaseFacts();
   };
 
   // UserPromptSubmit — one of the events allowed to block: a deny here ends
@@ -560,6 +629,8 @@ export async function firePermissionDenied(
 /**
  * `PostToolBatch` — the whole batch resolved and the model has not been
  * called again yet. `additionalContext` joins the batch's hook context.
+ * The batch reaches the turn's transcript first (`assistantText` is what
+ * the model wrote with its calls), so a hook reading it sees the batch.
  */
 export async function runPostToolBatchStage(
   context: AgenticContext,
@@ -567,8 +638,20 @@ export async function runPostToolBatchStage(
   state: AgenticLoopState,
   toolCalls: ToolCall[],
   results: ToolResult[],
+  assistantText = "",
 ): Promise<void> {
   if (toolCalls.length === 0) return;
+  const transcript = turnHookFacts(context.agentConversationId)?.transcript;
+  if (transcript) {
+    void transcript.appendBatch({
+      text: assistantText,
+      toolCalls,
+      results,
+      messages: context._currentMessages,
+      iteration: state.iterations,
+    });
+    if (hasHooks(hooks, "postToolBatch")) await transcript.flush();
+  }
   const byId = new Map(results.map((result) => [result.id, result]));
   const summary = toolCalls.map((toolCall) => {
     const outcome = byId.get(toolCall.id)?.result as Record<string, unknown> | undefined;
@@ -617,6 +700,9 @@ export function flushHookContext(
  * `HOOKS.MAX_STOP_CONTINUATIONS` forced continuations in one turn the block
  * is logged and ignored. `additionalContext` without a block is kept in the
  * turn's messages, where the model sees it next turn.
+ *
+ * The answer is in the turn's transcript BEFORE the Stop hooks run — where a
+ * hook written for Claude Code looks for the last message.
  */
 export async function runStopStage(
   context: AgenticContext,
@@ -625,6 +711,11 @@ export async function runStopStage(
   lastAssistantMessage: string,
   currentMessages: ConversationMessage[],
 ): Promise<{ continueWith: string | null }> {
+  const transcript = turnHookFacts(context.agentConversationId)?.transcript;
+  if (transcript) {
+    void transcript.appendFinal(lastAssistantMessage, currentMessages, state.iterations);
+    if (hasHooks(hooks, "stop")) await transcript.flush();
+  }
   if (!hasHooks(hooks, "stop")) return { continueWith: null };
   const continuationsSoFar = state.stopHookContinuations ?? 0;
   const verdict = await hooks.run(

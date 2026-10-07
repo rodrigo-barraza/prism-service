@@ -98,12 +98,17 @@ const GENERIC_DECISIONS = new Set(["block", "allow", "deny"]);
 const PROTECTED_PAYLOAD_KEYS = new Set([
   "hook_event_name",
   "session_id",
+  "transcript_path",
+  "permission_mode",
+  "harness",
+  "workspace_root",
   "agent_conversation_id",
   "project",
   "username",
   "agent",
   "cwd",
   "parent_agent_conversation_id",
+  "agent_id",
   "tool_name",
   "tool_use_id",
 ]);
