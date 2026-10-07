@@ -218,9 +218,27 @@ export const COMMAND_TIMEOUT_BEHAVIORS = ["fail_open", "fail_closed"] as const;
 export type CommandTimeoutBehavior = (typeof COMMAND_TIMEOUT_BEHAVIORS)[number];
 
 /**
+ * Where a repository hooks file's command came from (WorkspaceHooks). Only
+ * set on hooks built in process from a trusted file — the stored schema
+ * refuses the field, so no document can ask to run in a workspace.
+ */
+export interface WorkspaceHookSource {
+  /** The directory holding `.prism/` — the command's working directory. */
+  cwd: string;
+  /** The hooks file, and the content it was trusted at. */
+  path: string;
+  sha256: string;
+  scope: "user" | "project";
+  /** A sub-agent's worktree: the tools-service sandbox admits its paths only with the override header. */
+  worktreePath?: string | null;
+}
+
+/**
  * Run a shell command with the payload on stdin (Claude Code's `command`
- * handler). Executed by tools-service in its dedicated hooks directory — see
- * `CommandHookHandler` for the exit-code contract and the privilege note.
+ * handler). Executed by tools-service in its dedicated hooks directory — or,
+ * for a repository's own hook, in the repository, on the machine the
+ * workspace is on. See `CommandHookHandler` for the exit-code contract and
+ * the privilege note.
  */
 export interface CommandHookHandlerConfig {
   type: typeof HOOK_HANDLER_TYPES.COMMAND;
@@ -231,6 +249,8 @@ export interface CommandHookHandlerConfig {
    * into a block, for a command that IS the security gate.
    */
   timeoutBehavior?: CommandTimeoutBehavior;
+  /** Set on a repository hook: run it there (`{workspace: true, cwd}`), not in the hooks directory. */
+  workspace?: WorkspaceHookSource;
 }
 
 /**

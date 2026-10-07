@@ -23,10 +23,15 @@ import type { HookHandlerResult } from "#src/services/hooks/HookRunner";
  *
  * **Where it runs.** Not in this process. tools-service executes it
  * (`POST /agentic/hook-command/run`) in a dedicated hooks directory — never a
- * workspace root, so a hook cannot be pointed at the repository the agent is
- * editing by accident — with an allowlisted environment (tools-service's
- * command allowlist plus the `PRISM_HOOK_*` variables below) and a hard
- * timeout that KILLS the process group rather than backgrounding it.
+ * workspace root, so a stored hook cannot be pointed at the repository the
+ * agent is editing by accident — with an allowlisted environment
+ * (tools-service's command allowlist plus the `PRISM_HOOK_*` variables
+ * below) and a hard timeout that KILLS the process group rather than
+ * backgrounding it. A repository's own hook (`config.workspace`, built from
+ * a trusted `.prism/hooks.json` by WorkspaceHooks) is the exception, and the
+ * point: the request says `{workspace: true, cwd: <the file's directory>}`,
+ * and the command runs there, through the workspace bridge serving it —
+ * the repository's guards, on the machine the repository is on.
  *
  * **Privilege.** There is no OS sandbox yet (#14). A command hook runs with
  * tools-service's own privileges: whatever that service's user can read,
@@ -186,6 +191,7 @@ export default async function runCommandHook(
     options.timeoutMilliseconds - DEADLINE_MARGIN_MILLISECONDS,
   );
 
+  const workspace = config.workspace;
   let response: Response;
   try {
     response = await fetch(`${TOOLS_SERVICE_URL}${HOOKS.COMMAND_RUN_PATH}`, {
@@ -194,6 +200,10 @@ export default async function runCommandHook(
         "Content-Type": "application/json",
         [IDENTITY_HEADERS.project]: options.project || "any",
         [IDENTITY_HEADERS.username]: options.owner || "any",
+        // A worktree's paths reach the tools-service sandbox only with this.
+        ...(workspace?.worktreePath && {
+          [IDENTITY_HEADERS.workspaceOverride]: workspace.worktreePath,
+        }),
         ...traceHeaders(),
       },
       body: JSON.stringify({
@@ -201,6 +211,7 @@ export default async function runCommandHook(
         stdin: options.payloadJson,
         timeoutMilliseconds: commandTimeoutMilliseconds,
         owner: options.owner,
+        ...(workspace && { workspace: true, cwd: workspace.cwd }),
         env: {
           PRISM_HOOK_EVENT: options.event,
           PRISM_HOOK_NAME: hookName,

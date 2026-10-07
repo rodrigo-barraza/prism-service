@@ -26,6 +26,7 @@ import {
   turnHookFacts,
   type TurnHookFacts,
 } from "#src/services/hooks/TurnHookFacts";
+import { isCommandHookOwner } from "#src/services/hooks/CommandHookOwners";
 import { openTurnTranscript } from "#src/services/hooks/ClaudeTranscript";
 import type AgentHooks from "#src/services/AgentHooks";
 import type { ApprovalDecisionSource } from "#src/services/ApprovalRegistry";
@@ -62,10 +63,10 @@ import type { LoadedInstruction } from "#src/services/instructions/InstructionsS
  *   the moment the user presses Stop.
  *
  * Before the first of them the turn records what every payload says about
- * it (TurnHookFacts: workspace root, permission mode) and, when a command
- * hook will run, opens its Claude-shaped transcript (ClaudeTranscript): the
- * prompt at turn start, each batch before PostToolBatch, the answer before
- * Stop.
+ * it (TurnHookFacts: workspace root, permission mode), attaches the
+ * repository's own hooks (WorkspaceHooks) and, when a command hook will
+ * run, opens its Claude-shaped transcript (ClaudeTranscript): the prompt at
+ * turn start, each batch before PostToolBatch, the answer before Stop.
  */
 
 function identityOf(context: AgenticContext) {
@@ -88,7 +89,8 @@ const TURN_OPENING_EVENTS = ["sessionStart", "subagentStart", "turnStart", "user
 
 /**
  * Everything the turn's hooks learn about it before its first event: its
- * facts (TurnHookFacts — workspace root, permission mode) and, when a
+ * facts (TurnHookFacts — workspace root, permission mode), the repository's
+ * own hooks (WorkspaceHooks — only an owner's turn loads them), and, when a
  * command hook will run, its Claude-shaped transcript, opened with the
  * prompt. The first turn of a conversation waits (bounded) for the
  * transcript's path when an opening event has hooks, so their payloads
@@ -109,6 +111,11 @@ async function openTurnFacts(
       transcript: null,
     };
     release = rememberTurnHookFacts(context.agentConversationId, facts);
+
+    if (workspace.root && isCommandHookOwner(context.username)) {
+      const { attachWorkspaceHooks } = await import("#src/services/hooks/WorkspaceHooks");
+      await attachWorkspaceHooks(hooks, context, workspace);
+    }
 
     if (runsCommandHooks(hooks)) {
       facts.transcript = openTurnTranscript(context, { root: hostRootOf(workspace), cwd: workspace.root });
