@@ -1452,6 +1452,64 @@ const MODELS = {
     ],
   },
 
+  // GA 2026-10-13. Verified that day against ai.google.dev (model page,
+  // "What's new in Gemini 4 Argon", pricing) and live: "minimal" is a 400,
+  // thinkingBudget: 0 is a 200 with no thought tokens (medium spent 667–1,247
+  // on the same prompt), and Search, code execution, URL context, function
+  // calls and image/PDF/audio input all answer. 65,536 is the synchronous
+  // output cap: past 64K ("long decode", up to 1M) needs background execution
+  // on the Interactions API, which Prism does not use. Implicit caching only
+  // (prompts of 4,096+ tokens); Prism creates no cachedContents anyway.
+  // Introductory rate card through 2026-11-30; from 2026-12-01 it is $4 in /
+  // $20 out / $0.20 cached. One input rate for every modality, no >200K tier.
+  GEMINI_4_ARGON: {
+    description:
+      "Google's Gemini 4 Argon (GA 2026-10-13) — its flagship reasoning model, built for complex coding, autonomous agents, math and science, with a 1M-token window.",
+    name: "gemini-4-argon",
+    label: "Gemini 4 Argon",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    // "Remove temperature, top_p, and top_k from your requests. If provided,
+    // they are ignored." (see gemini-3.6-flash).
+    lockedSampling: true,
+    pricing: {
+      inputPerMillion: 2.0,
+      cachedInputPerMillion: 0.1,
+      outputPerMillion: 10.0,
+      webSearchPer1kCalls: 14.0,
+    },
+    maxInputTokens: 1_048_576,
+    maxOutputTokens: 65_536,
+    // "Explicit caching (cachedContents / caches.create) is not supported."
+    implicitCacheOnly: true,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: {
+      image: { maxCount: 3000, maxSizeMB: 100 },
+      audio: { maxCount: 50, maxSizeMB: 100 },
+      video: { maxCount: 10, maxSizeMB: 100 },
+      pdf: { maxCount: 50, maxSizeMB: 100 },
+    },
+    streaming: true,
+    thinking: true,
+    // Google's default is medium. No "minimal"; thinking switches off with
+    // thinkingBudget: 0.
+    thinkingLevels: ["low", "medium", "high"],
+    canDisableThinking: true,
+    webSearch: "Google Search",
+    codeExecution: true,
+    urlContext: true,
+    tools: [
+      "Thinking",
+      "Google Search",
+      "Tool Calling",
+      "Code Execution",
+      "URL Context",
+    ],
+  },
+
   GEMINI_31_FLASH_LIVE: {
     description:
       "Low-latency Gemini 3.1 Flash Live model, optimized for real-time audio/video streaming, live API sessions, and instant feedback.",

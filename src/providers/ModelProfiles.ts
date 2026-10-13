@@ -225,7 +225,10 @@ export function getModelProfile(model: string, provider: string): ModelProfile {
       // Deprecated from Gemini 3.6 Flash / 3.5 Flash-Lite on.
       if (flag(record, "lockedSampling")) profile.rejectedParameters = ["temperature", "topP", "topK"];
       profile.toolChoice = ["auto", "any", "none"];
-      profile.caching = ["implicit", "explicit_cached_content"];
+      // Gemini 4 Argon has no cachedContents at all ("Implicit only").
+      profile.caching = flag(record, "implicitCacheOnly")
+        ? ["implicit"]
+        : ["implicit", "explicit_cached_content"];
       // Prism creates no cachedContents: the implicit cache is the one in play.
       profile.cacheLifeSeconds = CACHE_LIFE_SECONDS.geminiImplicit;
       break;
