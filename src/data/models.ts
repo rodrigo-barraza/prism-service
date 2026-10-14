@@ -1,6 +1,13 @@
 // ─── UNIFIED MODEL CATALOG ──────────────────────────────────
 // Every model lives here with all its metadata. Pure data — the
 // derivation helpers (defaults, options, pricing) live in src/config.ts.
+//
+// A price that changes on a known date goes in `pricingSchedule`: steps in
+// date order, each the FULL rate card from its `from` instant; `pricing` is
+// the card before the first step. config.ts makes `pricing` read as the
+// card in effect when it is read. Google states calendar dates with no time
+// zone; its steps start at 00:00 US/Pacific, the day boundary Cloud
+// Billing's own queries use.
 
 import { PROVIDERS, MODALITY_TYPES, MODEL_TYPES } from "#src/constants";
 
@@ -1460,8 +1467,8 @@ const MODELS = {
   // output cap: past 64K ("long decode", up to 1M) needs background execution
   // on the Interactions API, which Prism does not use. Implicit caching only
   // (prompts of 4,096+ tokens); Prism creates no cachedContents anyway.
-  // Introductory rate card through 2026-11-30; from 2026-12-01 it is $4 in /
-  // $20 out / $0.20 cached. One input rate for every modality, no >200K tier.
+  // One input rate for every modality, no >200K tier. Google's default, and
+  // so the model new conversations start on, since 2026-10-13 (owner's call).
   GEMINI_4_ARGON: {
     description:
       "Google's Gemini 4 Argon (GA 2026-10-13) — its flagship reasoning model, built for complex coding, autonomous agents, math and science, with a 1M-token window.",
@@ -1469,17 +1476,31 @@ const MODELS = {
     label: "Gemini 4 Argon",
     provider: PROVIDERS.GOOGLE,
     modelType: MODEL_TYPES.CONVERSATION,
+    default: true,
     year: 2026,
     defaultTemperature: 1.0,
     // "Remove temperature, top_p, and top_k from your requests. If provided,
     // they are ignored." (see gemini-3.6-flash).
     lockedSampling: true,
+    // Introductory through 2026-11-30, then list price "starting December 1,
+    // 2026" (pricing page, 2026-10-13).
     pricing: {
       inputPerMillion: 2.0,
       cachedInputPerMillion: 0.1,
       outputPerMillion: 10.0,
       webSearchPer1kCalls: 14.0,
     },
+    pricingSchedule: [
+      {
+        from: "2026-12-01T00:00:00-08:00",
+        pricing: {
+          inputPerMillion: 4.0,
+          cachedInputPerMillion: 0.2,
+          outputPerMillion: 20.0,
+          webSearchPer1kCalls: 14.0,
+        },
+      },
+    ],
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
     // "Explicit caching (cachedContents / caches.create) is not supported."
@@ -1641,8 +1662,8 @@ const MODELS = {
     // accepted and ignored today, a 400 in later generations (Gemini API
     // changelog). Never sent (buildGenerateConfig).
     lockedSampling: true,
-    // Promotional rate, in effect through 2026-12-31; reverts to $1.50 in /
-    // $7.50 out (cached $0.15) on 2027-01-01. Audio input is not published
+    // Introductory through 2026-12-31, then list price "starting January 1,
+    // 2027" (pricing page, 2026-10-13). Audio input is not published
     // separately for this tier — carried at Google's usual 2x input ratio.
     pricing: {
       inputPerMillion: 0.75,
@@ -1650,6 +1671,17 @@ const MODELS = {
       audioInputPerMillion: 1.5,
       outputPerMillion: 3.75,
     },
+    pricingSchedule: [
+      {
+        from: "2027-01-01T00:00:00-08:00",
+        pricing: {
+          inputPerMillion: 1.5,
+          cachedInputPerMillion: 0.15,
+          audioInputPerMillion: 3.0,
+          outputPerMillion: 7.5,
+        },
+      },
+    ],
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
@@ -1675,9 +1707,9 @@ const MODELS = {
     ],
   },
 
-  // Launched 2026-08 (version 3.7-flash-08-2026). Google lists 3.7 Flash at the
-  // same rate card as 3.6 Flash, so the figures below mirror that entry — see
-  // the note there about list vs. promotional pricing.
+  // Launched 2026-08 (version 3.7-flash-08-2026). Deprecated by Google on
+  // 2026-10-08: requests are served by gemini-3.8-flash, at the same rate
+  // card and schedule as 3.6 Flash, so the figures below mirror that entry.
   GEMINI_37_FLASH: {
     description:
       "Google's Gemini 3.7 Flash, the newest Flash-tier model — better long-horizon agentic reasoning and tool use than 3.6 Flash at the same price.",
@@ -1685,20 +1717,27 @@ const MODELS = {
     label: "Gemini 3.7 Flash",
     provider: PROVIDERS.GOOGLE,
     modelType: MODEL_TYPES.CONVERSATION,
-    default: true,
     year: 2026,
     defaultTemperature: 1.0,
     // Sampling deprecated (see gemini-3.6-flash).
     lockedSampling: true,
-    // Promotional rate, in effect through 2026-12-31; reverts to $1.50 in /
-    // $7.50 out (cached $0.15) on 2027-01-01. Audio input is not published
-    // separately for this tier — carried at Google's usual 2x input ratio.
     pricing: {
       inputPerMillion: 0.75,
       cachedInputPerMillion: 0.075,
       audioInputPerMillion: 1.5,
       outputPerMillion: 3.75,
     },
+    pricingSchedule: [
+      {
+        from: "2027-01-01T00:00:00-08:00",
+        pricing: {
+          inputPerMillion: 1.5,
+          cachedInputPerMillion: 0.15,
+          audioInputPerMillion: 3.0,
+          outputPerMillion: 7.5,
+        },
+      },
+    ],
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
@@ -1735,8 +1774,7 @@ const MODELS = {
   // GA 2026-09-02. Verified 2026-09-22 against ai.google.dev (models page,
   // model page, pricing) and live: "minimal" is a 400 ("Thinking level
   // MINIMAL is not supported for this model"), thinkingBudget: 0 is a 200.
-  // Same introductory rate card as 3.6/3.7 Flash through 2026-12-31 ($1.50 in
-  // / $7.50 out / $0.15 cached from 2027-01-01). Not the Flash default.
+  // Same rate card and schedule as 3.6 Flash. Not Google's default.
   GEMINI_38_FLASH: {
     description:
       "Google's Gemini 3.8 Flash (GA 2026-09-02) — the most capable Flash model, built for long-horizon software engineering, autonomous agents and complex enterprise workflows.",
@@ -1755,6 +1793,18 @@ const MODELS = {
       outputPerMillion: 3.75,
       webSearchPer1kCalls: 14.0,
     },
+    pricingSchedule: [
+      {
+        from: "2027-01-01T00:00:00-08:00",
+        pricing: {
+          inputPerMillion: 1.5,
+          cachedInputPerMillion: 0.15,
+          audioInputPerMillion: 3.0,
+          outputPerMillion: 7.5,
+          webSearchPer1kCalls: 14.0,
+        },
+      },
+    ],
     maxInputTokens: 1_048_576,
     maxOutputTokens: 65_536,
     inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],

@@ -8,6 +8,7 @@ import {
   getDefaultModels,
   getModelByName,
   resolveRecommendedDefault,
+  resolveConversationDefault,
   getModels,
   getModelOptions,
   MODALITY_TYPES,
@@ -295,6 +296,33 @@ describe("Config Utility Functions", () => {
         new Set()
       );
       expect(recommendation).toBeNull();
+    });
+  });
+
+  // The model a new conversation starts on is Google's catalog default; the
+  // cost ladder above stays the cheap model background work runs on.
+  describe("resolveConversationDefault", () => {
+    it("starts on Google's default, Gemini 4 Argon, for a chat and for an agent", () => {
+      const keys = new Set([PROVIDERS.GOOGLE, PROVIDERS.OPENAI, PROVIDERS.ANTHROPIC]);
+      for (const functionCallOnly of [false, true]) {
+        expect(
+          resolveConversationDefault(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT, keys, functionCallOnly),
+        ).toEqual({ provider: PROVIDERS.GOOGLE, model: "gemini-4-argon", temperature: 1.0 });
+      }
+    });
+
+    it("falls back to the cost ladder without a Google key", () => {
+      const keys = new Set([PROVIDERS.ANTHROPIC, PROVIDERS.OPENAI]);
+      expect(resolveConversationDefault(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT, keys)).toEqual(
+        resolveRecommendedDefault(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT, keys),
+      );
+    });
+
+    it("leaves background work on the cheap model", () => {
+      const keys = new Set([PROVIDERS.GOOGLE, PROVIDERS.OPENAI, PROVIDERS.ANTHROPIC]);
+      expect(resolveRecommendedDefault(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT, keys)?.model).not.toBe(
+        "gemini-4-argon",
+      );
     });
   });
 });

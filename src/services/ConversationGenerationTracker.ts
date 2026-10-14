@@ -119,18 +119,12 @@ const conversationIndex = new Map<string, Set<string>>();
 const conversationAccumulators = new Map<string, ConversationAccumulator>();
 
 // ── Live cost estimation ────────────────────────────────────
-// Model pricing is static config — resolve the text→text pricing map
-// once and reuse it for every stats computation.
-let textPricingMap: Record<string, TextPricing> | null = null;
-
+// Read per computation, never cached: a dated price (pricingSchedule)
+// changes on its day without a restart.
 function getModelPricing(model: string): TextPricing | undefined {
-  if (!textPricingMap) {
-    textPricingMap = getPricing(
-      MODALITY_TYPES.TEXT,
-      MODALITY_TYPES.TEXT,
-    ) as Record<string, TextPricing>;
-  }
-  return textPricingMap[model];
+  return (
+    getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT) as Record<string, TextPricing>
+  )[model];
 }
 
 /**

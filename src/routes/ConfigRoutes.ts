@@ -16,7 +16,7 @@ import {
   getModelOptions,
   getDefaultModels,
   getParameterDescriptors,
-  resolveRecommendedDefault,
+  resolveConversationDefault,
   getModelByName,
 } from "#src/config";
 import { estimateTokens } from "#src/utils/CostCalculator";
@@ -318,13 +318,13 @@ Guidelines:
       textToText: {
         models: textToTextModels,
         defaults: filterDefaults(getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)),
-        recommendedDefault: resolveRecommendedDefault(
+        recommendedDefault: resolveConversationDefault(
           MODALITY_TYPES.TEXT,
           MODALITY_TYPES.TEXT,
           AVAILABLE_PROVIDERS,
           false,
         ),
-        recommendedAgenticDefault: resolveRecommendedDefault(
+        recommendedAgenticDefault: resolveConversationDefault(
           MODALITY_TYPES.TEXT,
           MODALITY_TYPES.TEXT,
           AVAILABLE_PROVIDERS,

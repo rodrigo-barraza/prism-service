@@ -53,6 +53,53 @@ export interface ModelOptionEntry {
   deprecatedTopK?: boolean;
 }
 
+// ─── dated prices ───────────────────────────────────────────
+
+/**
+ * One step of a dated rate card: the full card in effect from `from` (an
+ * ISO instant) until the next step starts.
+ */
+export interface PricingStep {
+  from: string;
+  pricing: Record<string, number>;
+}
+
+/**
+ * The rate card in effect at `at` for a model whose price changes on known
+ * dates (`pricingSchedule`, steps in date order): the last step that has
+ * started, else the model's base `pricing`. A step whose `from` does not
+ * parse never starts.
+ */
+function pricingAt(
+  basePricing: Record<string, number> | undefined,
+  schedule: readonly PricingStep[],
+  at: number,
+): Record<string, number> | undefined {
+  let current = basePricing;
+  for (const step of schedule) {
+    if (!(Date.parse(step.from) <= at)) break;
+    current = step.pricing;
+  }
+  return current;
+}
+
+// A scheduled model's `pricing` reads as the card in effect NOW, so every
+// reader (getPricing, /config, getModelByName(…).pricing, cost logging,
+// budgets) prices a request at the rate it is billed at, with no deploy on
+// the day. Costs are computed when a request runs and stored with it, so a
+// past request keeps the price it was billed at.
+for (const model of Object.values(MODELS)) {
+  const modelRecord = model as ModelDefinition & Record<string, unknown>;
+  const schedule = modelRecord.pricingSchedule as PricingStep[] | undefined;
+  if (!schedule?.length) continue;
+  const basePricing = modelRecord.pricing as Record<string, number> | undefined;
+  Object.defineProperty(model, "pricing", {
+    enumerable: true,
+    configurable: true,
+    get: () => pricingAt(basePricing, schedule, Date.now()),
+  });
+}
+
 // ─── derive defaults, options, pricing from MODELS ──────────
 
 /**
@@ -337,7 +384,10 @@ function getModelNativeCapabilities(
 
 /**
  * Resolve the recommended default model for a given input→output type
- * and set of available providers.
+ * and set of available providers: the cheap model background work runs on
+ * (the utility chain, the benchmark judge), and what a new conversation
+ * falls back to when Google's default cannot serve it
+ * (resolveConversationDefault).
  *
  * Priority ladder (cost-optimized):
  *   1. Gemini 3.5 Flash  (google)    — cheapest high-quality model
@@ -451,6 +501,43 @@ function resolveRecommendedDefault(
   return null;
 }
 
+/**
+ * The model a new conversation starts on: /config's recommendedDefault and
+ * recommendedAgenticDefault, which prism-client opens a chat with when the
+ * browser remembers no model. Google's catalog default (`default: true`,
+ * Gemini 4 Argon since 2026-10-13) when Google has a key and that model
+ * qualifies (tool calling, for an agent), else the cost ladder above.
+ *
+ * Background work keeps the ladder: the utility chain (compaction, memory,
+ * critic, classifier, reader) and the benchmark judge call
+ * resolveRecommendedDefault, because the model a person chats with is not
+ * the model a summary should cost.
+ */
+function resolveConversationDefault(
+  inputType: string,
+  outputType: string,
+  availableProviders: Set<string>,
+  functionCallOnly = false,
+): { provider: string; model: string; temperature: number } | null {
+  const provider = PROVIDERS.GOOGLE;
+  const modelName = getDefaultModels(inputType, outputType)[provider];
+  if (modelName && availableProviders.has(provider)) {
+    const option = (getModelOptions(inputType, outputType)[provider] || []).find(
+      (model) =>
+        model.name === modelName &&
+        (!functionCallOnly || (model.tools || []).includes("Tool Calling")),
+    );
+    if (option) {
+      return {
+        provider,
+        model: option.name,
+        temperature: option.defaultTemperature ?? 1.0,
+      };
+    }
+  }
+  return resolveRecommendedDefault(inputType, outputType, availableProviders, functionCallOnly);
+}
+
 
 // ─── Parameter Registry ─────────────────────────────────────
 
@@ -484,6 +571,7 @@ export {
   resolveModelAlias,
   getModelNativeCapabilities,
   resolveRecommendedDefault,
+  resolveConversationDefault,
 
   // Voices
   VOICES,
