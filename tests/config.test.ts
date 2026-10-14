@@ -245,7 +245,7 @@ describe("Config Utility Functions", () => {
   });
 
   describe("resolveRecommendedDefault", () => {
-    it("should resolve Gemini 3.5 Flash first if google is available", () => {
+    it("should resolve Gemini 3.8 Flash first if google is available", () => {
       const recommendation = resolveRecommendedDefault(
         MODALITY_TYPES.TEXT,
         MODALITY_TYPES.TEXT,
@@ -253,7 +253,7 @@ describe("Config Utility Functions", () => {
       );
       expect(recommendation).not.toBeNull();
       expect(recommendation!.provider).toBe(PROVIDERS.GOOGLE);
-      expect(recommendation!.model).toBe("gemini-3.5-flash");
+      expect(recommendation!.model).toBe("gemini-3.8-flash");
     });
 
     it("should fallback to Anthropic Haiku if google is not available", () => {
@@ -286,7 +286,7 @@ describe("Config Utility Functions", () => {
         true
       );
       expect(recommendation).not.toBeNull();
-      expect(recommendation!.model).toBe("gemini-3.5-flash");
+      expect(recommendation!.model).toBe("gemini-3.8-flash");
     });
 
     it("should return null if no providers are available", () => {
@@ -318,10 +318,14 @@ describe("Config Utility Functions", () => {
       );
     });
 
-    it("leaves background work on the cheap model", () => {
+    it("leaves background work on the cheap model, Gemini 3.8 Flash", () => {
       const keys = new Set([PROVIDERS.GOOGLE, PROVIDERS.OPENAI, PROVIDERS.ANTHROPIC]);
-      expect(resolveRecommendedDefault(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT, keys)?.model).not.toBe(
-        "gemini-4-argon",
+      expect(resolveRecommendedDefault(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT, keys)?.model).toBe(
+        "gemini-3.8-flash",
+      );
+      // The vision role's default (an image in, text out) is the same model.
+      expect(resolveRecommendedDefault(MODALITY_TYPES.IMAGE, MODALITY_TYPES.TEXT, keys)?.model).toBe(
+        "gemini-3.8-flash",
       );
     });
   });
