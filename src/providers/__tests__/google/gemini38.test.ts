@@ -13,7 +13,7 @@
  *     history from another provider gets Google's documented dummy
  *     signature on its function calls
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import {
   buildGenerateConfig,
@@ -28,19 +28,31 @@ type CatalogModel = Record<string, unknown> & { name: string };
 const model = (name: string) => getModelByName(name) as unknown as CatalogModel;
 
 describe("gemini-3.8 catalog entries", () => {
-  it("gemini-3.8-flash: 1,048,576 in / 65,536 out, low|medium|high, introductory prices", () => {
+  it("gemini-3.8-flash: 1,048,576 in / 65,536 out, low|medium|high, introductory prices until 2027", () => {
     const flash = model("gemini-3.8-flash");
     expect(flash).toBeTruthy();
     expect(flash.maxInputTokens).toBe(1_048_576);
     expect(flash.maxOutputTokens).toBe(65_536);
     expect(flash.thinkingLevels).toEqual(["low", "medium", "high"]);
     expect(flash.canDisableThinking).toBe(true);
-    expect(flash.pricing).toMatchObject({
-      inputPerMillion: 0.75,
-      cachedInputPerMillion: 0.075,
-      outputPerMillion: 3.75,
-    });
-    // Not the Flash default (the prompt changes no default).
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-12-31T23:59:59-08:00"));
+      expect(flash.pricing).toMatchObject({
+        inputPerMillion: 0.75,
+        cachedInputPerMillion: 0.075,
+        outputPerMillion: 3.75,
+      });
+      vi.setSystemTime(new Date("2027-01-01T00:00:00-08:00"));
+      expect(flash.pricing).toMatchObject({
+        inputPerMillion: 1.5,
+        cachedInputPerMillion: 0.15,
+        outputPerMillion: 7.5,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+    // Not Google's default.
     expect(flash.default).toBeUndefined();
   });
 

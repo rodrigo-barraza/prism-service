@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
     calculateTextCost,
     calculateAudioCost,
@@ -467,19 +467,37 @@ describe("Pricing sanity checks against official published rates", () => {
         expect(m.pricing.outputPerMillion).toBe(3.0);
     });
 
-    // Promotional rate through 2026-12-31; reverts to 1.5 / 7.5 (cached 0.15)
-    // on 2027-01-01, at which point this test is the reminder to update it.
-    it("Gemini 3.7 Flash: $0.75 in / $3.75 out, $0.075 cachedIn (promo)", () => {
+    // Introductory through 2026-12-31; list price from 2027-01-01 (00:00
+    // Pacific), which the catalog's pricingSchedule switches to on the day.
+    it("Gemini 3.7 Flash: $0.75 in / $3.75 out, $0.075 cachedIn, then $1.50 / $7.50 / $0.15", () => {
         const m = getModel("gemini-3.7-flash");
-        expect(m.pricing.inputPerMillion).toBe(0.75);
-        expect(m.pricing.cachedInputPerMillion).toBe(0.075);
-        expect(m.pricing.outputPerMillion).toBe(3.75);
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+            vi.setSystemTime(new Date("2026-12-31T23:59:59-08:00"));
+            expect(m.pricing.inputPerMillion).toBe(0.75);
+            expect(m.pricing.cachedInputPerMillion).toBe(0.075);
+            expect(m.pricing.outputPerMillion).toBe(3.75);
+            vi.setSystemTime(new Date("2027-01-01T00:00:00-08:00"));
+            expect(m.pricing.inputPerMillion).toBe(1.5);
+            expect(m.pricing.cachedInputPerMillion).toBe(0.15);
+            expect(m.pricing.outputPerMillion).toBe(7.5);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
-    it("Gemini 3.6 Flash is priced identically to 3.7 Flash", () => {
+    it("Gemini 3.6 Flash is priced identically to 3.7 Flash, on both sides of the change", () => {
         const a = getModel("gemini-3.6-flash");
         const b = getModel("gemini-3.7-flash");
-        expect(a.pricing).toEqual(b.pricing);
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+            for (const instant of ["2026-10-13T12:00:00-07:00", "2027-01-01T00:00:00-08:00"]) {
+                vi.setSystemTime(new Date(instant));
+                expect(a.pricing).toEqual(b.pricing);
+            }
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("Gemini 3.5 Flash-Lite: $0.30 in / $2.50 out", () => {
