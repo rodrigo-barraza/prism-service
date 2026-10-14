@@ -46,6 +46,7 @@ import {
   selectInstanceForMember,
 } from "./orchestrator/InstanceResolver.ts";
 import { GitWorktreeHelper } from "./orchestrator/GitWorktreeHelper.ts";
+import { isNoRepository } from "./orchestrator/WorktreeCreation.ts";
 import {
   settleSubAgentWorktree,
   syncWorktreeState,
@@ -526,21 +527,38 @@ export class OrchestratorService {
       files || [],
     );
 
-    // Attempt git worktree creation — best-effort
-    // Non-git workspaces gracefully degrade to shared directory mode
+    // A worktree, or no sub-agent. Only a workspace with no repository runs
+    // it in the shared directory (there is nothing to isolate). Any other
+    // failure refuses it: falling back to the root used to put every
+    // isolated sub-agent of a bridged repository (whose worktree this host
+    // could not make) into the main checkouts, beside everyone's work.
     let worktreePath: string;
     const worktreeResult = await GitWorktreeHelper.createWorktree(
       repositoryPath,
       branchName,
     );
     if (worktreeResult.error) {
-      logger.warn(
-        `[Orchestrator] Worktree creation skipped for ${agentId}: ${worktreeResult.error}. Running in workspace root.`,
+      if (!isNoRepository(worktreeResult)) {
+        logger.warn(
+          `[Orchestrator] Sub-agent ${agentId} not started: no worktree in ${repositoryPath}: ${worktreeResult.error}`,
+        );
+        return {
+          error: `Sub-agent not started: its isolated worktree could not be created in ${repositoryPath} (${worktreeResult.error}). It would otherwise work in the shared checkout. Retry once that is fixed — for a bridged repository, its workspace bridge must be connected and current.`,
+        };
+      }
+      logger.info(
+        `[Orchestrator] No repository in ${repositoryPath} for ${agentId}: running in the shared workspace root.`,
       );
       worktreePath = workspaceRoot;
     } else {
       worktreePath = worktreeResult.worktreePath || workspaceRoot;
     }
+    // The tree the worktree branched from, as the backend resolved it (a
+    // bridge resolves a bridged repository, and the caller's own worktree):
+    // commit, diff, merge and remove all run against it.
+    const subAgentRepositoryPath = worktreeResult.error
+      ? repositoryPath
+      : worktreeResult.repoPath || repositoryPath;
 
     const subAgentConversationId = crypto.randomUUID();
 
@@ -604,7 +622,7 @@ export class OrchestratorService {
       // remove, never recomputed from the agent id.
       branchName: worktreeResult.error ? null : worktreeResult.branch ?? null,
       worktreePath,
-      repositoryPath,
+      repositoryPath: subAgentRepositoryPath,
       isolated: !worktreeResult.error, // true if running in a worktree
       status: SYSTEM_STATUSES.RUNNING,
       output: "",

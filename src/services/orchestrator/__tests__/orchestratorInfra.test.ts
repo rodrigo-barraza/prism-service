@@ -324,11 +324,13 @@ describe("Orchestrator Infrastructure Suite", () => {
       const rootPath = GitWorktreeHelper.getDefaultWorkspaceRoot();
       expect(rootPath).toBeDefined();
 
+      // The project directory, even with no .git found on this host: a
+      // bridged repository is resolved by its bridge (the create's repoPath)
       const resolved = GitWorktreeHelper.resolveRepositoryPath(
         "/workspace",
         ["/workspace/project-a/src/index.ts"]
       );
-      expect(resolved).toBe("/workspace");
+      expect(resolved).toBe("/workspace/project-a");
     });
 
     it("should execute toolsApiPost calls successfully via mocked fetch", async () => {

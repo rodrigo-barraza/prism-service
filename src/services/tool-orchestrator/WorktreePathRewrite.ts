@@ -48,6 +48,9 @@ interface Redirect {
 }
 
 function redirectPath(value: string, redirect: Redirect): string {
+  // Already in the worktree. A bridge's sits INSIDE its checkout
+  // (<repo>/.claude/worktrees/<name>): moving such a path again nested it.
+  if (value === redirect.worktree || value.startsWith(`${redirect.worktree}/`)) return value;
   if (value === redirect.checkout) return redirect.worktree;
   if (value.startsWith(`${redirect.checkout}/`)) {
     return redirect.worktree + value.slice(redirect.checkout.length);
@@ -87,10 +90,14 @@ export function redirectArgumentsToWorktree(
   const checkout = worktreeCheckoutRoot(state);
   const worktree = state.worktreePath.replace(/\/+$/, "");
   if (!checkout || checkout === "/" || !worktree || checkout === worktree) return { ...args };
+  // A worktree inside its checkout is itself a "mention" of the checkout:
+  // a command that already names the worktree is left as it is
+  const insideCheckout = worktree.startsWith(`${checkout}/`) ? worktree.slice(checkout.length) : null;
+  const notTheWorktree = insideCheckout ? `(?!${escapeForRegExp(insideCheckout)}(?![\\w.~@+-]))` : "";
   const redirect: Redirect = {
     checkout,
     worktree,
-    mention: new RegExp(`(?<![\\w.~/-])${escapeForRegExp(checkout)}(?![\\w.~@+-])`, "g"),
+    mention: new RegExp(`(?<![\\w.~/-])${escapeForRegExp(checkout)}${notTheWorktree}(?![\\w.~@+-])`, "g"),
   };
   return redirectValue(args, null, redirect) as Record<string, unknown>;
 }
