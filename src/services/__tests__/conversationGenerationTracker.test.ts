@@ -6,7 +6,7 @@
  * If register/update/complete lifecycle is broken, the frontend shows
  * stale or incorrect tok/s. If cleanup leaks, memory grows unbounded.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 const { default: ConversationGenerationTracker } = await import(
   "#src/services/ConversationGenerationTracker"
@@ -358,6 +358,29 @@ describe("ConversationGenerationTracker — live cost estimation", () => {
     const expected =
       (2000 / 1_000_000) * inputPerMillion + (500 / 1_000_000) * outputPerMillion;
     expect(stats.estimatedCost).toBeCloseTo(expected, 8);
+  });
+
+  // A dated price (pricingSchedule) changes on its day without a restart.
+  it("prices a running request at the rate in effect, across a dated price change", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-11-30T23:59:00-08:00"));
+      ConversationGenerationTracker.register("cost-session", "cost-req-dated", {
+        model: "gemini-4-argon",
+      });
+      ConversationGenerationTracker.update("cost-req-dated", {
+        inputTokens: 1_000_000,
+        outputTokens: 1_000_000,
+      });
+      // Introductory: $2 in + $10 out.
+      expect(ConversationGenerationTracker.getConversationStats("cost-session").estimatedCost).toBeCloseTo(12, 8);
+
+      vi.setSystemTime(new Date("2026-12-01T00:01:00-08:00"));
+      // List price from 2026-12-01: $4 in + $20 out.
+      expect(ConversationGenerationTracker.getConversationStats("cost-session").estimatedCost).toBeCloseTo(24, 8);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("rolls cost into the accumulator on complete (monotonic across iterations)", () => {

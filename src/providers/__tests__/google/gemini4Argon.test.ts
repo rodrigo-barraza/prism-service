@@ -8,9 +8,11 @@
  *     200 with no thought tokens
  *   - temperature / top_p / top_k are ignored ("Remove … from your requests")
  *   - implicit caching only: no cachedContents
- *   - introductory rate card through 2026-11-30: $2 in / $10 out / $0.10 cached
+ *   - introductory rate card through 2026-11-30: $2 in / $10 out / $0.10
+ *     cached; $4 / $20 / $0.20 from 2026-12-01 (pricingSchedule)
+ *   - Google's default, and what a new conversation starts on (2026-10-13)
  */
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 
 import { buildGenerateConfig } from "#src/providers/google";
 import { getModelProfile } from "#src/providers/ModelProfiles";
@@ -21,6 +23,7 @@ import {
   getPricing,
   MODALITY_TYPES,
   PROVIDERS,
+  resolveConversationDefault,
 } from "#src/config";
 import { calculateTextCost, type TextPricing } from "#src/utils/CostCalculator";
 import type { ProviderOptions } from "#src/types/ProviderTypes";
@@ -54,7 +57,7 @@ describe("gemini-4-argon catalog entry", () => {
     expect(argon().outputTypes).toEqual([MODALITY_TYPES.TEXT]);
   });
 
-  it("is offered as a Google conversation model with its server-side tools, and changes no default", () => {
+  it("is offered as a Google conversation model with its server-side tools", () => {
     const google = getModelOptions(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[PROVIDERS.GOOGLE] ?? [];
     const option = google.find((entry) => entry.name === "gemini-4-argon");
     expect(option).toMatchObject({
@@ -70,18 +73,34 @@ describe("gemini-4-argon catalog entry", () => {
       contextLength: 1_048_576,
       maxOutputTokens: 65_536,
     });
-    expect(argon().default).toBeUndefined();
-    expect(getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[PROVIDERS.GOOGLE]).not.toBe(
-      "gemini-4-argon",
-    );
+  });
+
+  it("is Google's default and what a new conversation or agent starts on", () => {
+    expect(argon().default).toBe(true);
+    expect(getDefaultModels(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)[PROVIDERS.GOOGLE]).toBe("gemini-4-argon");
+    const keys = new Set([PROVIDERS.GOOGLE, PROVIDERS.ANTHROPIC, PROVIDERS.OPENAI]);
+    for (const functionCallOnly of [false, true]) {
+      expect(
+        resolveConversationDefault(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT, keys, functionCallOnly),
+      ).toEqual({ provider: PROVIDERS.GOOGLE, model: "gemini-4-argon", temperature: 1.0 });
+    }
   });
 });
 
 describe("gemini-4-argon pricing", () => {
-  const pricing = () => getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)["gemini-4-argon"] as TextPricing;
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-  it("carries the introductory rate card, one input rate for every modality", () => {
-    expect(pricing()).toEqual({
+  /** The text→text rate card for gemini-4-argon with the clock at `instant`. */
+  const pricingAt = (instant: string) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(instant));
+    return getPricing(MODALITY_TYPES.TEXT, MODALITY_TYPES.TEXT)["gemini-4-argon"] as TextPricing;
+  };
+
+  it("carries the introductory rate card through 2026-11-30, one input rate for every modality", () => {
+    expect(pricingAt("2026-11-30T23:59:59-08:00")).toEqual({
       inputPerMillion: 2.0,
       cachedInputPerMillion: 0.1,
       outputPerMillion: 10.0,
@@ -89,11 +108,24 @@ describe("gemini-4-argon pricing", () => {
     });
   });
 
-  it("bills thinking as output and cache hits at 95% off", () => {
-    expect(calculateTextCost({ inputTokens: 1_000_000, outputTokens: 1_000_000 }, pricing())).toBe(12);
-    expect(
-      calculateTextCost({ inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 1_000_000 }, pricing()),
-    ).toBe(0.1);
+  it("switches to the list price at 00:00 Pacific on 2026-12-01", () => {
+    expect(pricingAt("2026-12-01T00:00:00-08:00")).toEqual({
+      inputPerMillion: 4.0,
+      cachedInputPerMillion: 0.2,
+      outputPerMillion: 20.0,
+      webSearchPer1kCalls: 14.0,
+    });
+  });
+
+  it("bills thinking as output and cache hits at 95% off, at either rate", () => {
+    const tokens = { inputTokens: 1_000_000, outputTokens: 1_000_000 };
+    const cacheHit = { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 1_000_000 };
+    const introductory = pricingAt("2026-10-13T12:00:00-07:00");
+    expect(calculateTextCost(tokens, introductory)).toBe(12);
+    expect(calculateTextCost(cacheHit, introductory)).toBe(0.1);
+    const list = pricingAt("2027-03-01T12:00:00-08:00");
+    expect(calculateTextCost(tokens, list)).toBe(24);
+    expect(calculateTextCost(cacheHit, list)).toBe(0.2);
   });
 });
 

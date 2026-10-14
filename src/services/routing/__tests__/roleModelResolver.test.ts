@@ -30,10 +30,15 @@ vi.mock("#src/providers/instance-registry", async (importOriginal) => ({
   getInstanceType: vi.fn().mockReturnValue(null),
 }));
 
-// Every cloud provider has a key (the oracle's default looks at which do).
+// Every cloud provider has a key unless a test narrows it (the oracle's
+// default looks at which do).
+const cloudKeys = vi.hoisted(() => {
+  const all = ["anthropic", "openai", "google"];
+  return { all, providers: all };
+});
 vi.mock("#src/services/ModelRoleRouter", async (importOriginal) => ({
   ...(await importOriginal<typeof import("#src/services/ModelRoleRouter")>()),
-  getAvailableCloudProviders: () => new Set(["anthropic", "openai", "google"]),
+  getAvailableCloudProviders: () => new Set(cloudKeys.providers),
 }));
 
 // Built-in personas carry no pins today; this one is registered per test.
@@ -179,6 +184,19 @@ describe("RoleModelResolver — precedence", () => {
 
       const underGpt = await resolveOracleModel({ agent: "CODING", main: { provider: PROVIDERS.OPENAI, model: "gpt-5.6-luna" } });
       expect(underGpt).toMatchObject({ provider: PROVIDERS.ANTHROPIC, model: "claude-opus-5-5" });
+    });
+
+    it("default with only a Google key: Google's strongest, Gemini 4 Argon", async () => {
+      cloudKeys.providers = [PROVIDERS.GOOGLE];
+      try {
+        const decision = await resolveOracleModel({
+          agent: "CODING",
+          main: { provider: PROVIDERS.GOOGLE, model: "gemini-3.8-flash" },
+        });
+        expect(decision).toMatchObject({ source: "default", provider: PROVIDERS.GOOGLE, model: "gemini-4-argon" });
+      } finally {
+        cloudKeys.providers = cloudKeys.all;
+      }
     });
   });
 

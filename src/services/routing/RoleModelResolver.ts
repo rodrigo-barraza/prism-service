@@ -305,7 +305,7 @@ export async function resolveSubAgentModel({
 const ORACLE_FRONTIER: Array<[string, string[]]> = [
   [PROVIDERS.ANTHROPIC, ["claude-opus-5-5", "claude-opus-5"]],
   [PROVIDERS.OPENAI, ["gpt-6-astra", "gpt-5.6-sol", "gpt-5.5-pro"]],
-  [PROVIDERS.GOOGLE, ["gemini-3.1-pro-preview"]],
+  [PROVIDERS.GOOGLE, ["gemini-4-argon", "gemini-3.1-pro-preview"]],
 ];
 
 function oracleFrontierOf(provider: string): string | null {
