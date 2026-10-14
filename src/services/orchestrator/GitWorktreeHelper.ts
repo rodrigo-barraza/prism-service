@@ -1,4 +1,4 @@
-import { resolve, relative } from "node:path";
+import { isAbsolute, resolve, relative } from "node:path";
 import { existsSync } from "node:fs";
 import { TOOLS_SERVICE_URL } from "#config";
 import { toolsServiceAuthHeaders } from "#src/utils/ToolsServiceAuth";
@@ -81,13 +81,20 @@ export class GitWorktreeHelper {
   }
 
   /**
-   * Derive the git repository path from a sub-agent's file list.
+   * Derive the tree a sub-agent's worktree branches from, from its files.
    *
-   * If files live under a git subdirectory of the workspace root
-   * (e.g. /workspace/projectA/.git exists), return that subdirectory
-   * as the repository path so worktrees branch from it.
+   * - The workspace root, when it is itself a repository (on this host).
+   * - The parent's own worktree, when the files are in one
+   *   (<root>/<repo>/.claude/worktrees/<name>/…): the sub-agent branches
+   *   from the parent's branch, and merges back into it.
+   * - Otherwise the project directory the first file is in (<root>/<repo>).
+   *   It is returned even when no .git is found HERE: a bridged repository
+   *   lives on the bridge's machine, and the create resolves it there (its
+   *   `repoPath` is what later calls use). A directory with no repository
+   *   comes back as reason "not-a-repository".
    *
-   * Falls back to workspaceRoot if no git repository is found.
+   * The workspace root when there are no files, or the first is directly in
+   * it or outside it.
    */
   static resolveRepositoryPath(workspaceRoot: string, files: string[]): string {
     if (!files?.length) return workspaceRoot;
@@ -95,19 +102,16 @@ export class GitWorktreeHelper {
     // Check if workspace root itself is a git repository
     if (existsSync(resolve(workspaceRoot, ".git"))) return workspaceRoot;
 
-    // Take the first file, get its path relative to workspace root,
-    // extract the first directory segment (the project dir)
-    const firstFile = resolve(files[0]);
+    const firstFile = isAbsolute(files[0]) ? files[0] : resolve(workspaceRoot, files[0]);
     const relativePath = relative(workspaceRoot, firstFile);
-    const firstSegment = relativePath.split("/")[0];
-    if (!firstSegment) return workspaceRoot;
+    if (!relativePath || relativePath.startsWith("..") || isAbsolute(relativePath)) return workspaceRoot;
+    const segments = relativePath.split("/");
+    if (segments.length < 2) return workspaceRoot;
 
-    const candidate = resolve(workspaceRoot, firstSegment);
-    if (existsSync(resolve(candidate, ".git"))) {
-      return candidate;
+    if (segments.length > 4 && segments[1] === ".claude" && segments[2] === "worktrees") {
+      return resolve(workspaceRoot, ...segments.slice(0, 4));
     }
-
-    return workspaceRoot;
+    return resolve(workspaceRoot, segments[0]);
   }
 
   static async toolsApiPost<T extends ToolsApiResponse>(

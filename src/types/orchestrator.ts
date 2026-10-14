@@ -399,6 +399,16 @@ export interface WorktreeCreateResponse extends ToolsApiResponse {
   worktreePath?: string;
   /** The branch as created; stored and used verbatim, never recomputed. */
   branch?: string;
+  /**
+   * The tree the worktree branched from, as tools-service or the bridge
+   * resolved it (the repository, or the caller's own worktree): the path
+   * every later worktree call uses.
+   */
+  repoPath?: string;
+  /** A bridge's: the package directories whose node_modules it hard-linked in. */
+  linked?: string[];
+  /** "not-a-repository": nothing to isolate — the only failure that may share the directory. */
+  reason?: "not-a-repository";
 }
 
 export interface WorktreeCommitResponse extends ToolsApiResponse {
@@ -410,7 +420,8 @@ export interface WorktreeCommitResponse extends ToolsApiResponse {
 export interface WorktreeMergeResponse extends ToolsApiResponse {
   merged?: string;
   into?: string;
-  reason?: "conflict" | "local-changes";
+  /** "protected-branch" (a bridge's): never merged into master/main; the work stays on its branch. */
+  reason?: "conflict" | "local-changes" | "protected-branch";
   conflictingFiles?: string[];
 }
 

@@ -6,6 +6,7 @@ import type {
   MergeBackReport,
   SubAgentResult,
   SubAgentState,
+  WorktreeMergeResponse,
 } from "#src/types/orchestrator";
 import type { EmitFunction } from "#src/services/harnesses/types";
 
@@ -67,6 +68,16 @@ function keep(
   return report;
 }
 
+/**
+ * How a refused merge is kept: "conflict" when the branches clash (or the
+ * target's own edits are in the way), "failed" for anything else — a
+ * bridge's protected branch included, whose error says the work waits on
+ * its branch for its owner (master moves only by the batch).
+ */
+function keptStatusFor(reason: WorktreeMergeResponse["reason"]): "conflict" | "failed" {
+  return reason === "conflict" || reason === "local-changes" ? "conflict" : "failed";
+}
+
 /** Tell the parent's stream that a sub-agent's work was kept, not merged. */
 function emitKept(
   emit: EmitFunction | null | undefined,
@@ -102,7 +113,7 @@ async function mergeThenCleanUp(
     if (merge.error) {
       return keep(
         report,
-        merge.reason ? "conflict" : "failed",
+        keptStatusFor(merge.reason),
         merge.error,
         merge.conflictingFiles,
       );
@@ -271,7 +282,7 @@ export async function mergeDeferredKeepingWorktree(
     `Merge sub-agent ${result.agent_id}: ${result.description}`,
   );
   if (merge.error) {
-    keep(report, merge.reason ? "conflict" : "failed", merge.error, merge.conflictingFiles);
+    keep(report, keptStatusFor(merge.reason), merge.error, merge.conflictingFiles);
     emitKept(emit, result.agent_id, null, report);
   }
   return report;

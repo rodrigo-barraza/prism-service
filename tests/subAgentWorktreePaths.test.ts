@@ -161,4 +161,40 @@ describe("sub-agent worktree — paths into the parent's checkout are redirected
     const plain = await run("read_file", { absolutePath: `${ROOT}/primes.txt` }, "a-root-session");
     expect(plain.absolutePath).toBe(`${ROOT}/primes.txt`);
   });
+
+  // A bridge makes the worktree INSIDE the checkout it isolates
+  // (<repo>/.claude/worktrees/<name>, workspace-service GitWorktreeHandler):
+  // a path already in it is a path under the checkout too, and was moved
+  // again — <worktree>/.claude/worktrees/<name>/… .
+  describe("a worktree inside its checkout (a bridge's)", () => {
+    const BRIDGED = "sub-agent-bridged";
+    const INSIDE = `${ROOT}/.claude/worktrees/orchestrator_agent-2`;
+
+    beforeEach(() => {
+      ToolOrchestratorService._setWorktree(BRIDGED, {
+        originalRoot: "/home/user/projects",
+        worktreePath: INSIDE,
+        branch: "orchestrator/agent-2",
+        repoPath: ROOT,
+      });
+    });
+    afterEach(() => ToolOrchestratorService._clearWorktree(BRIDGED));
+
+    it("leaves a path already in the worktree where it is, and moves the checkout's", async () => {
+      const inWorktree = await run("read_file", { absolutePath: `${INSIDE}/a.ts` }, BRIDGED);
+      expect(inWorktree.absolutePath).toBe(`${INSIDE}/a.ts`);
+      const inCheckout = await run("read_file", { absolutePath: `${ROOT}/src/b.ts` }, BRIDGED);
+      expect(inCheckout.absolutePath).toBe(`${INSIDE}/src/b.ts`);
+    });
+
+    it("rewrites only the checkout's mentions in a command, never the worktree's own", async () => {
+      const command = await run(
+        "execute_command",
+        { command: `cat ${INSIDE}/a.txt && ls ${ROOT}/src ${ROOT}`, cwd: INSIDE },
+        BRIDGED,
+      );
+      expect(command.command).toBe(`cat ${INSIDE}/a.txt && ls ${INSIDE}/src ${INSIDE}`);
+      expect(command.cwd).toBe(INSIDE);
+    });
+  });
 });

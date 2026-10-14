@@ -1822,9 +1822,9 @@ describe("OrchestratorService Spawning & Agent Types", () => {
       expect((result as any).error).toContain("Continuation execution failed");
     });
 
-    it("should set workspaceRoot to parent workspace root when worktree creation fails", async () => {
+    it("should set workspaceRoot to parent workspace root when there is no repository to isolate", async () => {
       vi.mocked(GitWorktreeHelper.createWorktree).mockResolvedValueOnce({
-        error: "Worktree failed to initialize"
+        error: "fatal: not a git repository (or any of the parent directories): .git"
       });
       vi.mocked(GitWorktreeHelper.getDefaultWorkspaceRoot).mockReturnValueOnce("/parent/workspace/root");
 
@@ -1843,6 +1843,26 @@ describe("OrchestratorService Spawning & Agent Types", () => {
 
       const lastCall = mockRunAgenticLoop.mock.calls[mockRunAgenticLoop.mock.calls.length - 1][0];
       expect(lastCall.workspaceRoot).toBe("/parent/workspace/root");
+    });
+
+    // Falling back to the root for any failure put every isolated sub-agent
+    // of a bridged repository into the shared checkout
+    it("should not start a sub-agent whose worktree fails for any other reason", async () => {
+      vi.mocked(GitWorktreeHelper.createWorktree).mockResolvedValueOnce({
+        error: "Worktree failed to initialize"
+      });
+      const callsBefore = mockRunAgenticLoop.mock.calls.length;
+
+      const result = await OrchestratorService.spawnFromTool({
+        description: "Failed worktree agent",
+        prompt: "Run task",
+        files: ["/parent/workspace/root/file.ts"],
+        awaitCompletion: true,
+        orchestratorContext: { ...orchestratorContext, workspaceRoot: "/parent/workspace/root" },
+      });
+
+      expect(result).toEqual({ error: expect.stringContaining("Worktree failed to initialize") });
+      expect(mockRunAgenticLoop.mock.calls.length).toBe(callsBefore);
     });
 
     it("should warn and fallback when specified agent type is not found in registry", async () => {
