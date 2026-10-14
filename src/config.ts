@@ -390,8 +390,10 @@ function getModelNativeCapabilities(
  * (resolveConversationDefault).
  *
  * Priority ladder (cost-optimized):
- *   1. Gemini 3.5 Flash  (google)    — cheapest high-quality model
- *   2. Gemini 3 Flash    (google)    — fallback if 3.5 unavailable
+ *   1. Gemini 3.8 Flash  (google)    — cheapest high-quality model (owner's
+ *                                      pick 2026-10-13; Google retired 3.5
+ *                                      Flash on 2026-10-08)
+ *   2. Gemini 3 Flash    (google)    — fallback if 3.8 unavailable
  *   3. Haiku             (anthropic) — fast and cheap
  *   4. GPT 5.4 Mini/Nano (openai)    — mini/nano tier
  *   5. GPT 5 Mini/Nano   (openai)    — legacy mini/nano
@@ -447,7 +449,7 @@ function resolveRecommendedDefault(
 
   // Priority 1–2: Google (Gemini Flash variants)
   const googleResult = tryProvider("google", [
-    MODELS.GEMINI_35_FLASH.name,
+    MODELS.GEMINI_38_FLASH.name,
     MODELS.GEMINI_3_FLASH.name,
   ]);
   if (googleResult) return googleResult;
