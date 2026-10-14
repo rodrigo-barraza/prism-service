@@ -350,9 +350,16 @@ describe("Provider availability filtering", () => {
     expect(providers).not.toContain(PROVIDERS.OLLAMA);
   });
 
-  it("Google's text default is Gemini 3.7 Flash", async () => {
+  it("Google's text default is Gemini 4 Argon", async () => {
     const res = await request(app).get("/config").expect(200);
-    expect(res.body.textToText.defaults.google).toBe("gemini-3.7-flash");
+    expect(res.body.textToText.defaults.google).toBe("gemini-4-argon");
+  });
+
+  it("starts a new conversation, and a new agent, on Gemini 4 Argon", async () => {
+    const res = await request(app).get("/config").expect(200);
+    const argon = { provider: PROVIDERS.GOOGLE, model: "gemini-4-argon", temperature: 1.0 };
+    expect(res.body.textToText.recommendedDefault).toEqual(argon);
+    expect(res.body.textToText.recommendedAgenticDefault).toEqual(argon);
   });
 
   it("exactly one Google conversation model carries the default flag", async () => {
