@@ -3,7 +3,7 @@
  * last use in the last 30 days, catalog and body tokens, and "never invoked
  * in 30 days" — counted from the usage rows load_skill / execute_skill write.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 import { app } from "./setup.ts";
 import { createMockCollection } from "./mongoMock.ts";
@@ -127,8 +127,16 @@ describe("buildSkillUsageReport", () => {
 });
 
 describe("GET /admin/skills/usage", () => {
+  // The route reads the clock itself: pin it to the seeded rows' NOW, or they
+  // age out of the 30-day window (red from 2026-10-23, 30 days after NOW).
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
     vi.mocked(MongoWrapper.getDb).mockReturnValue(seeded());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("serves the report", async () => {
