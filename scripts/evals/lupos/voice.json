@@ -1,0 +1,105 @@
+{
+  "description": "Lupos voice set — ten everyday Discord turns (banter, a bad day, food, a roast, an insult, a wake-up shout, a pick-one, a fact, a greeting, a rating) to read his voice side by side when his model or persona changes: run it with --suite voice.json --out <file> per model and compare the replies in each outcome's `text`. It grades only that he answers, in character and without a leaked tool call; the reading is the point. Uses cases.json's Discord context.",
+  "cases": [
+    {
+      "id": "mondays",
+      "category": "voice",
+      "text": "lupos thoughts on mondays",
+      "graders": [
+        { "type": "text_nonempty" },
+        { "type": "max_passes", "value": 3 },
+        { "type": "text_not_matches", "pattern": "\\b(sorry,? i can(no|')t|i cannot (fulfill|help|comply)|as an ai)\\b", "flags": "i" }
+      ]
+    },
+    {
+      "id": "bad-day",
+      "category": "voice",
+      "text": "lupos i just got dumped 😔",
+      "graders": [
+        { "type": "text_nonempty" },
+        { "type": "max_passes", "value": 3 },
+        { "type": "text_not_matches", "pattern": "\\b(sorry,? i can(no|')t|i cannot (fulfill|help|comply)|as an ai)\\b", "flags": "i" }
+      ]
+    },
+    {
+      "id": "fed",
+      "category": "voice",
+      "text": "here lupos have a burger 🍔",
+      "graders": [
+        { "type": "text_nonempty" },
+        { "type": "max_passes", "value": 3 },
+        { "type": "text_not_matches", "pattern": "\\b(sorry,? i can(no|')t|i cannot (fulfill|help|comply)|as an ai)\\b", "flags": "i" }
+      ]
+    },
+    {
+      "id": "roast-me",
+      "category": "voice",
+      "text": "lupos roast me, i can take it",
+      "graders": [
+        { "type": "text_nonempty" },
+        { "type": "max_passes", "value": 3 },
+        { "type": "text_not_matches", "pattern": "\\b(sorry,? i can(no|')t|i cannot (fulfill|help|comply)|as an ai)\\b", "flags": "i" }
+      ]
+    },
+    {
+      "id": "insulted",
+      "category": "voice",
+      "text": "lupos you're just a dumb bot lol",
+      "graders": [
+        { "type": "text_nonempty" },
+        { "type": "max_passes", "value": 3 },
+        { "type": "text_not_matches", "pattern": "\\b(sorry,? i can(no|')t|i cannot (fulfill|help|comply)|as an ai)\\b", "flags": "i" }
+      ]
+    },
+    {
+      "id": "wake-up",
+      "category": "voice",
+      "text": "LUPOS WAKE UP",
+      "graders": [
+        { "type": "text_nonempty" },
+        { "type": "max_passes", "value": 3 },
+        { "type": "text_not_matches", "pattern": "\\b(sorry,? i can(no|')t|i cannot (fulfill|help|comply)|as an ai)\\b", "flags": "i" }
+      ]
+    },
+    {
+      "id": "pick-one",
+      "category": "voice",
+      "text": "lupos cats or dogs, pick one",
+      "graders": [
+        { "type": "text_nonempty" },
+        { "type": "max_passes", "value": 3 },
+        { "type": "text_not_matches", "pattern": "\\b(sorry,? i can(no|')t|i cannot (fulfill|help|comply)|as an ai)\\b", "flags": "i" }
+      ]
+    },
+    {
+      "id": "wolf-fact",
+      "category": "voice",
+      "text": "lupos tell me something cool about wolves",
+      "graders": [
+        { "type": "text_nonempty" },
+        { "type": "max_passes", "value": 3 },
+        { "type": "text_not_matches", "pattern": "\\b(sorry,? i can(no|')t|i cannot (fulfill|help|comply)|as an ai)\\b", "flags": "i" }
+      ]
+    },
+    {
+      "id": "good-morning",
+      "category": "voice",
+      "text": "good morning lupos ☀️",
+      "graders": [
+        { "type": "text_nonempty" },
+        { "type": "max_passes", "value": 3 },
+        { "type": "text_not_matches", "pattern": "\\b(sorry,? i can(no|')t|i cannot (fulfill|help|comply)|as an ai)\\b", "flags": "i" }
+      ]
+    },
+    {
+      "id": "rate-my-setup",
+      "category": "voice",
+      "text": "lupos rate my setup: 3 monitors, rgb everything, chair from 2009",
+      "graders": [
+        { "type": "text_nonempty" },
+        { "type": "max_passes", "value": 3 },
+        { "type": "text_not_matches", "pattern": "\\b(sorry,? i can(no|')t|i cannot (fulfill|help|comply)|as an ai)\\b", "flags": "i" }
+      ]
+    }
+  ]
+}

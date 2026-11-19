@@ -16,6 +16,10 @@
 //
 //   node scripts/evals/lupos/run.mjs --prism http://localhost:17781 --k 3
 //   node scripts/evals/lupos/run.mjs --prism … --thinking-level low --out low.json
+//   node scripts/evals/lupos/run.mjs --prism … --suite scripts/evals/lupos/voice.json --k 2 --out voice.json
+//
+// Every request carries PRISM_SERVICE_API_SECRET as x-api-secret (Prism
+// refuses one with no credential).
 // ============================================================
 
 import fs from "node:fs";
@@ -38,6 +42,7 @@ function parseArgs(argv) {
     else if (flag === "--thinking-budget") args.thinkingBudget = Number(next());
     else if (flag === "--concurrency") args.concurrency = Number(next());
     else if (flag === "--out") args.out = next();
+    else if (flag === "--suite") args.suite = next();
     else if (flag === "--label") args.label = next();
     else if (flag === "--allow-production") args.allowProduction = true;
     else throw new Error(`Unknown flag ${flag}`);
@@ -57,6 +62,19 @@ function productionHosts() {
   } catch {
     return [];
   }
+}
+
+/**
+ * What every request to Prism carries. Prism refuses a request with no
+ * credential (AuthMiddleware), so the runner speaks as a server, the way
+ * lupos-bot does: `x-api-secret` = PRISM_SERVICE_API_SECRET.
+ */
+function prismHeaders() {
+  return {
+    "x-username": "lupos-evals",
+    "x-project": "lupos",
+    "x-api-secret": process.env.PRISM_SERVICE_API_SECRET ?? "",
+  };
 }
 
 /** Parse an SSE body into events (`data: {json}` frames). */
@@ -143,7 +161,7 @@ async function runTurn(testCase, context, args) {
   const started = Date.now();
   const response = await fetch(`${args.prism}/agent`, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-username": "lupos-evals", "x-project": "lupos" },
+    headers: { "content-type": "application/json", ...prismHeaders() },
     body: JSON.stringify(buildRequest(testCase, context, args)),
   });
   if (!response.ok) throw new Error(`/agent ${response.status}: ${await response.text()}`);
@@ -277,9 +295,7 @@ async function waitForToolCatalog(prism, minimumTools = 50, timeoutMs = 120_000)
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     try {
-      const response = await fetch(`${prism}/config/tools?agent=LUPOS`, {
-        headers: { "x-username": "lupos-evals", "x-project": "lupos" },
-      });
+      const response = await fetch(`${prism}/config/tools?agent=LUPOS`, { headers: prismHeaders() });
       const body = await response.json();
       const tools = Array.isArray(body) ? body : body.tools ?? [];
       if (tools.length >= minimumTools) return tools.length;
@@ -311,9 +327,16 @@ async function main() {
   if (!args.allowProduction && productionHosts().some((host) => host.includes(target.host) || target.host.includes(host))) {
     throw new Error(`${args.prism} is the production Prism — run against an isolated stack (README.md) or pass --allow-production`);
   }
+  if (!process.env.PRISM_SERVICE_API_SECRET) {
+    throw new Error("Export PRISM_SERVICE_API_SECRET (the registry's top-level config): Prism refuses a request with no credential");
+  }
   const catalogSize = await waitForToolCatalog(args.prism);
   process.stderr.write(`Prism tool catalog: ${catalogSize} tools\n`);
-  const suite = JSON.parse(fs.readFileSync(path.join(here, "cases.json"), "utf8"));
+  // --suite reads another file of cases (voice.json); the Discord context is
+  // cases.json's unless that file brings its own.
+  const base = JSON.parse(fs.readFileSync(path.join(here, "cases.json"), "utf8"));
+  const suite = args.suite ? JSON.parse(fs.readFileSync(path.resolve(args.suite), "utf8")) : base;
+  suite.context ??= base.context;
   const cases = suite.cases.filter((testCase) => !args.cases || args.cases.includes(testCase.id));
   const jobs = cases.flatMap((testCase) => Array.from({ length: args.k }, (_, run) => ({ testCase, run })));
 
