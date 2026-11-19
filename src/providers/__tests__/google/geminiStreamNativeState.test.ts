@@ -176,6 +176,19 @@ describe("Gemini — Google Search with function calling", () => {
     });
   });
 
+  it("asks for it on Gemini 4 Neon too (a live 400 without it, 2026-11-19)", async () => {
+    streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }], { finishReason: "STOP" })]));
+    await collect(
+      googleProvider.generateTextStream([{ role: "user", content: "go" }], "gemini-4-neon", {
+        webSearch: true,
+        tools: [{ name: "react_to_discord_message", parameters: { type: "object", properties: {} } }],
+      }),
+    );
+    expect(streamMock.mock.calls[0][0].config.toolConfig).toMatchObject({
+      includeServerSideToolInvocations: true,
+    });
+  });
+
   it("does not ask for it with only built-in tools, or only functions", async () => {
     streamMock.mockResolvedValue(streamOf([partsChunk([{ text: "hi" }], { finishReason: "STOP" })]));
     await collect(
