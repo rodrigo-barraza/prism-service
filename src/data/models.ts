@@ -1531,6 +1531,63 @@ const MODELS = {
     ],
   },
 
+  // Released 2026-11-18. Verified on 2026-11-19 against Google's docs (model
+  // page, "What's new in Gemini 4 Neon", thinking, caching, pricing) and live:
+  // models.get says 1,048,576 in / 65,536 out; low | medium | high | xhigh all
+  // answer (Google's default is high) and "minimal" is a 400; thinkingBudget: 0
+  // does NOT switch thinking off (still 104–117 thought tokens on a one-word
+  // answer, and 2,045 with an empty reply on a harder prompt), so "thinking
+  // off" sends the lowest level. temperature / top_p / top_k in range are
+  // ignored and out of range a 400 ("Remove … from requests"). Function calls,
+  // Google Search beside them (with includeServerSideToolInvocations, else a
+  // 400), image and audio input all answer; a repeated 13K-token prompt read
+  // 11,099 tokens from the implicit cache. One input rate for every modality,
+  // no introductory rate card. Not a default.
+  GEMINI_4_NEON: {
+    description:
+      "Google's Gemini 4 Neon (2026-11-18) — the middle of the Gemini 4 line, between Hydrogen and Carbon: complex coding, analytical reasoning and agent work, with a natural, direct writing voice and a 1M-token window.",
+    name: "gemini-4-neon",
+    label: "Gemini 4 Neon",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    lockedSampling: true,
+    pricing: {
+      inputPerMillion: 3.0,
+      cachedInputPerMillion: 0.15,
+      outputPerMillion: 15.0,
+      webSearchPer1kCalls: 14.0,
+    },
+    maxInputTokens: 1_048_576,
+    maxOutputTokens: 65_536,
+    // "Gemini 4 Neon does not support explicit caching (cachedContents and
+    // caches.create)."
+    implicitCacheOnly: true,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: {
+      image: { maxCount: 3000, maxSizeMB: 100 },
+      audio: { maxCount: 50, maxSizeMB: 100 },
+      video: { maxCount: 10, maxSizeMB: 100 },
+      pdf: { maxCount: 50, maxSizeMB: 100 },
+    },
+    streaming: true,
+    thinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh"],
+    canDisableThinking: false,
+    webSearch: "Google Search",
+    codeExecution: true,
+    urlContext: true,
+    tools: [
+      "Thinking",
+      "Google Search",
+      "Tool Calling",
+      "Code Execution",
+      "URL Context",
+    ],
+  },
+
   GEMINI_31_FLASH_LIVE: {
     description:
       "Low-latency Gemini 3.1 Flash Live model, optimized for real-time audio/video streaming, live API sessions, and instant feedback.",

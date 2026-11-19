@@ -26,8 +26,11 @@ production (the runner refuses the registry's production Prism unless
 
 ```bash
 # Hosts, ports and secrets come from the registry (workspace CLAUDE.md §0);
-# export MONGO_URI and the provider keys from vault-service/projects.json
-# `config` into a chmod-600 env file and source it first.
+# export MONGO_URI, the provider keys and the services' secrets
+# (PRISM_SERVICE_API_SECRET, TOOLS_SERVICE_API_SECRET) from
+# vault-service/projects.json `config` into a chmod-600 env file and source it
+# first. Prism refuses a request with no credential, so the runner sends
+# PRISM_SERVICE_API_SECRET as `x-api-secret`, as lupos-bot does.
 export STUB_PORT=18337 TOOLS_PORT=18608 PRISM_PORT=17781
 
 # 1. stand-in lupos-bot (never the real bot)
@@ -49,7 +52,14 @@ node scripts/evals/lupos/run.mjs --prism http://localhost:$PRISM_PORT --k 3 --ou
 
 A/B a harness setting by running twice with different flags, e.g.
 `--thinking-level low` vs `--thinking-budget 10000` (what lupos-bot sent before
-2026-09-22). Archive searches read the real `lupos.Messages` collection
+2026-09-22). To weigh a new model for him, run the suite and then his voice
+set on each candidate (`--model <name> --provider <provider> --suite
+scripts/evals/lupos/voice.json --k 2 --out <file>`) and read the replies side by
+side: `voice.json` holds ten everyday turns and grades only that he answers in
+character, so the reading is the comparison. Give each model a fresh
+`PRISM_SERVICE_MONGO_DB_NAME`: his mood and the variety service's last replies
+live in that database, and a second model would otherwise start from the first
+one's. Archive searches read the real `lupos.Messages` collection
 read-only; everything else stays in the two test databases — drop their
 collections when done (the service Mongo user cannot `dropDatabase`).
 
