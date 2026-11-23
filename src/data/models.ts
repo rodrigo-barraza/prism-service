@@ -1588,6 +1588,118 @@ const MODELS = {
     ],
   },
 
+  // Verified 2026-11-23 against Google's pricing page and live: models.list
+  // says 1,048,576 in / 32,768 out; low | medium | high answer, "minimal" and
+  // "xhigh" are a 400; thinkingBudget: 0 switches thinking off (no thought
+  // tokens). temperature out of range is a 400, as on Argon and Neon, so
+  // lockedSampling. Search, code execution, URL context and function calls
+  // beside Search all answer. Implicit caching only. Introductory price through
+  // 2026-11-30, then list price. Not a default.
+  GEMINI_4_CARBON: {
+    description:
+      "Google's Gemini 4 Carbon — the top of the Gemini 4 line, for the hardest reasoning, coding and agent work, with a 1M-token window.",
+    name: "gemini-4-carbon",
+    label: "Gemini 4 Carbon",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    lockedSampling: true,
+    pricing: {
+      inputPerMillion: 2.0,
+      cachedInputPerMillion: 0.1,
+      outputPerMillion: 10.0,
+      webSearchPer1kCalls: 14.0,
+    },
+    pricingSchedule: [
+      {
+        from: "2026-12-01T00:00:00-08:00",
+        pricing: {
+          inputPerMillion: 4.0,
+          cachedInputPerMillion: 0.2,
+          outputPerMillion: 20.0,
+          webSearchPer1kCalls: 14.0,
+        },
+      },
+    ],
+    maxInputTokens: 1_048_576,
+    maxOutputTokens: 32_768,
+    // "Implicit caching only (explicit caching is not supported)."
+    implicitCacheOnly: true,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: {
+      image: { maxCount: 3000, maxSizeMB: 100 },
+      audio: { maxCount: 50, maxSizeMB: 100 },
+      video: { maxCount: 10, maxSizeMB: 100 },
+      pdf: { maxCount: 50, maxSizeMB: 100 },
+    },
+    streaming: true,
+    thinking: true,
+    thinkingLevels: ["low", "medium", "high"],
+    canDisableThinking: true,
+    webSearch: "Google Search",
+    codeExecution: true,
+    urlContext: true,
+    tools: [
+      "Thinking",
+      "Google Search",
+      "Tool Calling",
+      "Code Execution",
+      "URL Context",
+    ],
+  },
+
+  // Verified 2026-11-23 against Google's pricing page and live: models.list
+  // says 1,048,576 in / 65,536 out; low | medium | high | xhigh answer and
+  // "minimal" is a 400; thinkingBudget: 0 does NOT switch thinking off (70
+  // thought tokens on a one-word answer), so "thinking off" sends the lowest
+  // level, as on Neon. temperature out of range is a 400, so lockedSampling.
+  // Search, code execution, URL context and function calls beside Search all
+  // answer. No scheduled price change. Not a default.
+  GEMINI_4_HYDROGEN: {
+    description:
+      "Google's Gemini 4 Hydrogen — the fast, low-cost end of the Gemini 4 line, for everyday reasoning, coding and agent work, with a 1M-token window.",
+    name: "gemini-4-hydrogen",
+    label: "Gemini 4 Hydrogen",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    lockedSampling: true,
+    pricing: {
+      inputPerMillion: 1.5,
+      cachedInputPerMillion: 0.075,
+      outputPerMillion: 7.5,
+      webSearchPer1kCalls: 14.0,
+    },
+    maxInputTokens: 1_048_576,
+    maxOutputTokens: 65_536,
+    implicitCacheOnly: true,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.AUDIO, MODALITY_TYPES.VIDEO, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT],
+    mediaLimits: {
+      image: { maxCount: 3000, maxSizeMB: 100 },
+      audio: { maxCount: 50, maxSizeMB: 100 },
+      video: { maxCount: 10, maxSizeMB: 100 },
+      pdf: { maxCount: 50, maxSizeMB: 100 },
+    },
+    streaming: true,
+    thinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh"],
+    canDisableThinking: false,
+    webSearch: "Google Search",
+    codeExecution: true,
+    urlContext: true,
+    tools: [
+      "Thinking",
+      "Google Search",
+      "Tool Calling",
+      "Code Execution",
+      "URL Context",
+    ],
+  },
+
   GEMINI_31_FLASH_LIVE: {
     description:
       "Low-latency Gemini 3.1 Flash Live model, optimized for real-time audio/video streaming, live API sessions, and instant feedback.",
@@ -2058,6 +2170,40 @@ const MODELS = {
     outputTypes: [MODALITY_TYPES.AUDIO],
     streaming: true,
   },
+  // Verified 2026-11-23 live (audio out with a prebuilt voice) and against
+  // Google's pricing page: introductory through 2026-12-31, then double.
+  GEMINI_38_FLASH_TTS: {
+    description:
+      "Google's Gemini 3.8 Flash Text-to-Speech model, natural and expressive vocal synthesis.",
+    name: "gemini-3.8-flash-tts",
+    label: "Gemini 3.8 Flash TTS",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.AUDIO,
+    year: 2026,
+    pricing: { inputPerMillion: 0.5, audioOutputPerMillion: 9.0 },
+    pricingSchedule: [
+      { from: "2027-01-01T00:00:00-08:00", pricing: { inputPerMillion: 1.0, audioOutputPerMillion: 18.0 } },
+    ],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
+    streaming: true,
+  },
+  GEMINI_38_FLASH_LITE_TTS: {
+    description:
+      "Google's Gemini 3.8 Flash-Lite Text-to-Speech model, the cheapest tier of Gemini speech synthesis.",
+    name: "gemini-3.8-flash-lite-tts",
+    label: "Gemini 3.8 Flash-Lite TTS",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.AUDIO,
+    year: 2026,
+    pricing: { inputPerMillion: 0.5, audioOutputPerMillion: 6.0 },
+    pricingSchedule: [
+      { from: "2027-01-01T00:00:00-08:00", pricing: { inputPerMillion: 1.0, audioOutputPerMillion: 12.0 } },
+    ],
+    inputTypes: [MODALITY_TYPES.TEXT],
+    outputTypes: [MODALITY_TYPES.AUDIO],
+    streaming: true,
+  },
   ESPEAKNG: {
     description:
       "eSpeak NG open-source speech synthesizer, offering multi-lingual phonetic text-to-speech.",
@@ -2292,6 +2438,37 @@ const MODELS = {
     // Verified 2026-08-20: LOW and MEDIUM are rejected by name on the image
     // models ("Thinking level LOW is not supported for this model").
     thinkingLevels: ["minimal", "high"],
+    webSearch: true,
+    tools: ["Thinking", "Image Generation", "Web Search"],
+  },
+
+  // Verified 2026-11-23 live and against Google's pricing page: models.list
+  // says 65,536 in / 65,536 out; minimal | medium | high answer and LOW is a
+  // 400 by name; Google Search grounding answers. No cached-input price.
+  GEMINI_NANO_BANANA_21: {
+    description:
+      "Google's Nano Banana 2.1, its newest image generation and editing model.",
+    name: "gemini-nano-banana-2.1",
+    label: "Nano Banana 2.1",
+    provider: PROVIDERS.GOOGLE,
+    modelType: MODEL_TYPES.CONVERSATION,
+    year: 2026,
+    defaultTemperature: 1.0,
+    pricing: {
+      inputPerMillion: 1.5,
+      imageInputPerMillion: 1.5,
+      outputPerMillion: 7.5,
+      imageOutputPerMillion: 30.0,
+      webSearchPer1kCalls: 14.0,
+    },
+    imageTokensPerImage: 1120,
+    maxInputTokens: 65_536,
+    maxOutputTokens: 65_536,
+    inputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE, MODALITY_TYPES.PDF],
+    outputTypes: [MODALITY_TYPES.TEXT, MODALITY_TYPES.IMAGE],
+    streaming: false,
+    thinking: true,
+    thinkingLevels: ["minimal", "medium", "high"],
     webSearch: true,
     tools: ["Thinking", "Image Generation", "Web Search"],
   },
